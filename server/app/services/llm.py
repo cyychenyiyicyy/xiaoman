@@ -83,6 +83,7 @@ async def _mock_stream(user_text: str, n_images: int, thinking: str) -> AsyncIte
     body = (
         f"{head}\n\n这是**内置演示模型**的回显：\n\n"
         f"> {(user_text or '（无文字）')[:200]}\n\n"
+        "公式测试：\n\n$$E=mc^2$$\n\n"
         "在下面点模型胶囊，添加一个真实端点（baseUrl + API Key），"
         "就能换成真的回答。"
     )

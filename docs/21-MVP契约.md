@@ -254,3 +254,11 @@ cd server
 - 前四项必填校验；后四项可选，**留空则等 sync 后由目录补**；
 - 保存后自动 `sync-models`，若 `enriched > 0` 给 toast `已从 models.dev 填充 N 个模型`；
 - 保存是唯一 filled 按钮，取消为 outlined。
+### 9.4 两个踩过的坑（写下来，别再犯）
+
+**① 逐字 span 的类名不能叫 `.sw`。** `theme.css` 里 `.sw` 是设计系统的**开关组件**（42×25 + 19×19 白色旋钮）。流式逐字 span 借用了它，结果每个字都被画成一个白色圆点，看起来像「一排圆形乱码」。逐字 span 现用 `.stream-word`。
+**教训**：新增组件的类名必须先在 `theme.css` 里搜一遍，禁止复用既有语义类。
+
+**② 数学公式必须渲染，不能当普通文本吐。** 接 KaTeX（`web/vendor/katex/`，离线，270KB JS + 60 个字体 + 22.8KB CSS），走 `auto-render`，只对 `.stable`（已提交段落）做，正在流的 `.live` 加 `no-math` 跳过，避免半截公式变红字。display 公式（`$$…$$`）闭合即提交渲染，缩短裸 TeX 窗口。
+
+**③ 客户端断开不能记成 done。** 之前断流时半截回复被标 `done`，历史里会留一条残句。现在 `CancelledError` → `status=error / 连接中断`。

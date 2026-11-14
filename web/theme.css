@@ -536,7 +536,7 @@ button.srow:active{background:var(--fill)}
 
 /* ── 表单 ─────────────────────────────────────────── */
 .formpane{flex:1;min-height:0;display:flex;flex-direction:column}
-.formpane .fields{flex:1;min-height:0;overflow-y:auto}
+.formpane .fields{flex:1;min-height:0;overflow-y:auto;width:100%;max-width:640px;margin:0 auto}
 .formpane .btnbar{flex:none;border-top:1px solid var(--line);background:var(--card);
   padding-bottom:calc(var(--q3) + env(safe-area-inset-bottom))}
 .formpane .field{padding:var(--q3) var(--q4) 0}
@@ -554,6 +554,52 @@ button.srow:active{background:var(--fill)}
   background:var(--ink);color:var(--paper);border-radius:var(--rc);
   padding:var(--q3) var(--q4);font-size:var(--s5);line-height:var(--l5)}
 .toast[hidden]{display:none}
+
+/* ── 流式渐显（契约 §9.3-A）────────────────────────── */
+.sbody .live{white-space:pre-wrap;overflow-wrap:anywhere}
+.sbody .stable:empty{display:none}
+.stream-word{display:inline;white-space:normal;animation:swfade .28s ease-out both}/* 注意：不能叫 .sw —— 那是设计系统的开关组件 */
+@keyframes swfade{from{opacity:0;transform:translateY(1px)}to{opacity:1;transform:none}}
+.caret{display:inline-block;width:2px;height:18px;background:var(--clay);border-radius:1px;
+  vertical-align:-4px;margin-left:var(--q1);animation:caretblink 1s steps(2) infinite}
+@keyframes caretblink{from{opacity:1}to{opacity:0}}
+
+/* ── 内置平台目录（契约 §9.3-B）────────────────────── */
+.subhead{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500;
+  padding:var(--q2) var(--q1) var(--q2)}
+.sgroup .subhead + .scard{margin-bottom:var(--q3)}
+.srow .n1{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shd .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 模型行可点（§9.3-C）*/
+button.mitem{width:100%;border:0;background:transparent;color:inherit;text-align:left;
+  cursor:pointer;font-family:inherit}
+button.mitem:active{background:var(--fill)}
+button.mitem:focus-visible{outline:2px solid var(--clay);outline-offset:-2px}
+.mitem .chev{width:var(--i-sm);height:var(--i-sm);color:var(--ink3);stroke-width:var(--stroke);flex:none}
+
+/* 模型设置 sheet（§9.3-C）*/
+.sheet .field{padding:var(--q3) 0 0}
+.src{font-size:var(--s6);color:var(--ink3);padding:var(--q2) 0 0}
+.swrow{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.swrow:active{background:var(--fill)}
+.kwrap{position:relative}
+.kwrap .fi{padding-right:var(--q5)}
+.kwrap .unit{position:absolute;right:var(--q3);top:50%;transform:translateY(-50%);
+  font-size:var(--s5);color:var(--ink3)}
+
+/* ── 表单标签 / 必填 / 提交反馈（ux 规则 1·2·5）────── */
+.field .flabel{display:block;font-size:var(--s6);letter-spacing:.08em;color:var(--ink3);
+  font-weight:500;margin-bottom:var(--q2)}
+.field .req{font-style:normal;color:var(--clay);margin-left:var(--q1)}
+.errbar{display:flex;align-items:flex-start;gap:var(--q2);margin:var(--q3) var(--q4) 0;
+  padding:var(--q2) var(--q3);border:1px solid var(--clayline);background:var(--claybg);
+  border-radius:var(--rc);font-size:var(--s5);line-height:var(--l5);color:var(--ink)}
+.errbar[hidden]{display:none}
+.errbar .ic{color:var(--clay);flex:none;margin-top:1px}
+.formpane .scard{margin:var(--q3) var(--q4) 0}
+.formpane .scard .srow{min-height:52px}
+.sheet .errbar{margin:var(--q2) 0 0}
 
 /* ── 响应式 ───────────────────────────────────────── */
 @media (max-width:600px){
@@ -585,3 +631,9 @@ button.srow:active{background:var(--fill)}
    UA 默认的 outline:auto 在深色下是刺眼的白色方框（返回/关闭按钮踩过）。 */
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--clay);outline-offset:2px}
+/* 公式：display 公式给上下呼吸空间，超宽可横滚，不被容器切掉半个字形 */
+.agbody .katex-display{margin:var(--q3) 0;padding:2px 0;overflow-x:auto;overflow-y:hidden}
+.agbody .katex{font-size:1.02em}
+.agbody .katex-display>.katex{max-width:100%}
+/* 消息流底部留白：让最后一行不贴着输入框边被切 */
+.stream{padding-bottom:var(--q5)}

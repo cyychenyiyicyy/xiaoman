@@ -26,6 +26,11 @@
     msgState: 'loading',     // loading | ready | error
     msgError: '',
     sending: false,
+    liveMsg: null,           // 正在逐词揭示的 assistant 消息（null = 没有）
+    catalog: null,           // GET /catalog 的 sources
+    catalogState: 'loading', // loading | ready | error
+    catalogError: '',
+    lookup: {},              // catalog_id|model_key → 目录查到的元数据 / null
     pending: [],             // 待发送图片 {tmpId,id,url,mime,uploading}
     stick: true,
     toastTimer: 0
@@ -43,11 +48,17 @@
     return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
   }
   function idVal(x) { return x != null && /^\d+$/.test(String(x)) ? Number(x) : x; }
+  var keySeq = 0;
+  // 稳定 key：id 会被 meta 回填、消息列表会被重载，DOM 跟踪只能靠这个不变值
+  function newKey(prefix) { keySeq += 1; return (prefix || 'k') + '-' + keySeq; }
   function fmtCtx(n) {
     var v = Number(n);
     if (!isFinite(v) || v <= 0) return '';
-    if (v >= 1000000) return (v % 1000000 === 0 ? String(v / 1000000) : (v / 1000000).toFixed(1)) + 'M';
-    if (v >= 1000) return Math.round(v / 1000) + 'K';
+    if (v >= 1048576) {
+      var mm = v / 1048576;
+      return (Math.abs(mm - Math.round(mm)) < 0.05 ? String(Math.round(mm)) : mm.toFixed(1)) + 'M';
+    }
+    if (v >= 1024) return Math.round(v / 1024) + 'K';
     return String(v);
   }
   function normThink(v) {
@@ -278,6 +289,7 @@
   function normalizeMessage(m) {
     return {
       id: m.id,
+      _key: newKey('h'),
       role: m.role,
       kind: m.kind,
       content_md: m.content_md || '',
@@ -306,11 +318,50 @@
     return state.models[pid];
   }
 
+  function findCatalog(cid) {
+    return (state.catalog || []).filter(function (s) {
+      return String(s.catalog_id) === String(cid);
+    })[0] || null;
+  }
+
+  async function loadCatalog() {
+    state.catalogState = 'loading';
+    try {
+      var r = await api('/catalog');
+      var src = r && Array.isArray(r.sources) ? r.sources : (Array.isArray(r) ? r : []);
+      state.catalog = src;
+      state.catalogState = 'ready';
+    } catch (e) {
+      state.catalog = null;
+      state.catalogState = 'error';
+      state.catalogError = e.message;
+    }
+  }
+
+  // 目录查元数据；404（目录未收录）返回 null
+  async function lookupMeta(catalogId, modelKey) {
+    var lk = catalogId + '|' + modelKey;
+    if (Object.prototype.hasOwnProperty.call(state.lookup, lk)) return state.lookup[lk];
+    var meta = null;
+    try {
+      var r = await api('/catalog/lookup?catalog_id=' + encodeURIComponent(catalogId) +
+        '&model_key=' + encodeURIComponent(modelKey));
+      meta = r && typeof r === 'object' ? r : null;
+    } catch (e) {
+      meta = null;
+    }
+    state.lookup[lk] = meta;
+    return meta;
+  }
+
   async function reloadAll() {
     state.models = {};
     state.modelsError = {};
+    state.lookup = {};
+    state.catalog = null;
+    state.catalogState = 'loading';
     state.msgState = 'loading';
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true)]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog()]);
     render();
     if (state.settings && state.settings.provider_id != null) {
       await loadModelsFor(state.settings.provider_id);
@@ -406,7 +457,7 @@
       '</div></div>';
   }
 
-  function renderStream() {
+  function renderStream(force) {
     var el = q('#stream');
     var prev = el.scrollTop;
     el.setAttribute('aria-busy', state.msgState === 'loading' ? 'true' : 'false');
@@ -425,9 +476,17 @@
       return;
     }
 
+    // 逐词揭示进行中：不重刷 DOM（重刷会打断 .sw 的 CSS 动画，这正是「突然跳出」的来源。类名用 .stream-word，.sw 是设计系统的开关，不能借）
+    if (!force && state.liveMsg && el.querySelector('.sbody')) {
+      if (state.stick) el.scrollTop = el.scrollHeight;
+      return;
+    }
+
     var streaming = state.messages.some(function (m) { return m.status === 'streaming'; });
     el.setAttribute('aria-live', streaming ? 'off' : 'polite');
     el.innerHTML = '<div class="col">' + state.messages.map(msgHtml).join('') + '</div>';
+    if (state.liveMsg) repaintLive(state.liveMsg);
+    typesetMath(el);
     if (state.stick) el.scrollTop = el.scrollHeight;
     else el.scrollTop = prev;
   }
@@ -443,18 +502,26 @@
     }
     var inner = '';
     if (m.reasoning_md) inner += reasoningHtml(m);
-    if (m.content_md) inner += '<div class="agbody">' + renderMarkdown(m.content_md) + '</div>';
-    else if (m.status === 'streaming') inner += '<div class="skel inmsg">' + skelRows(2) + '</div>';
+    if (m._st) {
+      inner += '<div class="agbody sbody"><div class="stable"></div>' +
+        '<div class="live">' + caretHtml() + '</div></div>';
+    } else if (m.content_md) {
+      inner += '<div class="agbody">' + renderMarkdown(m.content_md) + '</div>';
+    } else if (m.status === 'streaming') {
+      inner += '<div class="skel inmsg">' + skelRows(2) + '</div>';
+    }
     if (m.error) inner += msgErrorHtml(m);
-    return '<div class="ag">' + inner + '</div>';
+    return '<div class="ag" data-key="' + esc(m._key) + '">' + inner + '</div>';
   }
+
+  function caretHtml() { return '<span class="caret" aria-hidden="true"></span>'; }
 
   function reasoningHtml(m) {
     var live = m.status === 'streaming' && !m.content_md;
     var open = m._open !== undefined ? m._open : live;
     var label = m.status === 'streaming' ? '思考中' : '思考';
     m._renderOpen = open;
-    return '<details class="rbox" data-mid="' + esc(m.id) + '"' + (open ? ' open' : '') + '>' +
+    return '<details class="rbox" data-key="' + esc(m._key) + '"' + (open ? ' open' : '') + '>' +
       '<summary class="rsum">' + ic('zap', 'sm') + '<span>' + label + '</span>' + ic('chevron-down', 'sm rcar') +
       '</summary><div class="rbody">' + renderMarkdown(m.reasoning_md) + '</div></details>';
   }
@@ -463,8 +530,235 @@
     var canRetry = !!m.canRetry && state.messages[state.messages.length - 1] === m;
     return '<div class="merr">' + ic('alert-circle') +
       '<span class="msg">' + esc(m.error || '') + '</span>' +
-      (canRetry ? '<button type="button" class="btn" data-act="retry" data-mid="' + esc(m.id) + '">重试</button>' : '') +
+      (canRetry ? '<button type="button" class="btn" data-act="retry" data-key="' + esc(m._key) + '">重试</button>' : '') +
       '</div>';
+  }
+
+  /* ── 流式渐显：节奏队列 + 词级 span（DOM 稳定，不逐帧重刷）──
+     55 字/秒 匀速揭示；积压每 40 字再 +25%，收尾时 ×1.6 追赶。 */
+  var REVEAL_BASE = 55;
+  var REVEAL_STEP = 40;
+  var REVEAL_BOOST = 0.25;
+
+  function msgRoot(m) {
+    if (!m || !m._key) return null;
+    return q('#stream .ag[data-key="' + m._key + '"]');
+  }
+
+function typesetMath(el) {
+    if (!el || typeof window.renderMathInElement !== "function") return;
+    try {
+      window.renderMathInElement(el, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "$", right: "$", display: false },
+          { left: "\\(", right: "\\)", display: false }
+        ],
+        throwOnError: false,
+        errorColor: "inherit",
+        strict: false,
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+        ignoredClasses: ["no-math"]
+      });
+    } catch (e) { /* 公式坏了就保持原文，不能阻塞渲染 */ }
+  }
+
+  function caretEl() {    var c = document.createElement('span');
+    c.className = 'caret';
+    c.setAttribute('aria-hidden', 'true');
+    return c;
+  }
+
+  function liveEls(m) {
+    var st = m && m._st;
+    if (!st) return null;
+    if (st.el && st.el.live && st.el.live.isConnected) return st.el;
+    var root = msgRoot(m);
+    if (!root) return null;
+    var body = root.querySelector('.sbody');
+    if (!body) return null;
+    st.el = { body: body, stable: body.querySelector('.stable'), live: body.querySelector('.live') };
+    return st.el;
+  }
+
+  function ensureLiveStructure(m) {
+    var root = msgRoot(m);
+    if (!root) return null;
+    var body = root.querySelector('.sbody');
+    if (!body) {
+      var skel = root.querySelector('.skel');
+      if (skel && skel.parentNode) skel.parentNode.removeChild(skel);
+      body = document.createElement('div');
+      body.className = 'agbody sbody';
+      body.innerHTML = '<div class="stable"></div><div class="live no-math">' + caretHtml() + '</div>';
+      root.appendChild(body);
+    }
+    var live = body.querySelector('.live');
+    if (live && !live.querySelector('.caret')) live.appendChild(caretEl());
+    return body;
+  }
+
+  function startLive(m) {
+    if (!m._st) {
+      m._st = { target: '', shown: 0, pending: '', committed: '', final: false, raf: 0, el: null };
+    }
+    if (state.liveMsg !== m) state.liveMsg = m;
+    ensureLiveStructure(m);
+    liveEls(m);
+  }
+
+  var CJK_CH = /[\u4e00-\u9fff\u3400-\u4dbf]/;
+  var CJK_PUNCT = /[\u3000-\u303f\uff01-\uff20\uff3b-\uff40\uff5b-\uff65]/;
+
+  // 中文逐字（每字一个 span），拉丁按连续段，空白直接放文本节点，标点挂到前一个 token
+  function tokenizeLive(text) {
+    var out = [];
+    var re = /[A-Za-z0-9][A-Za-z0-9._’'+-]*|\s+|[\s\S]/g;
+    var mm;
+    while ((mm = re.exec(text))) {
+      var tok = mm[0];
+      if (/^\s+$/.test(tok)) { out.push({ t: tok, ws: true }); continue; }
+      var single = tok.length === 1;
+      var isCjk = single && CJK_CH.test(tok);
+      var isWord = /^[A-Za-z0-9]/.test(tok);
+      if (!isCjk && !isWord) {
+        var prev = out.length ? out[out.length - 1] : null;
+        if (prev && !prev.ws) { prev.t += tok; continue; }
+      }
+      out.push({ t: tok });
+    }
+    return out;
+  }
+
+  function appendLiveSpans(live, text) {
+    var cs = live.querySelector('.caret');
+    var frag = document.createDocumentFragment();
+    var toks = tokenizeLive(text);
+    for (var i = 0; i < toks.length; i++) {
+      if (toks[i].ws) {
+        frag.appendChild(document.createTextNode(toks[i].t));
+      } else {
+        var sp = document.createElement('span');
+        sp.className = 'stream-word';
+        sp.textContent = toks[i].t;
+        frag.appendChild(sp);
+      }
+    }
+    live.insertBefore(frag, cs || null);
+  }
+
+  function commitParagraph(m) {
+    var st = m && m._st;
+    if (!st) return;
+    var idx = st.pending.lastIndexOf('\n\n');
+    // display 公式（$$…$$）自成一块：闭合就立刻提交，避免尾巴里长时间显示 \frac 这种裸源码
+    var dbl = st.pending.split('$$').length - 1;
+    if (dbl > 0 && dbl % 2 === 0) {
+      var closeAt = st.pending.lastIndexOf('$$') + 2;
+      idx = Math.max(idx, closeAt);
+    }
+    if (idx < 0) return;
+    st.committed += st.pending.slice(0, idx) + '\n\n';
+    st.pending = st.pending.slice(idx + 2).replace(/^\n+/, '');
+    var els = liveEls(m);
+    if (!els) return;
+    els.stable.innerHTML = renderMarkdown(st.committed);
+    typesetMath(els.stable);
+    els.live.textContent = '';
+    els.live.appendChild(caretEl());
+    if (st.pending) appendLiveSpans(els.live, st.pending);
+  }
+
+  function revealChars(m, amount) {
+    var st = m && m._st;
+    if (!st) return;
+    var els = liveEls(m);
+    if (!els) return;
+    var want = Math.min(st.target.length, st.shown + Math.max(1, Math.floor(amount)));
+    if (want <= st.shown) return;
+    var chunk = st.target.slice(st.shown, want);
+    // 不把 ASCII 词切成两半，否则同一个词会淡入两次
+    if (want < st.target.length && /[A-Za-z0-9._’'+-]$/.test(chunk) &&
+      /[A-Za-z0-9._’'+-]/.test(st.target.charAt(want))) {
+      var tail = chunk.match(/[A-Za-z0-9._’'+-]+$/);
+      if (tail && tail[0].length < chunk.length) chunk = chunk.slice(0, chunk.length - tail[0].length);
+    }
+    if (!chunk) return;
+    st.shown += chunk.length;
+    st.pending += chunk;
+    appendLiveSpans(els.live, chunk);
+    commitParagraph(m);
+    var sc = q('#stream');
+    if (sc && state.stick) sc.scrollTop = sc.scrollHeight;
+  }
+
+  function pumpReveal(m) {
+    var st = m && m._st;
+    if (!st || st.raf) return;
+    var lastT = 0;
+    function frame(now) {
+      st.raf = 0;
+      if (!m._st || m._st !== st) return;
+      if (!lastT) lastT = now;
+      var dt = Math.max(0, Math.min(now - lastT, 120));
+      lastT = now;
+      var backlog = st.target.length - st.shown;
+      if (backlog > 0) {
+        var rate = REVEAL_BASE * (1 + REVEAL_BOOST * Math.floor(backlog / REVEAL_STEP));
+        if (st.final) rate *= 1.6;
+        revealChars(m, rate * dt / 1000);
+      }
+      if (!m._st || m._st !== st) return;
+      if (st.target.length > st.shown) st.raf = requestAnimationFrame(frame);
+      else if (st.final) finalizeLive(m);
+    }
+    st.raf = requestAnimationFrame(frame);
+  }
+
+  function repaintLive(m) {
+    var st = m && m._st;
+    if (!st) return;
+    var els = liveEls(m);
+    if (!els) return;
+    els.stable.innerHTML = st.committed ? renderMarkdown(st.committed) : '';
+    typesetMath(els.stable);
+    els.live.textContent = '';
+    if (st.pending) {
+      var sp = document.createElement('span');
+      sp.className = 'stream-word';
+      sp.textContent = st.pending;
+      els.live.appendChild(sp);
+    }
+    els.live.appendChild(caretEl());
+  }
+
+  function dropLive(m) {
+    if (!m) return;
+    if (m._st && m._st.raf) cancelAnimationFrame(m._st.raf);
+    m._st = null;
+    if (state.liveMsg === m) state.liveMsg = null;
+  }
+
+  // 收尾：一次渲染完整 Markdown，去掉 streaming 标记与光标
+  function finalizeLive(m) {
+    dropLive(m);
+    renderStream(true);
+  }
+
+  function paintReasoning(m) {
+    var root = msgRoot(m);
+    if (!root) return;
+    var det = root.querySelector('details.rbox');
+    if (!det) {
+      root.insertAdjacentHTML('afterbegin', reasoningHtml(m));
+      return;
+    }
+    det.setAttribute('open', '');
+    var body = det.querySelector('.rbody');
+    if (body) body.innerHTML = renderMarkdown(m.reasoning_md);
+    var label = det.querySelector('.rsum span');
+    if (label) label.textContent = m.status === 'streaming' ? '思考中' : '思考';
   }
 
   /* ── 渲染：模型弹层 ───────────────────────────────── */
@@ -528,6 +822,62 @@
       '</div></div></div>';
   }
 
+  function modelDetailSheetHtml(o) {
+    var m = findModel(o.pid, o.mid) || {};
+    var src = m.meta_source || '';
+    var meta = o.meta;                       // 目录结果：undefined=查询中 / null=未收录
+    var pending = !src && meta === undefined;
+    var body = '';
+
+    if (pending) {
+      body = '<div class="skel inmsg">' + skelRows(3) + '</div>';
+    } else {
+      var use;
+      if (src === 'catalog' || src === 'manual') {
+        use = {
+          name: m.display_name || '', ctx: m.context_len || 0,
+          images: !!m.supports_images, tools: !!m.supports_tools, reason: !!m.supports_thinking
+        };
+      } else if (meta) {
+        use = {
+          name: meta.name || '', ctx: meta.context || 0,
+          images: !!meta.images, tools: !!meta.tools, reason: !!meta.reasoning
+        };
+      } else {
+        use = { name: '', ctx: 0, images: false, tools: false, reason: false };
+      }
+      var source = src === 'manual' ? '手填' : (meta || src === 'catalog' ? 'models.dev' : '未收录，请手动填写');
+      body =
+        '<div class="field"><label class="flabel" for="m-name">显示名</label>' +
+        '<input class="fi" id="m-name" name="display_name" type="text" autocomplete="off" ' +
+        'spellcheck="false" value="' + esc(use.name) + '">' +
+        '<div class="fmsg" data-msg="display_name"></div></div>' +
+        '<div class="field"><label class="flabel" for="m-ctx">上下文长度</label>' +
+        '<div class="kwrap"><input class="fi" id="m-ctx" name="context_k" type="text" inputmode="numeric" ' +
+        'autocomplete="off" value="' + esc(use.ctx ? Math.round(use.ctx / 1024) : '') + '">' +
+        '<span class="unit">K</span></div>' +
+        '<div class="fmsg" data-msg="context_k"></div></div>' +
+        '<div class="scard">' +
+        switchRow('多模态', 'images', use.images) +
+        switchRow('工具调用', 'tools', use.tools) +
+        switchRow('思考', 'reasoning', use.reason) +
+        '</div>' +
+        '<div class="src">' + esc(source) + '</div>';
+    }
+
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="md-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="md-ttl">' + esc(m.model_key || '模型设置') + '</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + body + '</div>' +
+      '<div class="sheet-foot"><div class="btnbar full">' +
+      '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+      (pending ? '' : '<button type="button" class="btn p" data-act="save-model" data-pid="' + esc(o.pid) +
+        '" data-mid="' + esc(o.mid) + '">保存</button>') +
+      '</div></div></div>';
+  }
+
   function renderOverlay() {
     var host = q('#overlay');
     if (!state.overlay) {
@@ -536,14 +886,14 @@
       return;
     }
     host.hidden = false;
-    host.innerHTML = state.overlay.kind === 'confirm'
-      ? confirmSheetHtml(state.overlay)
-      : modelSheetHtml();
+    var kind = state.overlay.kind;
+    host.innerHTML = kind === 'confirm' ? confirmSheetHtml(state.overlay)
+      : (kind === 'model' ? modelDetailSheetHtml(state.overlay) : modelSheetHtml());
   }
 
   /* ── 渲染：模型管理 / provider 详情 / 表单 ─────────── */
   function navbar(title, sub, backAct, backLabel, closeIcon) {
-    var btn = '<button type="button" class="hit" data-act="' + backAct + '" aria-label="' + esc(backLabel) + '">' +
+    var btn = '<button type="button" class="hit back" data-act="' + backAct + '" aria-label="' + esc(backLabel) + '">' +
       ic(closeIcon ? 'x' : 'chevron-left') + '</button>';
     return '<div class="navbar' + (closeIcon ? ' flow' : '') + '">' + btn +
       '<div class="tbox"><div class="ttl">' + esc(title) + '</div>' +
@@ -569,6 +919,42 @@
     return '<div class="srow void"><span class="md"><span class="n1">' + esc(text) + '</span></span></div>';
   }
 
+  function catalogRow(src) {
+    return '<button type="button" class="srow" data-act="connect-catalog" data-cid="' + esc(src.catalog_id) + '">' +
+      '<span class="lead">' + ic('globe') + '</span>' +
+      '<span class="md"><span class="n1">' + esc(src.name) + '</span></span>' +
+      '<span class="trail"><span class="val">连接</span>' + ic('chevron-right', 'sm chev') + '</span></button>';
+  }
+
+  function catalogGroupHtml() {
+    var inner = '';
+    if (state.catalogState === 'loading') {
+      inner = '<div class="scard"><div class="skel inmsg">' + skelRows(2) + '</div></div>';
+    } else if (state.catalogState === 'error') {
+      inner = '<div class="scard"><button type="button" class="srow" data-act="reload-catalog">' +
+        '<span class="lead">' + ic('alert-circle') + '</span>' +
+        '<span class="md"><span class="n1">目录加载失败</span></span>' +
+        '<span class="trail"><span class="val">重试</span></span></button></div>';
+    } else {
+      var open = (state.catalog || []).filter(function (s) { return !s.connected; });
+      if (!open.length) {
+        inner = '<div class="scard">' + voidRow('全部已连接') + '</div>';
+      } else {
+        var cn = open.filter(function (s) { return s.group === '国内'; });
+        var ab = open.filter(function (s) { return s.group !== '国内'; });
+        if (cn.length) {
+          inner += '<div class="subhead">国内</div><div class="scard">' +
+            cn.map(catalogRow).join('') + '</div>';
+        }
+        if (ab.length) {
+          inner += '<div class="subhead">海外</div><div class="scard">' +
+            ab.map(catalogRow).join('') + '</div>';
+        }
+      }
+    }
+    return '<div class="sgroup"><div class="slabel">内置平台</div>' + inner + '</div>';
+  }
+
   function modelsPageHtml() {
     var nav = navbar('模型管理', '', 'goto-chat', '返回', false);
 
@@ -581,15 +967,18 @@
     }
 
     var conn = (state.providers || []).filter(function (p) { return p.connected; });
-    var disc = (state.providers || []).filter(function (p) { return !p.connected; });
+    var loose = (state.providers || []).filter(function (p) {
+      return !p.connected && !p.catalog_id;
+    });
+    var addRow = '<button type="button" class="srow" data-act="open-add-form">' +
+      '<span class="lead">' + ic('plus') + '</span>' +
+      '<span class="md"><span class="n1">添加 OpenAI 兼容端点</span></span>' +
+      '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>';
 
     return nav + '<div class="settings">' +
       groupHtml('已连接', conn.length ? conn.map(providerRow).join('') : voidRow('还没有已连接的端点')) +
-      groupHtml('未连接', disc.length ? disc.map(providerRow).join('') : voidRow('没有未连接的端点')) +
-      groupHtml('自定义', '<button type="button" class="srow" data-act="open-add-form">' +
-        '<span class="lead">' + ic('plus') + '</span>' +
-        '<span class="md"><span class="n1">添加 OpenAI 兼容端点</span></span>' +
-        '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>') +
+      catalogGroupHtml() +
+      groupHtml('自定义', loose.map(providerRow).join('') + addRow) +
       '</div>';
   }
 
@@ -610,9 +999,12 @@
     var cur = state.settings && state.settings.model_id;
     return '<div class="mlist">' + models.map(function (m) {
       var on = cur != null && String(m.id) === String(cur);
-      return '<div class="mitem"><span class="ck">' + (on ? ic('check', 'sm') : '') + '</span>' +
+      return '<button type="button" class="mitem" data-act="model-settings" data-pid="' + esc(pid) +
+        '" data-mid="' + esc(m.id) + '">' +
+        '<span class="ck">' + (on ? ic('check', 'sm') : '') + '</span>' +
         '<span class="id mono">' + esc(m.model_key) + '</span>' +
-        '<span class="ctx2">' + esc(fmtCtx(m.context_len)) + '</span></div>';
+        '<span class="ctx2">' + esc(fmtCtx(m.context_len)) + '</span>' +
+        ic('chevron-right', 'sm chev') + '</button>';
     }).join('') + '</div>';
   }
 
@@ -646,29 +1038,62 @@
     return nav + body;
   }
 
-  function formField(label, key, input) {
-    return '<div class="field"><label class="fl" for="f-' + key + '">' + label + '</label>' + input +
+  function formField(label, key, input, required) {
+    return '<div class="field"><label class="flabel" for="f-' + key + '">' + label +
+      (required ? '<em class="req" aria-hidden="true">*</em>' : '') + '</label>' + input +
       '<div class="fmsg" data-msg="' + key + '"></div></div>';
   }
 
+  function switchRow(label, key, on) {
+    return '<button type="button" class="srow swrow" role="switch" aria-checked="' + (on ? 'true' : 'false') + '"' +
+      ' data-act="toggle-sw" data-sw="' + key + '">' +
+      '<span class="md"><span class="n1">' + esc(label) + '</span></span>' +
+      '<span class="trail"><span class="sw' + (on ? ' on' : '') + '"></span></span></button>';
+  }
+
   function formHtml(page) {
-    var p = page.providerId ? findProvider(page.providerId) : null;
-    var pid = p ? p.id : '';
-    var title = p ? '连接端点' : '添加端点';
+    var p = page.providerId != null ? findProvider(page.providerId) : null;
+    var src = page.catalogId ? findCatalog(page.catalogId) : null;
+    var mode = p ? 'edit' : (src ? 'catalog' : 'custom');
+    var nameVal = p ? p.name : (src ? src.name : '');
+    var urlVal = p ? p.base_url : (src ? src.base_url : '');
+    var title = p ? '编辑端点' : (src ? src.name : '添加端点');
     var nav = navbar(title, '', 'close-form', '关闭', true);
-    return nav + '<form class="formpane" id="provider-form" data-pid="' + esc(pid) + '" novalidate>' +
+
+    var meta = '';
+    if (mode === 'custom') {
+      meta =
+        formField('显示名', 'display_name',
+          '<input class="fi" id="f-display_name" name="display_name" type="text" autocomplete="off" ' +
+          'spellcheck="false" placeholder="DeepSeek V4">', true) +
+        formField('上下文长度', 'context_k',
+          '<div class="kwrap"><input class="fi" id="f-context_k" name="context_k" type="text" ' +
+          'inputmode="numeric" autocomplete="off"><span class="unit">K</span></div>') +
+        '<div class="scard">' +
+        switchRow('多模态', 'images', false) +
+        switchRow('工具调用', 'tools', false) +
+        switchRow('思考', 'reasoning', false) +
+        '</div>';
+    }
+
+    return nav + '<form class="formpane" id="provider-form" data-mode="' + mode +
+      '" data-pid="' + esc(p ? p.id : '') + '" data-cid="' + esc(src ? src.catalog_id : '') + '" novalidate>' +
       '<div class="fields">' +
-      formField('名称', 'name', '<input class="fi" id="f-name" name="name" type="text" maxlength="80" ' +
-        'autocomplete="off" spellcheck="false" value="' + esc(p ? p.name : '') + '">') +
-      formField('端点', 'base_url', '<input class="fi" id="f-base_url" name="base_url" type="text" ' +
-        'inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" ' +
-        'value="' + esc(p ? p.base_url : '') + '">') +
-      formField('API Key', 'api_key', '<input class="fi" id="f-api_key" name="api_key" type="password" ' +
-        'autocomplete="off" spellcheck="false" placeholder="' + (p ? '保持不变' : '') + '">') +
-      '<div class="field"><div class="fl">接口类型</div><div class="fi static mono">openai</div></div>' +
+      '<div class="errbar" id="form-err" role="alert" hidden>' + ic('alert-circle') +
+      '<span class="msg"></span></div>' +
+      formField('名称', 'name',
+        '<input class="fi" id="f-name" name="name" type="text" maxlength="80" autocomplete="off" ' +
+        'spellcheck="false" value="' + esc(nameVal) + '">', true) +
+      formField('端点', 'base_url',
+        '<input class="fi" id="f-base_url" name="base_url" type="url" inputmode="url" autocomplete="off" ' +
+        'spellcheck="false" placeholder="https://…" value="' + esc(urlVal) + '">', true) +
+      formField('API Key', 'api_key',
+        '<input class="fi" id="f-api_key" name="api_key" type="password" autocomplete="off" ' +
+        'spellcheck="false" placeholder="' + (p ? '保持不变' : 'sk-…') + '">', !p) +
+      meta +
       '</div>' +
       '<div class="btnbar full">' +
-      '<button type="button" class="btn g" data-act="close-form">取消</button>' +
+      '<button type="button" class="btn" data-act="close-form">取消</button>' +
       '<button type="submit" class="btn p" id="f-submit">保存</button>' +
       '</div></form>';
   }
@@ -691,8 +1116,8 @@
     }
     if (state.focusPending === 'page') {
       state.focusPending = '';
-      var hit = q('#view-page .navbar .hit');
-      if (hit) hit.focus();
+      var host = q('#view-page');
+      if (host) { host.setAttribute('tabindex', '-1'); host.focus({ preventScroll: true }); }
     }
   }
 
@@ -748,6 +1173,104 @@
     }
   }
 
+  function openModelDetails(pid, mid) {
+    var m = findModel(pid, mid);
+    var p = findProvider(pid);
+    var need = !!(m && !m.meta_source && p && p.catalog_id);
+    var o = { kind: 'model', pid: pid, mid: mid, meta: need ? undefined : null };
+    setOverlay(o);
+    if (!need) return;
+    lookupMeta(p.catalog_id, m.model_key).then(function (meta) {
+      if (state.overlay !== o) return;
+      o.meta = meta || null;
+      renderOverlay();
+    });
+  }
+
+  function toggleSwitch(el) {
+    var on = el.getAttribute('aria-checked') === 'true';
+    el.setAttribute('aria-checked', on ? 'false' : 'true');
+    var sw = el.querySelector('.sw');
+    if (sw) sw.classList.toggle('on', !on);
+  }
+
+  function swState(key, root) {
+    var el = q('[data-sw="' + key + '"]', root || document);
+    return el ? el.getAttribute('aria-checked') === 'true' : false;
+  }
+
+  async function saveModelMeta(pid, mid) {
+    var m = findModel(pid, mid);
+    if (!m) return;
+    var sheet = q('#overlay');
+    var nameEl = q('#m-name', sheet);
+    var ctxEl = q('#m-ctx', sheet);
+    var name = (nameEl ? nameEl.value : '').trim();
+    var ctxK = (ctxEl ? ctxEl.value : '').trim();
+    clearMsgs(sheet || document);
+    hideFormErr(sheet);
+    if (ctxK && !/^\d+$/.test(ctxK)) {
+      showMsg(sheet || document, 'context_k', '需数字');
+      if (ctxEl) ctxEl.focus();
+      return;
+    }
+    var payload = {
+      display_name: name,
+      context_len: ctxK ? Number(ctxK) * 1024 : (m.context_len || 0),
+      supports_images: swState('images', sheet),
+      supports_tools: swState('tools', sheet),
+      supports_thinking: swState('reasoning', sheet)
+    };
+    var btn = q('[data-act="save-model"]', sheet);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+    }
+    try {
+      await api('/models/' + encodeURIComponent(mid), { method: 'PATCH', json: payload });
+      delete state.models[pid];
+      state.lookup = {};
+      await loadModelsFor(pid);
+      closeOverlay();
+      render();
+      toast('已保存');
+    } catch (e) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '保存';
+      }
+      var body = q('.sheet-body', sheet);
+      if (body) body.insertAdjacentHTML('afterbegin',
+        '<div class="errbar" role="alert">' + ic('alert-circle') +
+        '<span class="msg">' + esc('保存失败 · ' + e.message) + '</span></div>');
+    }
+  }
+
+  // 自定义端点：表单手填的元数据落到该 provider 的第一个模型（sync 补不出时用）
+  async function applyMetaDraft(pid, draft) {
+    if (!draft) return;
+    await loadModelsFor(pid);
+    var list = state.models[pid] || [];
+    if (!list.length) return;
+    var body = {};
+    if (draft.display_name) body.display_name = draft.display_name;
+    if (draft.context_len) body.context_len = draft.context_len;
+    if (draft.supports_images) body.supports_images = true;
+    if (draft.supports_tools) body.supports_tools = true;
+    if (draft.supports_thinking) body.supports_thinking = true;
+    if (!Object.keys(body).length) return;
+    try {
+      await api('/models/' + encodeURIComponent(list[0].id), { method: 'PATCH', json: body });
+      delete state.models[pid];
+      await loadModelsFor(pid);
+    } catch (e) { /* 元数据补写失败不阻断连接流程 */ }
+  }
+
+  async function reloadCatalog() {
+    await loadCatalog();
+    render();
+  }
+
   /* ── 动作 ─────────────────────────────────────────── */
   async function setThinking(v) {
     var val = THINK.indexOf(v) >= 0 ? v : 'med';
@@ -792,8 +1315,10 @@
       delete state.modelsError[pid];
       await loadModelsFor(pid);
       await loadProviders();
+      await loadCatalog();
       render();
-      toast(r && r.total != null ? Number(r.total) + ' 个模型' : '已更新');
+      if (r && r.enriched > 0) toast('已从 models.dev 填充 ' + Number(r.enriched) + ' 个模型');
+      else toast(r && r.total != null ? Number(r.total) + ' 个模型' : '已更新');
     } catch (e) {
       toast('更新失败 · ' + e.message);
     }
@@ -868,15 +1393,6 @@
   }
 
   /* ── 发送 / SSE ───────────────────────────────────── */
-  var rafPending = false;
-
-  function scheduleRender(now) {
-    if (now) { renderStream(); return; }
-    if (rafPending) return;
-    rafPending = true;
-    requestAnimationFrame(function () { rafPending = false; renderStream(); });
-  }
-
   async function submitMessage() {
     if (state.sending) return;
     var ta = q('#ta');
@@ -899,12 +1415,14 @@
   async function doSend(text, imageIds, imgs) {
     var payload = { text: text, image_ids: imageIds || [], thinking: thinkValue() };
     var userMsg = {
-      id: 'tmp-u-' + Date.now(), role: 'user', kind: (imgs && imgs.length) ? 'image' : 'text',
+      id: 'tmp-u-' + Date.now(), _key: newKey('u'), role: 'user',
+      kind: (imgs && imgs.length) ? 'image' : 'text',
       content_md: text, reasoning_md: '', images: imgs || [], status: 'done', error: ''
     };
     var asst = {
-      id: 'tmp-a-' + Date.now(), role: 'assistant', kind: 'text', content_md: '', reasoning_md: '',
-      images: [], status: 'streaming', error: '', _payload: payload, _userMsg: userMsg
+      id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
+      content_md: '', reasoning_md: '', images: [], status: 'streaming', error: '',
+      _payload: payload, _userMsg: userMsg
     };
     state.messages.push(userMsg, asst);
     state.sending = true;
@@ -917,6 +1435,7 @@
       asst.status = 'error';
       asst.error = e.message;
       asst.canRetry = true;
+      dropLive(asst);
     } finally {
       state.sending = false;
       renderStream();
@@ -964,19 +1483,26 @@
           if (ev.provider_id != null) asst.provider_id = ev.provider_id;
           if (ev.model_key) asst.model_key = ev.model_key;
           if (ev.thinking) asst.thinking = ev.thinking;
-          scheduleRender();
+          // 只回填 id：DOM 靠 _key 跟踪，不重刷（重刷会打断渐显）
         } else if (ev.type === 'reasoning') {
           asst.reasoning_md += ev.delta || '';
-          scheduleRender();
+          paintReasoning(asst);
         } else if (ev.type === 'text') {
           asst.content_md += ev.delta || '';
-          scheduleRender();
+          if (!asst._st) startLive(asst);
+          if (asst._st) {
+            asst._st.target = asst.content_md;
+            pumpReveal(asst);
+          }
         } else if (ev.type === 'done') {
           sawDone = true;
           asst.status = 'done';
           asst.usage = ev.usage || null;
           if (ev.message_id != null) asst.id = ev.message_id;
-          scheduleRender();
+          if (asst._st) {
+            asst._st.final = true;
+            pumpReveal(asst);
+          }
         } else if (ev.type === 'error') {
           srvErr = ev.message || ev.code || '流式错误';
         }
@@ -987,34 +1513,49 @@
       asst.status = 'error';
       asst.error = srvErr;
       asst.canRetry = true;
+      dropLive(asst);
     } else if (!sawDone) {
       asst.status = 'error';
       asst.error = '连接中断';
       asst.canRetry = true;
+      dropLive(asst);
+    } else if (!asst.content_md) {
+      asst.status = 'error';
+      asst.error = '空回复';
+      dropLive(asst);
     } else {
       asst.status = 'done';
     }
-    scheduleRender(true);
+
+    if (asst._st) {
+      asst._st.target = asst.content_md;
+      asst._st.final = true;
+      pumpReveal(asst);
+    } else {
+      renderStream(true);
+    }
   }
 
-  async function retryMessage(mid) {
+  async function retryMessage(key) {
     var idx = -1;
     for (var i = 0; i < state.messages.length; i++) {
-      if (String(state.messages[i].id) === String(mid)) { idx = i; break; }
+      if (String(state.messages[i]._key) === String(key)) { idx = i; break; }
     }
     if (idx < 0 || idx !== state.messages.length - 1) return;
     var old = state.messages[idx];
     if (!old._payload) return;
     var userMsg = old._userMsg || state.messages[idx - 1] || null;
+    dropLive(old);
     state.messages.splice(idx, 1);
     var fresh = {
-      id: 'tmp-a-' + Date.now(), role: 'assistant', kind: 'text', content_md: '', reasoning_md: '',
-      images: [], status: 'streaming', error: '', _payload: old._payload, _userMsg: userMsg
+      id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
+      content_md: '', reasoning_md: '', images: [], status: 'streaming', error: '',
+      _payload: old._payload, _userMsg: userMsg
     };
     state.messages.push(fresh);
     state.sending = true;
     state.stick = true;
-    renderStream();
+    renderStream(true);
     syncSend();
     try {
       await streamRequest(old._payload, userMsg || {}, fresh);
@@ -1022,6 +1563,7 @@
       fresh.status = 'error';
       fresh.error = e.message;
       fresh.canRetry = true;
+      dropLive(fresh);
     } finally {
       state.sending = false;
       renderStream();
@@ -1038,86 +1580,154 @@
     state.toastTimer = setTimeout(function () { el.hidden = true; }, 4000);
   }
 
-  /* ── 表单提交 ─────────────────────────────────────── */
+  /* ── 表单提交 / 校验 ───────────────────────────────── */
   function showMsg(form, key, text) {
     var el = form.querySelector('[data-msg="' + key + '"]');
     if (el) el.textContent = text;
-    var input = form.querySelector('#' + 'f' + '-' + key);
-    if (input) input.classList.add('err');
+    var input = form.querySelector('#f-' + key) || form.querySelector('#m-' + (key === 'context_k' ? 'ctx' : key));
+    if (input) {
+      input.classList.add('err');
+      input.setAttribute('aria-invalid', 'true');
+    }
   }
-  function clearMsgs(form) {
-    qa('.fmsg', form).forEach(function (el) { el.textContent = ''; });
-    qa('.fi', form).forEach(function (el) { el.classList.remove('err'); });
+  function clearMsgs(root) {
+    qa('.fmsg', root).forEach(function (el) { el.textContent = ''; });
+    qa('.fi', root).forEach(function (el) {
+      el.classList.remove('err');
+      el.removeAttribute('aria-invalid');
+    });
+    qa('.errbar', root).forEach(function (el) { el.hidden = true; });
+  }
+  function showFormErr(root, msg) {
+    var bar = q('#form-err', root) || q('.errbar', root);
+    if (!bar) return;
+    bar.hidden = false;
+    var t = bar.querySelector('.msg');
+    if (t) t.textContent = msg;
+  }
+  function hideFormErr(root) {
+    var bar = root ? q('#form-err', root) : null;
+    if (bar) bar.hidden = true;
+  }
+
+  // 失焦即校验（不只在提交时）：端点 http(s)://、长度数字
+  function onBlurValidate(e) {
+    var el = e.target;
+    if (!el || !el.id) return;
+    if (el.id !== 'f-base_url' && el.id !== 'm-ctx' && el.id !== 'f-context_k') return;
+    var box = el.closest('form, .sheet-body');
+    if (!box) return;
+    var v = (el.value || '').trim();
+    var key = el.id === 'm-ctx' ? 'context_k' : el.id.slice(2);
+    var msg = '';
+    if (el.id === 'f-base_url') {
+      if (!v) msg = '必填';
+      else if (!/^https?:\/\//i.test(v)) msg = '需 http:// 或 https://';
+    } else if (v && !/^\d+$/.test(v)) {
+      msg = '需数字';
+    }
+    var slot = box.querySelector('[data-msg="' + key + '"]');
+    if (slot) slot.textContent = msg;
+    el.classList.toggle('err', !!msg);
+    if (msg) el.setAttribute('aria-invalid', 'true');
+    else el.removeAttribute('aria-invalid');
   }
 
   async function onProviderSubmit(e) {
     e.preventDefault();
     var form = e.currentTarget;
-    var nameEl = form.querySelector('[name="name"]');
-    var urlEl = form.querySelector('[name="base_url"]');
-    var keyEl = form.querySelector('[name="api_key"]');
+    var mode = form.getAttribute('data-mode') || 'custom';
     var pid = form.getAttribute('data-pid') || '';
-    var name = (nameEl.value || '').trim();
-    var baseUrl = (urlEl.value || '').trim();
-    var key = (keyEl.value || '').trim();
+    var cid = form.getAttribute('data-cid') || '';
+    var name = ((form.querySelector('[name="name"]') || {}).value || '').trim();
+    var baseUrl = ((form.querySelector('[name="base_url"]') || {}).value || '').trim();
+    var key = ((form.querySelector('[name="api_key"]') || {}).value || '').trim();
+    var dnEl = form.querySelector('[name="display_name"]');
+    var ctxEl = form.querySelector('[name="context_k"]');
+    var displayName = dnEl ? (dnEl.value || '').trim() : '';
+    var ctxK = ctxEl ? (ctxEl.value || '').trim() : '';
 
     clearMsgs(form);
+    hideFormErr(form);
     var bad = '';
-    if (!name) { showMsg(form, 'name', '必填'); bad = 'name'; }
+    if (!name) { showMsg(form, 'name', '必填'); bad = bad || 'name'; }
     if (!baseUrl) {
       showMsg(form, 'base_url', '必填');
-      if (!bad) bad = 'base_url';
+      bad = bad || 'base_url';
     } else if (!/^https?:\/\//i.test(baseUrl)) {
       showMsg(form, 'base_url', '需 http:// 或 https://');
-      if (!bad) bad = 'base_url';
+      bad = bad || 'base_url';
     }
-    if (!pid && !key) {
-      showMsg(form, 'api_key', '必填');
-      if (!bad) bad = 'api_key';
-    }
+    if (mode !== 'edit' && !key) { showMsg(form, 'api_key', '必填'); bad = bad || 'api_key'; }
+    if (mode === 'custom' && !displayName) { showMsg(form, 'display_name', '必填'); bad = bad || 'display_name'; }
+    if (ctxK && !/^\d+$/.test(ctxK)) { showMsg(form, 'context_k', '需数字'); bad = bad || 'context_k'; }
     if (bad) {
       var el = form.querySelector('[name="' + bad + '"]');
       if (el) el.focus();
       return;
     }
 
+    // 开关状态在离开表单前读走
+    var draft = mode === 'custom' ? {
+      display_name: displayName,
+      context_len: ctxK ? Number(ctxK) * 1024 : 0,
+      supports_images: swState('images', form),
+      supports_tools: swState('tools', form),
+      supports_thinking: swState('reasoning', form)
+    } : null;
+
     var btn = q('#f-submit', form);
-    if (btn) btn.disabled = true;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+    }
     var newId = '';
 
     try {
-      if (pid) {
+      if (mode === 'edit') {
         var body = { name: name, base_url: baseUrl };
         if (key) body.api_key = key;
         await api('/providers/' + encodeURIComponent(pid), { method: 'PATCH', json: body });
         newId = pid;
       } else {
-        var created = await api('/providers', {
-          method: 'POST',
-          json: { name: name, base_url: baseUrl, api_key: key, api_style: 'openai' }
-        });
+        var src = cid ? findCatalog(cid) : null;
+        var payload = {
+          name: name, base_url: baseUrl, api_key: key,
+          api_style: src ? (src.api_style || 'openai') : 'openai'
+        };
+        if (cid) payload.catalog_id = cid;
+        var created = await api('/providers', { method: 'POST', json: payload });
         newId = created && (created.id != null ? created.id : created.provider_id);
       }
     } catch (err) {
-      toast('保存失败 · ' + err.message);
-      if (btn) btn.disabled = false;
+      showFormErr(form, '保存失败 · ' + err.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '保存';
+      }
       return;
     }
 
     await loadProviders();
-    if (newId != null && newId !== '') {
-      delete state.models[newId];
-      openPage({ kind: 'provider', providerId: newId });
-      try {
-        await api('/providers/' + encodeURIComponent(newId) + '/sync-models', { method: 'POST' });
-        await loadModelsFor(newId);
-        await loadProviders();
-        render();
-      } catch (err2) {
-        toast('更新失败 · ' + err2.message);
-      }
-    } else {
+    if (newId == null || newId === '') {
       openPage({ kind: 'models' });
+      return;
+    }
+    delete state.models[newId];
+    openPage({ kind: 'provider', providerId: newId });
+    try {
+      var r = await api('/providers/' + encodeURIComponent(newId) + '/sync-models', { method: 'POST' });
+      await loadModelsFor(newId);
+      if (mode === 'custom') await applyMetaDraft(newId, draft);
+      await loadProviders();
+      await loadCatalog();
+      render();
+      if (r && r.enriched > 0) {
+        toast('已从 models.dev 填充 ' + Number(r.enriched) + ' 个模型');
+      }
+    } catch (err2) {
+      toast('更新失败 · ' + err2.message);
+      render();
     }
   }
 
@@ -1128,7 +1738,19 @@
     'pick-model': function (el) { pickModel(el.getAttribute('data-pid'), el.getAttribute('data-mid')); },
     'connect': function (el) {
       closeOverlay();
-      openPage({ kind: 'form', providerId: el.getAttribute('data-pid') });
+      var pid = el.getAttribute('data-pid');
+      var p = findProvider(pid);
+      if (p && p.catalog_id && findCatalog(p.catalog_id)) openPage({ kind: 'form', catalogId: p.catalog_id });
+      else openPage({ kind: 'form', providerId: pid });
+    },
+    'connect-catalog': function (el) { openPage({ kind: 'form', catalogId: el.getAttribute('data-cid') }); },
+    'reload-catalog': function () { reloadCatalog(); },
+    'model-settings': function (el) {
+      openModelDetails(el.getAttribute('data-pid'), el.getAttribute('data-mid'));
+    },
+    'toggle-sw': function (el) { toggleSwitch(el); },
+    'save-model': function (el) {
+      saveModelMeta(el.getAttribute('data-pid'), el.getAttribute('data-mid'));
     },
     'edit-provider': function (el) { openPage({ kind: 'form', providerId: el.getAttribute('data-pid') }); },
     'open-models': function () { closeOverlay(); openPage({ kind: 'models' }); },
@@ -1145,7 +1767,7 @@
     'sync': function (el) { syncProvider(el.getAttribute('data-pid')); },
     'ask-disconnect': function (el) { askDisconnect(el.getAttribute('data-pid')); },
     'confirm-disconnect': function () { doDisconnect(); },
-    'retry': function (el) { retryMessage(el.getAttribute('data-mid')); },
+    'retry': function (el) { retryMessage(el.getAttribute('data-key')); },
     'reload-all': function () { reloadAll(); },
     'reload-providers': function () { reloadProviders(); },
     'focus-composer': function () { q('#ta').focus(); },
@@ -1171,10 +1793,10 @@
   function onToggle(e) {
     var d = e.target;
     if (!d || d.tagName !== 'DETAILS') return;
-    var mid = d.getAttribute('data-mid');
+    var key = d.getAttribute('data-key');
     for (var i = 0; i < state.messages.length; i++) {
       var m = state.messages[i];
-      if (String(m.id) !== String(mid)) continue;
+      if (String(m._key) !== String(key)) continue;
       // 重建 DOM 时带 open 属性也会触发 toggle：只记“用户按下”的差异
       if (m._renderOpen !== undefined && d.open === m._renderOpen) return;
       m._open = d.open;
@@ -1185,6 +1807,7 @@
   function bindEvents() {
     document.addEventListener('click', onClick);
     document.addEventListener('keydown', onKey);
+    document.addEventListener('blur', onBlurValidate, true);
 
     var ta = q('#ta');
     ta.addEventListener('input', function () { autosize(); syncSend(); });
@@ -1219,7 +1842,7 @@
     autosize();
     render();
 
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true)]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog()]);
     render();
 
     if (state.settings && state.settings.provider_id != null) {
@@ -1232,3 +1855,7 @@
 
   boot();
 })();
+
+
+
+

@@ -173,6 +173,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         reason_parts: list[str] = []
         usage = {"prompt_tokens": 0, "completion_tokens": 0}
         error: dict | None = None
+        cancelled = False
 
         yield _sse(
             {
@@ -211,6 +212,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     yield _sse({"type": "error", **error})
                     break
         except asyncio.CancelledError:
+            # 客户端断开（刷新/关页）：不能把半截回复记成 done，否则历史里会留一条残句
+            cancelled = True
             raise
         except Exception as exc:  # noqa: BLE001 - 任何异常都要让界面看见，而不是静默断流
             error = {"code": "internal", "message": str(exc)[:400]}
@@ -221,8 +224,12 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 if row is not None:
                     row.content_md = "".join(text_parts)
                     row.reasoning_md = "".join(reason_parts)
-                    row.status = "error" if error else ("done" if text_parts else "empty")
-                    row.error = error["message"] if error else ""
+                    if error:
+                        row.status, row.error = "error", error["message"]
+                    elif cancelled:
+                        row.status, row.error = "error", "连接中断（客户端断开）"
+                    else:
+                        row.status = "done" if text_parts else "empty"
                     row.prompt_tokens = usage["prompt_tokens"]
                     row.completion_tokens = usage["completion_tokens"]
                     current = s.get(Conversation, conv_id)
