@@ -726,3 +726,22 @@ button.it:active{background:var(--fill)}
 .tstep-n{color:var(--ink3);font-size:var(--s6);margin-left:auto;white-space:nowrap;flex:none}
 .tstep-c{margin-left:var(--q1);color:var(--ink3);flex:none;margin-top:0}
 .tstep-mem .tstep-q{color:var(--ink3)}
+
+
+/* ── 回到底部 ─────────────────────────────────────── */
+.tobottom{position:absolute;right:var(--q4);bottom:calc(var(--q4) + 88px);width:44px;height:44px;
+  display:grid;place-items:center;border:1px solid var(--line2);border-radius:var(--rp);
+  background:var(--card);color:var(--ink2);box-shadow:0 4px 16px rgba(25,25,25,.18);
+  z-index:3;cursor:pointer;transition:opacity .15s ease,transform .12s ease}
+.tobottom[hidden]{display:none}
+.tobottom:active{transform:scale(.96);background:var(--fill)}
+.tobottom .ic{display:block}
+
+/* ── 记忆页 ───────────────────────────────────────── */
+.srow .n2{display:block;font-size:var(--s6);color:var(--ink3);letter-spacing:.02em;margin-top:2px}
+.srow .n1{display:block}
+.seg{display:flex;gap:var(--q2);margin-top:var(--q2)}
+.seg .tpill{border:1px solid var(--line2);background:transparent}
+.seg .tpill.on{border-color:var(--clayline);background:var(--claybg);color:var(--clay)}
+.fta{height:auto;min-height:88px;padding:var(--q2) var(--q3);line-height:var(--l4);resize:vertical}
+.btn.danger{color:var(--clay);border:1px solid var(--clayline);background:transparent}

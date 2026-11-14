@@ -481,3 +481,52 @@ async def stream_with_tools(
             count = len(result) if isinstance(result, list) else 1
             yield {"type": "tool", "name": name, "state": "end", "count": count}
             msgs.append({"role": "tool", "tool_call_id": call["id"], "content": payload_str})
+
+
+MEMORY_ADD_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "memory_add",
+        "description": "记住一件关于用户的事。用户明确说「记住…」，或出现稳定的学习事实/偏好时调用。text 一条不超过 40 字。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "一句话，主语用「她」，不要引号"},
+                "kind": {"type": "string", "enum": ["fact", "pref"], "description": "fact=学习事实，pref=偏好/画像"},
+                "subject": {"type": "string", "description": "学科，可空"},
+            },
+            "required": ["text"],
+        },
+    },
+}
+
+MEMORY_UPDATE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "memory_update",
+        "description": "修正一条已有记忆（用户说他记错了、或要补充细节时用）。先用 memory_search 找到 id。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "text": {"type": "string"},
+                "kind": {"type": "string", "enum": ["fact", "pref"]},
+                "subject": {"type": "string"},
+            },
+            "required": ["id"],
+        },
+    },
+}
+
+MEMORY_DELETE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "memory_delete",
+        "description": "删掉一条记忆（归档，可恢复）。用户明确说「忘掉这条」时用。先用 memory_search 找到 id。",
+        "parameters": {
+            "type": "object",
+            "properties": {"id": {"type": "string"}},
+            "required": ["id"],
+        },
+    },
+}

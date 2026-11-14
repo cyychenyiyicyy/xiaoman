@@ -114,7 +114,14 @@ class MemoryOut(BaseModel):
     status: str
     use_count: int = 0
     last_used_at: datetime | None = None
+    source_message_id: str | None = None
     created_at: datetime
+
+
+class MemoryCreate(BaseModel):
+    text: str
+    kind: str = "fact"
+    subject: str = ""
 
 
 class MemoryPatch(BaseModel):

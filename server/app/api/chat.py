@@ -23,7 +23,10 @@ from ..seed import get_current, get_memory_cfg, get_search_cfg
 from ..services import memory as memory_service
 from ..services import search as search_service
 from ..services.llm import (
+    MEMORY_ADD_TOOL,
+    MEMORY_DELETE_TOOL,
     MEMORY_TOOL,
+    MEMORY_UPDATE_TOOL,
     WEB_TOOL,
     build_openai_messages,
     stream_chat,
@@ -286,6 +289,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         think_ms = 0
         sources: list[dict] = list(initial_sources)
         tools: list[str] = ["web_search"] if web_sources else []
+        remembered: list[dict] = []
         parts: list[dict] = []
         cur_reason: dict | None = None
         cur_text: dict | None = None
@@ -306,8 +310,28 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             yield _sse({"type": "tool", "name": "web_search", "state": "end", "count": len(web_sources)})
 
         async def _exec_tool(name: str, args: dict):
-            """服务端执行函数工具（记忆/联网）。命中的记忆写进本消息来源。"""
-            query = (args or {}).get("query") or text
+            """服务端执行函数工具（记忆检索 / 增改删 / 联网）。"""
+            args = args or {}
+            query = args.get("query") or text
+            if name == "memory_add":
+                with SessionLocal() as s2:
+                    row = memory_service.create(
+                        s2, args.get("text", ""), args.get("kind", "fact"),
+                        args.get("subject", ""), assistant_id,
+                    )
+                    item = {"id": row.id, "text": row.text, "kind": row.kind, "subject": row.subject}
+                remembered.append(item)
+                return [item]
+            if name in ("memory_update", "memory_delete"):
+                with SessionLocal() as s2:
+                    if name == "memory_update":
+                        row = memory_service.update(
+                            s2, args.get("id", ""), args.get("text"),
+                            args.get("kind"), args.get("subject"),
+                        )
+                        return [{"ok": bool(row), "id": args.get("id", "")}]
+                    ok = memory_service.archive(s2, args.get("id", ""))
+                    return [{"ok": ok, "id": args.get("id", "")}]
             if name == "memory_search":
                 with SessionLocal() as s2:
                     rows = memory_service.retrieve(s2, query)
@@ -335,14 +359,20 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 return items
             return []
 
-        fn_tools: list[dict] = [MEMORY_TOOL]
+        fn_tools: list[dict] = [MEMORY_TOOL, MEMORY_ADD_TOOL, MEMORY_UPDATE_TOOL, MEMORY_DELETE_TOOL]
         if not native_search and search_on and (search_cfg.get("provider") or "deepseek") != "deepseek":
             fn_tools.append(WEB_TOOL)
         server_tools = [{"type": "deepseek_web_search"}] if native_search else []
 
         try:
-            base_msgs = build_openai_messages(hist, text, atts, "", web_hint)
-            stream = stream_with_tools(
+            if getattr(provider_snap, "kind", "") == "mock" or (provider_snap.base_url or "").startswith("mock://"):
+                stream = stream_chat(
+                    provider_snap, model_snap, hist, text, atts, thinking,
+                    memory_block="", web_block=web_hint, native_search=False,
+                )
+            else:
+                base_msgs = build_openai_messages(hist, text, atts, "", web_hint)
+                stream = stream_with_tools(
                 provider_snap,
                 model_snap,
                 base_msgs,

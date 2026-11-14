@@ -227,3 +227,59 @@ def save(db: Session, items: list[dict], source_message_id: str | None) -> list[
     for row in saved:
         db.refresh(row)
     return [{"id": r.id, "text": r.text, "kind": r.kind, "subject": r.subject} for r in saved]
+
+# ── 记忆的增 / 改 / 删（供 agent 工具与界面共用）──────────────
+def create(db: Session, text: str, kind: str = "fact", subject: str = "",
+           source_message_id: str | None = None) -> Memory:
+    # 去重：已有相似的就不新增（模型常常同一件事说好几遍）
+    existing = db.scalars(select(Memory).where(Memory.status == "active")).all()
+    for old in existing:
+        if jaccard(text, old.text) > 0.6:
+            if len((text or "").strip()) > len(old.text) + 6:
+                old.text = _clean(text)[:120]
+                db.commit()
+                db.refresh(old)
+            return old
+    row = Memory(
+        text=_clean(text)[:120] or "（空）",
+        kind="pref" if kind == "pref" else "fact",
+        subject=(subject or "")[:20],
+        source_message_id=source_message_id,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update(db: Session, mid: str, text: str | None = None, kind: str | None = None,
+           subject: str | None = None) -> Memory | None:
+    row = db.get(Memory, mid)
+    if row is None:
+        return None
+    if text is not None and text.strip():
+        row.text = _clean(text)[:120]
+    if kind is not None:
+        row.kind = "pref" if kind == "pref" else "fact"
+    if subject is not None:
+        row.subject = subject[:20]
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def archive(db: Session, mid: str) -> bool:
+    """「删」用归档实现：界面上消失，但可恢复（不可逆操作不给 agent 开工具）。"""
+    row = db.get(Memory, mid)
+    if row is None:
+        return False
+    row.status = "archived"
+    db.commit()
+    return True
+
+
+def search(db: Session, query: str, limit: int = 5) -> list[dict]:
+    rows = retrieve(db, query, limit)
+    touch(db, rows)
+    db.commit()
+    return [{"id": r.id, "text": r.text, "kind": r.kind, "subject": r.subject} for r in rows]

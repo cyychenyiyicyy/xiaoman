@@ -576,6 +576,23 @@
       '</div></div>';
   }
 
+  function updateToBottom() {
+    var el = q('#stream');
+    var btn = q('#to-bottom');
+    if (!el || !btn) return;
+    var away = el.scrollHeight - el.scrollTop - el.clientHeight;
+    btn.hidden = !(away > 240) || state.msgState !== 'ready';
+  }
+
+  function scrollToBottom(smooth) {
+    var el = q('#stream');
+    if (!el) return;
+    state.stick = true;
+    if (smooth && el.scrollTo) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    else el.scrollTop = el.scrollHeight;
+    updateToBottom();
+  }
+
   function renderStream(force) {
     var el = q('#stream');
     var prev = el.scrollTop;
@@ -606,6 +623,7 @@
     el.innerHTML = '<div class="col">' + state.messages.map(msgHtml).join('') + '</div>';
     if (state.liveMsg) repaintLive(state.liveMsg);
     typesetMath(el);
+    updateToBottom();
     if (state.stick) el.scrollTop = el.scrollHeight;
     else el.scrollTop = prev;
   }
@@ -1202,6 +1220,33 @@ function typesetMath(el) {
   }
 
   /* ── 来源浮窗（§5.2）：上半记忆、下半网页 ─────────── */
+  function memoryEditSheetHtml(o) {
+    var m = o.id ? (state.memories || []).filter(function (x) { return String(x.id) === String(o.id); })[0] : null;
+    var kind = (m && m.kind) || 'fact';
+    var body =
+      '<div class="field"><label class="flabel" for="mem-text">内容</label>' +
+      '<textarea class="fi fta" id="mem-text" rows="3" placeholder="一句话，例如：她物理最怕电磁感应">' +
+      esc(m ? m.text : '') + '</textarea></div>' +
+      '<div class="field"><span class="flabel">类型</span><div class="seg">' +
+      '<button type="button" class="tpill' + (kind === 'fact' ? ' on' : '') + '" data-act="pick-memory-kind" data-kind="fact">事实</button>' +
+      '<button type="button" class="tpill' + (kind === 'pref' ? ' on' : '') + '" data-act="pick-memory-kind" data-kind="pref">偏好</button>' +
+      '</div></div>' +
+      '<div class="field"><label class="flabel" for="mem-subject">学科</label>' +
+      '<input class="fi" id="mem-subject" type="text" autocomplete="off" value="' + esc(m ? m.subject || '' : '') +
+      '" placeholder="可空"></div>';
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mem-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="mem-ttl">' + (m ? '记忆' : '添加记忆') + '</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + body + '</div>' +
+      '<div class="sheet-foot"><div class="btnbar full">' +
+      (m ? '<button type="button" class="btn danger" data-act="ask-delete-memory" data-id="' + esc(m.id) + '">删除</button>' : '') +
+      '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+      '<button type="button" class="btn p" data-act="save-memory" data-id="' + esc(m ? m.id : '') + '">保存</button>' +
+      '</div></div></div>';
+  }
+
   function sourcesSheetHtml(o) {
     var m = findMessageByKey(o.key);
     var mem = m ? (m.sources || []).filter(function (s) { return s && s.type === 'memory'; }) : [];
@@ -1341,6 +1386,7 @@ function typesetMath(el) {
     host.innerHTML = kind === 'confirm' ? confirmSheetHtml(state.overlay)
       : kind === 'model' ? modelDetailSheetHtml(state.overlay)
         : kind === 'sources' ? sourcesSheetHtml(state.overlay)
+      : kind === 'memory' ? memoryEditSheetHtml(state.overlay)
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -1622,41 +1668,52 @@ function typesetMath(el) {
       '</div>';
   }
 
+  function memoryRow(m) {
+    var meta = [kindLabel(m.kind), m.subject || '', fmtWhen(m.created_at)];
+    if (m.use_count) meta.push('用过 ' + m.use_count + ' 次');
+    return '<button type="button" class="srow" data-act="edit-memory" data-id="' + esc(m.id) + '">' +
+      '<span class="md"><span class="n1">' + esc(m.text || '') + '</span>' +
+      '<span class="n2 mono">' + esc(meta.filter(Boolean).join(' · ')) + '</span></span>' +
+      '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>';
+  }
+
   function memoriesPageHtml() {
     var auto = !state.memorySetting || state.memorySetting.auto !== false;
+    var list = state.memories || [];
     var total = state.memoryStats && state.memoryStats.total != null
-      ? Number(state.memoryStats.total) : null;
+      ? Number(state.memoryStats.total) : list.length;
     var nav = '<div class="navbar"><div class="tbox"><div class="ttl">记忆</div>' +
-      '<div class="sub">' + (total == null ? '' : numWrap(total) + ' 条') + '</div></div></div>';
-    var autoRow = '<div class="settings"><div class="sgroup"><div class="slabel">收录</div>' +
-      '<div class="scard">' +
+      '<div class="sub">' + numWrap(total) + ' 条</div></div></div>';
+    var tools = '<div class="settings"><div class="sgroup flat"><div class="scard">' +
+      '<button type="button" class="srow" data-act="new-memory">' +
+      '<span class="lead">' + ic('plus') + '</span>' +
+      '<span class="md"><span class="n1">添加记忆</span></span></button>' +
       '<div class="srow swrow" role="switch" aria-checked="' + (auto ? 'true' : 'false') + '">' +
+      '<span class="lead">' + ic('sparkles') + '</span>' +
       '<span class="md"><span class="n1">自动记忆</span></span>' +
       '<span class="trail"><button type="button" class="sw' + (auto ? ' on' : '') +
       '" data-act="toggle-memory" aria-label="自动记忆"></button></span></div>' +
       '</div></div></div>';
+
     if (state.memoriesState === 'loading') {
-      return nav + autoRow + '<div class="settings"><div class="skel">' + skelRows(4) + '</div></div>';
+      return nav + tools + '<div class="settings"><div class="skel">' + skelRows(4) + '</div></div>';
     }
     if (state.memoriesState === 'error') {
-      return nav + autoRow + '<div class="settings">' +
+      return nav + tools + '<div class="settings">' +
         pageErrorState('加载失败', state.memoriesError, 'reload-memories', 'rail-chat', '返回对话') +
         '</div>';
     }
-    var list = state.memories || [];
     if (!list.length) {
-      return nav + autoRow + '<div class="settings"><div class="empty">' + ic('database') +
+      return nav + tools + '<div class="settings"><div class="empty">' + ic('database') +
         '<div class="t">还没有记忆</div>' +
-        '<button type="button" class="btn" data-act="rail-chat">返回对话</button></div></div>';
+        '<button type="button" class="btn" data-act="new-memory">添加记忆</button></div></div>';
     }
-    var rows = list.map(function (m) {
-      return '<div class="srow">' +
-        '<span class="md"><span class="n1">' + esc(m.text || '') + '</span>' +
-        '<span class="n2 mono">' + esc(kindLabel(m.kind)) + ' · ' + esc(fmtWhen(m.created_at)) + '</span></span>' +
-        '<span class="trail"><button type="button" class="iconbtn" data-act="ask-delete-memory" data-id="' +
-        esc(m.id) + '" aria-label="删除">' + ic('x', 'sm') + '</button></span></div>';
-    }).join('');
-    return nav + autoRow + '<div class="settings">' + groupHtml('已存 ' + list.length + ' 条', rows) + '</div>';
+    var prefs = list.filter(function (m) { return m.kind === 'pref'; });
+    var facts = list.filter(function (m) { return m.kind !== 'pref'; });
+    var html = nav + tools;
+    if (prefs.length) html += '<div class="settings">' + groupHtml('关于她 · ' + prefs.length, prefs.map(memoryRow).join('')) + '</div>';
+    if (facts.length) html += '<div class="settings">' + groupHtml('学习 · ' + facts.length, facts.map(memoryRow).join('')) + '</div>';
+    return html;
   }
 
   function renderPage() {
@@ -1901,6 +1958,43 @@ function typesetMath(el) {
     openPage({ kind: 'memories' });
     await Promise.all([loadMemories(), loadMemoryStats(), loadMemorySettings()]);
     if (state.page && state.page.kind === 'memories') render();
+  }
+
+  function openMemoryEdit(id) {
+    setOverlay({ kind: 'memory', id: id || '' });
+  }
+
+  function pickMemoryKind(el) {
+    var host = q('#overlay');
+    if (!host) return;
+    qa('#overlay .seg .tpill').forEach(function (b) {
+      b.classList.toggle('on', b === el);
+    });
+  }
+
+  async function saveMemory(id) {
+    var host = q('#overlay');
+    if (!host) return;
+    var textEl = q('#mem-text', host);
+    var subjEl = q('#mem-subject', host);
+    var kindEl = q('#overlay .seg .tpill.on');
+    var text = (textEl ? textEl.value : '').trim();
+    if (!text) { toast('内容不能为空'); return; }
+    var payload = {
+      text: text,
+      kind: kindEl ? kindEl.getAttribute('data-kind') : 'fact',
+      subject: (subjEl ? subjEl.value : '').trim()
+    };
+    try {
+      if (id) await api('/memories/' + encodeURIComponent(id), { method: 'PATCH', json: payload });
+      else await api('/memories', { method: 'POST', json: payload });
+      state.overlay = null;
+      await Promise.all([loadMemories(), loadMemoryStats()]);
+      render();
+      toast(id ? '已保存' : '已添加');
+    } catch (e) {
+      toast('保存失败：' + e.message);
+    }
   }
 
   function askDeleteMemory(id) {
@@ -2492,6 +2586,11 @@ function typesetMath(el) {
     'results-inc': function () { bumpResults(1); },
     'test-search': function () { testSearch(); },
     'toggle-memory': function (el) { toggleMemorySwitch(el); },
+    'new-memory': function () { openMemoryEdit(''); },
+    'edit-memory': function (el) { openMemoryEdit(el.getAttribute('data-id')); },
+    'save-memory': function (el) { saveMemory(el.getAttribute('data-id')); },
+    'pick-memory-kind': function (el) { pickMemoryKind(el); },
+    'to-bottom': function () { scrollToBottom(true); },
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
     'reload-memories': function () { loadMemories().then(function () { render(); }); },
@@ -2585,6 +2684,7 @@ function typesetMath(el) {
     var stream = q('#stream');
     stream.addEventListener('scroll', function () {
       state.stick = (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 80;
+    updateToBottom();
     });
     stream.addEventListener('toggle', onToggle, true);
   }

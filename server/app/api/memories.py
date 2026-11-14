@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Memory
-from ..schemas import MemoryOut, MemoryPatch
+from ..schemas import MemoryCreate, MemoryOut, MemoryPatch
+from ..services import memory as memory_service
 
 router = APIRouter(tags=["memories"])
 
@@ -31,6 +32,15 @@ def list_memories(
         "items": [MemoryOut.model_validate(r).model_dump() for r in rows],
         "next": rows[-1].id if has_more and rows else None,
     }
+
+
+@router.post("/memories", response_model=MemoryOut, status_code=201)
+def create_memory(payload: MemoryCreate, db: Session = Depends(get_db)):
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "内容不能为空")
+    row = memory_service.create(db, text, payload.kind, payload.subject)
+    return row
 
 
 @router.get("/memories/stats")
