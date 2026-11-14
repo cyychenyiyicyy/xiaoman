@@ -136,6 +136,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     search_cfg = get_search_cfg(db)
     web_sources: list[dict] = []
     native_search = False
+    web_hint = ""
     if search_cfg.get("enabled") and text:
         prov = search_cfg.get("provider") or "deepseek"
         if prov == "deepseek" and (
@@ -143,6 +144,10 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             or "deepseek.com" in (provider.base_url or "")
         ):
             native_search = True
+            web_hint = (
+                "\n\n本轮已开启联网搜索工具（deepseek_web_search）："
+                "涉及新闻、价格、赛事、最新数据这类时效问题时直接调用它，不要回答「我无法联网」。\n"
+            )
         elif prov in ("tavily", "bocha"):
             try:
                 web_sources = await search_service.search(
@@ -254,7 +259,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 atts,
                 thinking,
                 memory_block=memory_block,
-                web_block=_web_block(web_sources),
+                web_block=web_hint + _web_block(web_sources),
                 native_search=native_search,
             ):
                 kind = ev.get("type")

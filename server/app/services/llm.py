@@ -14,6 +14,8 @@ import base64
 import json
 from collections.abc import AsyncIterator
 
+from datetime import datetime
+
 import httpx
 
 from ..config import settings
@@ -41,6 +43,10 @@ def _data_url(att: Attachment) -> str:
     return f"data:{mime};base64,{raw}"
 
 
+def today_line() -> str:
+    return "\n\n今天是 " + datetime.now().strftime("%Y 年 %m 月 %d 日") + "。"
+
+
 def build_openai_messages(
     history: list[Message],
     user_text: str,
@@ -49,7 +55,7 @@ def build_openai_messages(
     web_block: str = "",
 ) -> list[dict]:
     """把历史 + 本轮拼成 OpenAI messages。历史只取文本，图片仅本轮带。"""
-    msgs: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + (memory_block or "") + (web_block or "")}]
+    msgs: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + today_line() + (memory_block or "") + (web_block or "")}]
     cap = settings.message_char_cap
     for m in history[-settings.history_limit :]:
         body = (m.content_md or "")[:cap]

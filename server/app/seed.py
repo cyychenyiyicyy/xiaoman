@@ -96,7 +96,7 @@ def set_current(db: Session, provider_id: str | None, model_id: str | None, thin
 
 # ── 联网搜索 / 记忆 设置 ────────────────────────────────
 SEARCH_DEFAULTS = {
-    "enabled": False,
+    "enabled": True,
     "provider": "deepseek",
     "api_key": "",
     "api_key_tail": "",

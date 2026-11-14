@@ -704,3 +704,25 @@ button.it:active{background:var(--fill)}
 .pbody p{margin:0 0 var(--q2);font-size:var(--s5);line-height:var(--l5)}
 .pbody p:last-child{margin-bottom:0}
 .steps .ic{display:block}
+
+
+/* ── 折叠的「思考 N 秒」：思考正文 / 工具 / 记忆统一在一个块里，按时间线排列 ── */
+.tgroup{border:1px solid var(--line);border-radius:var(--rc);margin:0 0 var(--q3);padding:0 var(--q3)}
+.tgsum{display:flex;align-items:center;gap:var(--q2);min-height:44px;cursor:pointer;list-style:none}
+.tgsum::-webkit-details-marker{display:none}
+.tglab{color:var(--ink2);font-size:var(--s5);white-space:nowrap}
+.tgchev{margin-left:auto;color:var(--ink3);flex:none;transition:transform .15s ease}
+.tgroup[open] .tgchev{transform:rotate(180deg)}
+.tgbody{padding:0 0 var(--q2)}
+.tstep{display:flex;align-items:flex-start;gap:var(--q2);width:100%;padding:var(--q1) 0;
+  font-size:var(--s5);color:var(--ink2);text-align:left}
+.tstep .ic{display:block;flex:none;margin-top:2px}
+.tstep-t{min-width:0;color:var(--ink2);font-size:var(--s5);line-height:var(--l5)}
+.tstep-t p{margin:0 0 var(--q1);font-size:var(--s5);line-height:var(--l5)}
+.tstep-t p:last-child{margin-bottom:0}
+.tstep-tool{border:0;background:transparent;font-family:inherit;cursor:pointer}
+.tstep-l{color:var(--ink2);white-space:nowrap;flex:none}
+.tstep-q{color:var(--ink3);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tstep-n{color:var(--ink3);font-size:var(--s6);margin-left:auto;white-space:nowrap;flex:none}
+.tstep-c{margin-left:var(--q1);color:var(--ink3);flex:none;margin-top:0}
+.tstep-mem .tstep-q{color:var(--ink3)}

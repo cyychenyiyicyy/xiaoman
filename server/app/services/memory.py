@@ -53,12 +53,12 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
     for r in rows:
         hit = len(q & bigrams(r.text))
         scored.append((hit, r))
-    matched = [r for hit, r in sorted(scored, key=lambda x: -x[0]) if hit > 0]
-    recent = rows[:2]
+    # 只认真正相关的：至少 2 个 2-gram 命中。无关时一条都不注入（否则每条回复都自称「根据记忆」）
+    matched = [r for hit, r in sorted(scored, key=lambda x: -x[0]) if hit >= 2]
 
     out: list[Memory] = []
     seen: set[str] = set()
-    for r in matched + recent:
+    for r in matched:
         if r.id in seen:
             continue
         seen.add(r.id)
@@ -99,12 +99,22 @@ def _clean(text: str) -> str:
     return t[:60]
 
 
-_EXTRACT_SYS = """你从一段学习对话里抽取「值得长期记住的事」。
-规则：
-- 只抽稳定的学习事实或稳定偏好，例如薄弱点、习惯、目标、明确的个人设定。
-- 不要抽寒暄、情绪、一次性提问、模型自己的话。
-- 每条不超过 40 字，用第三人称「她」，不要引号。
-- 最多 2 条。没有就返回空数组。
+_EXTRACT_SYS = """你判断这段对话里有没有「值得十年后还记住」的事，并抽取出来。
+
+最高优先级：用户明确要求记住的（「记住…」「记一下…」「别忘了…」「你记着…」）
+→ 必须抽出来，一条不漏，kind 用 pref，subject 留空。
+
+值得记（rare）：
+- 稳定的学习事实：明确的薄弱点、错因模式、已经掌握到什么程度。
+- 稳定的偏好：表达/学习方式偏好、每天可用时间、目标院校或考试时间。
+
+绝不记（常见错误，必须避免）：
+- 闲聊、情绪、一次性的问题或答案。
+- 模型自己说的话、题目内容、知识点本身。
+- 从「今天新闻」这类提问里推断出的任何「事实」。
+- 空泛到没有信息量的句子。
+
+要求：一条 ≤ 40 字，主语用「她」，不要引号，不要编。**大多数对话应该返回空数组**。
 只输出 JSON：{"memory":[{"text":"…","kind":"fact"或"pref","subject":"学科或空串"}]}"""
 
 
@@ -117,6 +127,17 @@ async def extract(
 ) -> list[dict]:
     """回合后抽取。任何异常都返回空列表——宁可漏，不可脏。"""
     if not (user_text or "").strip() or not (answer or "").strip():
+        return []
+    # 前置过滤：太短、纯提问、纯寒暄的消息不抽
+    u = (user_text or "").strip()
+    explicit = any(k in u for k in ("记住", "记一下", "别忘了", "记着", "记住我"))
+    if len(u) < 10 and not explicit:
+        return []
+    if len(answer or "") < 30:
+        return []
+    if not explicit and not any(
+        k in u for k in ("我", "我的", "怕", "总是", "不会", "习惯", "喜欢", "每天", "目标")
+    ):
         return []
     user = f"用户说：{user_text[:800]}\n\n小满回答：{answer[:2000]}"
     try:
@@ -157,11 +178,11 @@ def _parse_json(raw: str) -> dict:
         t = re.sub(r"\n?```$", "", t)
     start, end = t.find("{"), t.rfind("}")
     if start < 0 or end <= start:
-        return {}
+        return 
     try:
         return json.loads(t[start : end + 1])
     except json.JSONDecodeError:
-        return {}
+        return 
 
 
 def save(db: Session, items: list[dict], source_message_id: str | None) -> list[dict]:
