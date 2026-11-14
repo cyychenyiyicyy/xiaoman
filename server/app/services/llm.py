@@ -354,6 +354,7 @@ async def stream_with_tools(
     thinking: str,
     tools: list[dict],
     executor,
+    server_tools: list[dict] | None = None,
 ) -> AsyncIterator[dict]:
     """OpenAI 函数工具循环（最多 3 轮）。与 native 服务端工具互斥。"""
     base = provider.base_url.rstrip("/")
@@ -369,7 +370,7 @@ async def stream_with_tools(
             "messages": msgs,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "tools": tools,
+            "tools": list(tools) + list(server_tools or []),
         }
         if model.supports_thinking and thinking in THINKING_MAP:
             payload["reasoning_effort"] = THINKING_MAP[thinking]
@@ -411,6 +412,25 @@ async def stream_with_tools(
                                 "cache_miss": int(miss) if miss is not None else max(0, pt - hi),
                             }
                         for choice in chunk.get("choices") or []:
+                            ste = choice.get("server_tool_event")
+                            if isinstance(ste, dict):
+                                st = ste.get("type")
+                                call = ste.get("call") or {}
+                                if st == "step_reasoning_done":
+                                    yield {"type": "step_end", "kind": "reasoning"}
+                                elif st == "call_started":
+                                    action = call.get("action") or {}
+                                    yield {
+                                        "type": "tool",
+                                        "name": "web_search",
+                                        "state": "start",
+                                        "queries": action.get("queries") or ([action.get("url")] if action.get("url") else []),
+                                        "kind": "search",
+                                    }
+                                elif st == "call_completed":
+                                    yield {"type": "tool", "name": "web_search", "state": "end", "kind": "search"}
+                                    for src in _norm_web(call.get("sources") or []):
+                                        yield {"type": "source", "item": src}
                             delta = choice.get("delta") or {}
                             reason = delta.get("reasoning_content") or delta.get("reasoning")
                             if reason:

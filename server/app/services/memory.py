@@ -73,11 +73,14 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
         if inter <= 0:
             continue
         score = inter / min(len(qn), len(rn))
-        if score < 0.25:
+        if score < 0.1:
             continue
         ranked.append((score, r))
     matched = [r for _, r in sorted(ranked, key=lambda x: -x[0])]
 
+    # 工具是按需调用：模型明确来查时，就算词面对不上，也给最近几条兜底（空手而归更差）
+    if not matched:
+        matched = rows[:5]
     out: list[Memory] = []
     seen: set[str] = set()
     for r in matched:
