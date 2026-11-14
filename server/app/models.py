@@ -93,6 +93,8 @@ class Message(Base):
     parts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_hit_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_miss_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
 
 

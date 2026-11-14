@@ -23,8 +23,16 @@ DEDUPE_JACCARD = 0.7
 _SPACE = re.compile(r"\s+")
 
 
+_SELF = str.maketrans({"我": "她"})
+
+
+def _norm(text: str) -> str:
+    """记忆里的主语是「她」，用户的问法是「我」，归一后才能对上。"""
+    return (text or "").translate(_SELF)
+
+
 def bigrams(text: str) -> set[str]:
-    t = _SPACE.sub("", text or "")
+    t = _SPACE.sub("", _norm(text))
     if not t:
         return set()
     if len(t) < 2:
@@ -54,7 +62,21 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
         hit = len(q & bigrams(r.text))
         scored.append((hit, r))
     # 只认真正相关的：至少 2 个 2-gram 命中。无关时一条都不注入（否则每条回复都自称「根据记忆」）
-    matched = [r for hit, r in sorted(scored, key=lambda x: -x[0]) if hit >= 2]
+    # 打分：交集 / 较短一侧的 bigram 数；放宽到 1 个交集也算（短问句本来就没几个 bigram）
+    qn = bigrams(user_text)
+    ranked = []
+    for r in rows:
+        rn = bigrams(r.text)
+        if not qn or not rn:
+            continue
+        inter = len(qn & rn)
+        if inter <= 0:
+            continue
+        score = inter / min(len(qn), len(rn))
+        if score < 0.25:
+            continue
+        ranked.append((score, r))
+    matched = [r for _, r in sorted(ranked, key=lambda x: -x[0])]
 
     out: list[Memory] = []
     seen: set[str] = set()
@@ -73,8 +95,9 @@ def prompt_block(memories: list[Memory]) -> str:
         return ""
     lines = "\n".join(f"- {m.text}" for m in memories)
     return (
-        "\n\n你长期记得的关于她的事（不是本轮说的，是过去留下的；用得上就用，不要硬提）：\n"
+        "\n\n【你记得的关于用户的事｜长期记忆，来自之前的对话】\n"
         f"{lines}\n"
+        "（这些是你已经知道的事实，可以直接当作已知来回答；不要说\"我不知道\"，也不要再问她。）\n"
     )
 
 

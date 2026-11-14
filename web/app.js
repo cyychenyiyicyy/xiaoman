@@ -702,9 +702,11 @@
       } else if (p.type === 'tool') {
         tools += 1;
         var q = (p.queries && p.queries.length) ? '「' + p.queries.join('、') + '」' : '';
+        var tname = p.name === 'memory_search' ? '检索记忆' : '联网搜索';
+        var ticon = p.name === 'memory_search' ? 'database' : 'search';
         body.push('<button type="button" class="tstep tstep-tool" data-act="open-sources" data-key="' +
-          esc(m._key) + '">' + ic('search', 'sm') +
-          '<span class="tstep-l">联网搜索</span>' +
+          esc(m._key) + '">' + ic(ticon, 'sm') +
+          '<span class="tstep-l">' + tname + '</span>' +
           (q ? '<span class="tstep-q">' + esc(q) + '</span>' : '') +
           (p.count ? '<span class="tstep-n">' + numWrap(p.count) + ' 条</span>' : '') +
           ic('chevron-right', 'sm tstep-c') + '</button>');

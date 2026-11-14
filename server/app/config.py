@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     # 上下文与生成
     history_limit: int = 20
+    history_token_budget: int = 110000
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 

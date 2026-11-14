@@ -22,7 +22,13 @@ from ..schemas import ChatIn
 from ..seed import get_current, get_memory_cfg, get_search_cfg
 from ..services import memory as memory_service
 from ..services import search as search_service
-from ..services.llm import stream_chat
+from ..services.llm import (
+    MEMORY_TOOL,
+    WEB_TOOL,
+    build_openai_messages,
+    stream_chat,
+    stream_with_tools,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -43,6 +49,8 @@ def _msg_out(m: Message) -> dict:
         "model_key": m.model_key,
         "thinking": m.thinking,
         "thinking_ms": m.thinking_ms or 0,
+        "cache_hit_tokens": m.cache_hit_tokens or 0,
+        "cache_miss_tokens": m.cache_miss_tokens or 0,
         "sources": m.sources or [],
         "tools": m.tools or [],
         "remembered": m.remembered or [],
@@ -77,6 +85,35 @@ def get_conversation(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/stats/cache")
+def cache_stats(limit: int = 20, db: Session = Depends(get_db)):
+    rows = list(
+        db.scalars(
+            select(Message)
+            .where(Message.role == "assistant", Message.status == "done")
+            .order_by(Message.created_at.desc())
+            .limit(max(1, min(limit, 200)))
+        ).all()
+    )
+    hit = sum(r.cache_hit_tokens or 0 for r in rows)
+    miss = sum(r.cache_miss_tokens or 0 for r in rows)
+    total = hit + miss
+    return {
+        "requests": len(rows),
+        "hit_tokens": hit,
+        "miss_tokens": miss,
+        "hit_rate": round(hit / total, 4) if total else 0.0,
+        "recent": [
+            {
+                "at": r.created_at.isoformat() if r.created_at else None,
+                "hit": r.cache_hit_tokens or 0,
+                "miss": r.cache_miss_tokens or 0,
+            }
+            for r in rows[:10]
+        ],
+    }
+
+
 @router.get("/messages")
 def list_messages(before: str | None = None, limit: int = 50, db: Session = Depends(get_db)):
     conv = _conversation(db)
@@ -96,6 +133,16 @@ def list_messages(before: str | None = None, limit: int = 50, db: Session = Depe
     items = [_msg_out(m) for m in reversed(rows)]
     next_before = items[0]["id"] if (has_more and items) else None
     return {"items": items, "next_before": next_before}
+
+
+def _est_tokens(text: str) -> int:
+    """粗估 token：中文约 1 字 1 token，英文约 4 字符 1 token。"""
+    t = text or ""
+    if not t:
+        return 0
+    # DeepSeek 中文约 0.6–0.7 token/字，英文约 0.25 token/字符
+    cjk = sum(1 for ch in t if "\u4e00" <= ch <= "\u9fff")
+    return int(cjk * 0.68 + (len(t) - cjk) / 4) + 4
 
 
 def _web_block(sources: list[dict]) -> str:
@@ -128,6 +175,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             image_refs.append({"id": att.id, "url": f"/api/v1/attachments/{att.id}", "mime": att.mime})
 
     # ── 回合前：记忆检索 +（非原生）联网检索 ─────────────────
+    # 记忆放 system（只放与本轮相关的；多数轮次为空 → 前缀不变）
     used_memories = memory_service.retrieve(db, text) if text else []
     memory_sources = memory_service.sources_payload(used_memories)
     memory_block = memory_service.prompt_block(used_memories)
@@ -137,6 +185,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     web_sources: list[dict] = []
     native_search = False
     web_hint = ""
+    search_on = bool(search_cfg.get("enabled") and text)
     if search_cfg.get("enabled") and text:
         prov = search_cfg.get("provider") or "deepseek"
         if prov == "deepseek" and (
@@ -149,14 +198,14 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 "涉及新闻、价格、赛事、最新数据这类时效问题时直接调用它，不要回答「我无法联网」。\n"
             )
         elif prov in ("tavily", "bocha"):
-            try:
-                web_sources = await search_service.search(
-                    prov, search_cfg.get("api_key", ""), text, int(search_cfg.get("max_results") or 5)
-                )
-            except Exception:  # noqa: BLE001 - 检索失败不能挡住回答
-                web_sources = []
+            # 不再预检索：改成模型自己调 web_search 工具（见 stream_with_tools）
+            pass
 
-    history = list(
+    # 历史必须 append-only：每轮只是「上轮请求 + 新内容」，
+    # 否则滑动窗口一丢最旧消息，整条前缀就变了，DeepSeek 的前缀缓存直接归零。
+    # 只有累计超过 token 预算时才从最旧开始丢（丢一次之后长期稳定）。
+    budget = int(getattr(settings, "history_token_budget", 60000))
+    rows = list(
         db.scalars(
             select(Message)
             .where(
@@ -165,9 +214,17 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 Message.role.in_(("user", "assistant")),
             )
             .order_by(Message.created_at.desc())
-            .limit(settings.history_limit)
         ).all()
-    )[::-1]
+    )
+    picked: list[Message] = []
+    used = 0
+    for m in rows:
+        cost = _est_tokens(m.content_md)
+        if used + cost > budget:
+            break
+        used += cost
+        picked.append(m)
+    history = list(reversed(picked))
 
     user_msg = Message(
         conversation_id=conv.id,
@@ -223,7 +280,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     async def event_stream() -> AsyncIterator[str]:
         text_parts: list[str] = []
         reason_parts: list[str] = []
-        usage = {"prompt_tokens": 0, "completion_tokens": 0}
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_hit": 0, "cache_miss": 0}
         error: dict | None = None
         cancelled = False
         t_think_start: float | None = None
@@ -250,18 +307,60 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         if web_sources:
             yield _sse({"type": "tool", "name": "web_search", "state": "end", "count": len(web_sources)})
 
+        async def _exec_tool(name: str, args: dict):
+            """服务端执行函数工具（记忆/联网）。命中的记忆写进本消息来源。"""
+            query = (args or {}).get("query") or text
+            if name == "memory_search":
+                with SessionLocal() as s2:
+                    rows = memory_service.retrieve(s2, query)
+                    memory_service.touch(s2, rows)
+                    s2.commit()
+                    out = [
+                        {"id": r.id, "text": r.text, "kind": r.kind, "subject": r.subject}
+                        for r in rows
+                    ]
+                for item in out:
+                    if not any(x.get("id") == item["id"] for x in sources):
+                        sources.append({"type": "memory", **item})
+                return out
+            if name == "web_search":
+                items = await search_service.search(
+                    search_cfg.get("provider") or "tavily",
+                    search_cfg.get("api_key") or "",
+                    query,
+                    int(search_cfg.get("max_results") or 5),
+                )
+                for item in items:
+                    if item.get("url") and item["url"] not in seen_urls:
+                        seen_urls.add(item["url"])
+                        sources.append(item)
+                return items
+            return []
+
+        fn_tools: list[dict] = []
+        if not native_search and search_on and (search_cfg.get("provider") or "deepseek") != "deepseek":
+            fn_tools.append(WEB_TOOL)
+
         try:
-            async for ev in stream_chat(
-                provider_snap,
-                model_snap,
-                hist,
-                text,
-                atts,
-                thinking,
-                memory_block=memory_block,
-                web_block=web_hint + _web_block(web_sources),
-                native_search=native_search,
-            ):
+            if native_search or not fn_tools:
+                # 原生服务端工具（DeepSeek）或纯对话：单次请求
+                stream = stream_chat(
+                    provider_snap,
+                    model_snap,
+                    hist,
+                    text,
+                    atts,
+                    thinking,
+                    memory_block=memory_block,
+                    web_block=web_hint,
+                    native_search=native_search,
+                )
+            else:
+                base_msgs = build_openai_messages(hist, text, atts, memory_block, web_hint)
+                stream = stream_with_tools(
+                    provider_snap, model_snap, base_msgs, thinking, fn_tools, _exec_tool
+                )
+            async for ev in stream:
                 kind = ev.get("type")
                 if kind == "text":
                     if t_think_start is not None and t_think_end is None:
@@ -296,15 +395,18 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     usage = {
                         "prompt_tokens": int(ev.get("prompt_tokens") or 0),
                         "completion_tokens": int(ev.get("completion_tokens") or 0),
+                        "cache_hit": int(ev.get("cache_hit") or 0),
+                        "cache_miss": int(ev.get("cache_miss") or 0),
                     }
                 elif kind == "tool":
+                    tname = ev.get("name") or "web_search"
                     if ev.get("state") == "start":
                         cur_reason = None
-                        tools.append("web_search")
+                        tools.append(tname)
                         parts.append(
                             {
                                 "type": "tool",
-                                "name": ev.get("name") or "web_search",
+                                "name": tname,
                                 "queries": ev.get("queries") or [],
                                 "kind": ev.get("kind") or "search",
                                 "count": 0,
@@ -356,6 +458,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     row.parts = parts
                     row.prompt_tokens = usage["prompt_tokens"]
                     row.completion_tokens = usage["completion_tokens"]
+                    row.cache_hit_tokens = usage.get("cache_hit", 0)
+                    row.cache_miss_tokens = usage.get("cache_miss", 0)
                     current = s.get(Conversation, conv_id)
                     if current is not None:
                         current.updated_at = datetime.now(timezone.utc)
