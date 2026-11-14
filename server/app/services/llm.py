@@ -189,6 +189,8 @@ async def stream_chat(
                                     "queries": action.get("queries") or ([action.get("url")] if action.get("url") else []),
                                     "kind": kind,
                                 }
+                            elif ev_type == "step_reasoning_done":
+                                yield {"type": "step_end", "kind": "reasoning"}
                             elif ev_type == "call_completed":
                                 yield {"type": "tool", "name": "web_search", "state": "end", "kind": kind}
                                 for src in _norm_web(call.get("sources") or []):

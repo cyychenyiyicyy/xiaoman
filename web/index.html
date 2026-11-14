@@ -14,9 +14,9 @@
 <div class="shell" id="shell">
   <nav class="rail" aria-label="主导航">
     <div class="logo" aria-hidden="true">满</div>
-    <div class="it on" aria-current="page">
+    <button type="button" class="it on" id="rail-chat" data-act="rail-chat" aria-current="page">
       <svg class="ic" aria-hidden="true"><use data-i="circle-dot"/></svg><span>对话</span>
-    </div>
+    </button>
     <div class="it" aria-disabled="true">
       <svg class="ic" aria-hidden="true"><use data-i="book-open-text"/></svg><span>错题</span>
     </div>
@@ -30,9 +30,9 @@
       <svg class="ic" aria-hidden="true"><use data-i="zap"/></svg><span>本周</span>
     </div>
     <div class="sp"></div>
-    <div class="it" aria-disabled="true">
+    <button type="button" class="it" id="rail-settings" data-act="rail-settings">
       <svg class="ic" aria-hidden="true"><use data-i="settings"/></svg><span>设置</span>
-    </div>
+    </button>
   </nav>
 
   <main class="pane" id="pane">

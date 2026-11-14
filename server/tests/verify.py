@@ -232,11 +232,49 @@ def check_catalog(run: Run) -> None:
     run.results[-1].ms = int((time.perf_counter() - started) * 1000)
 
 
+def check_memory(run: Run) -> None:
+    """记忆：2-gram 检索命中 + 相似度去重（用回滚事务，不污染库）。"""
+    from app.db import SessionLocal
+    from app.models import Memory
+    from app.services import memory as mem
+
+    started = time.perf_counter()
+    db = SessionLocal()
+    try:
+        db.add_all(
+            [
+                Memory(text="她物理最怕电磁感应", kind="fact", subject="物理"),
+                Memory(text="她喜欢先看提示再要完整答案", kind="pref"),
+                Memory(text="她每天七点半开始学习", kind="fact"),
+            ]
+        )
+        db.flush()
+        hits = mem.retrieve(db, "电磁感应这块我总是搞不清", limit=3)
+        run.add(
+            "memory.retrieve",
+            "PASS" if hits and "电磁感应" in hits[0].text else "FAIL",
+            hits[0].text if hits else "无命中",
+        )
+        dup = mem.jaccard("她物理最怕电磁感应", "她物理最怕电磁感应")
+        diff = mem.jaccard("她物理最怕电磁感应", "她喜欢先看提示")
+        run.add(
+            "memory.dedupe",
+            "PASS" if dup > 0.7 and diff < 0.7 else "FAIL",
+            f"同句={dup:.2f} 异句={diff:.2f}",
+        )
+    except Exception as exc:  # noqa: BLE001
+        run.add("memory", "FAIL", f"{type(exc).__name__}: {exc}"[:300])
+    finally:
+        db.rollback()
+        db.close()
+    run.results[-1].ms = int((time.perf_counter() - started) * 1000)
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", default="schema,migration,api,catalog")
+    parser.add_argument("--only", default="schema,migration,api,catalog,memory")
     parser.add_argument("--selftest", action="store_true", help="注入一个假失败，验证脚本会 exit 1")
     parser.add_argument("--destructive", action="store_true")
     args = parser.parse_args()
@@ -257,6 +295,8 @@ def main() -> int:
         check_api(run)
     if "catalog" in selected:
         check_catalog(run)
+    if "memory" in selected:
+        check_memory(run)
     for name in ("fsrs", "export"):
         if name in selected:
             run.add(name, "SKIP", "MVP 未实现（M2 / M3 末）")

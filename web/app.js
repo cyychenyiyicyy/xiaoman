@@ -22,6 +22,15 @@
     modelsError: {},
     settings: null,
     settingsState: 'loading',
+    search: null,             // GET /settings/search: {enabled, provider, api_key_tail, max_results}
+    searchState: 'loading',   // loading | ready | error
+    searchError: '',
+    searchTest: { state: 'idle', ok: false, latency: 0, error: '' },
+    memorySetting: null,      // GET /settings/memory: {auto}
+    memoryStats: null,        // GET /memories/stats: {total, active, used_last_7d}
+    memories: null,           // GET /memories 的 items
+    memoriesState: 'loading',
+    memoriesError: '',
     messages: [],
     msgState: 'loading',     // loading | ready | error
     msgError: '',
@@ -295,6 +304,11 @@
       content_md: m.content_md || '',
       reasoning_md: m.reasoning_md || '',
       images: Array.isArray(m.images) ? m.images : [],
+      tools: Array.isArray(m.tools) ? m.tools : [],
+      sources: Array.isArray(m.sources) ? m.sources : [],
+      remembered: Array.isArray(m.remembered) ? m.remembered : [],
+      parts: Array.isArray(m.parts) ? m.parts : [],
+      thinking_ms: m.thinking_ms || 0,
       provider_id: m.provider_id,
       model_key: m.model_key,
       thinking: m.thinking,
@@ -354,6 +368,85 @@
     return meta;
   }
 
+  /* ── 设置：联网搜索 / 记忆（契约 §5.3）─────────────── */
+  var SEARCH_PROVIDERS = [
+    { id: 'deepseek', label: 'DeepSeek 原生' },
+    { id: 'tavily', label: 'Tavily' },
+    { id: 'bocha', label: '博查' }
+  ];
+
+  function searchProviderLabel(id) {
+    for (var i = 0; i < SEARCH_PROVIDERS.length; i++) {
+      if (SEARCH_PROVIDERS[i].id === id) return SEARCH_PROVIDERS[i].label;
+    }
+    return 'DeepSeek 原生';
+  }
+
+  function kindLabel(kind) {
+    if (kind === 'fact') return '事实';
+    if (kind === 'pref') return '偏好';
+    return String(kind || '');
+  }
+
+  function domainOf(url) {
+    if (!url) return '';
+    try { return new URL(String(url)).hostname.replace(/^www\./, ''); }
+    catch (e) { return String(url).replace(/^https?:\/\//, '').split('/')[0]; }
+  }
+
+  function fmtWhen(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso).slice(0, 16);
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  async function loadSearchSettings() {
+    state.searchState = 'loading';
+    try {
+      var r = await api('/settings/search');
+      state.search = r && typeof r === 'object' ? r : {};
+      state.searchState = 'ready';
+    } catch (e) {
+      state.searchState = 'error';
+      state.searchError = e.message;
+    }
+  }
+
+  async function loadMemorySettings() {
+    try {
+      var r = await api('/settings/memory');
+      state.memorySetting = r && typeof r === 'object' ? r : { auto: true };
+    } catch (e) {
+      if (!state.memorySetting) state.memorySetting = { auto: true };
+    }
+  }
+
+  async function loadMemoryStats() {
+    try { state.memoryStats = await api('/memories/stats'); }
+    catch (e) { state.memoryStats = null; }
+  }
+
+  async function loadMemories() {
+    state.memoriesState = 'loading';
+    try {
+      var r = await api('/memories?limit=50');
+      var items = r && Array.isArray(r.items) ? r.items : (Array.isArray(r) ? r : []);
+      state.memories = items;
+      state.memoriesState = 'ready';
+    } catch (e) {
+      state.memoriesState = 'error';
+      state.memoriesError = e.message;
+    }
+  }
+
+  async function openSettings() {
+    openPage({ kind: 'settings' });
+    await Promise.all([loadSearchSettings(), loadMemorySettings(), loadMemoryStats()]);
+    if (state.page && state.page.kind === 'settings') render();
+  }
+
   async function reloadAll() {
     state.models = {};
     state.modelsError = {};
@@ -373,6 +466,7 @@
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
     renderTop();
+    renderRail();
     var isChat = state.view === 'chat';
     q('#view-chat').hidden = !isChat;
     q('#view-page').hidden = isChat;
@@ -391,6 +485,24 @@
   function renderTop() {
     var el = q('#top-subject');
     if (state.conversation && state.conversation.subject) el.textContent = state.conversation.subject;
+  }
+
+  // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
+  function renderRail() {
+    var chat = q('#rail-chat');
+    var set = q('#rail-settings');
+    var onSettings = !!(state.view === 'page' && state.page &&
+      (state.page.kind === 'settings' || state.page.kind === 'memories'));
+    if (chat) {
+      chat.classList.toggle('on', !onSettings);
+      if (onSettings) chat.removeAttribute('aria-current');
+      else chat.setAttribute('aria-current', 'page');
+    }
+    if (set) {
+      set.classList.toggle('on', onSettings);
+      if (onSettings) set.setAttribute('aria-current', 'page');
+      else set.removeAttribute('aria-current');
+    }
   }
 
   function renderPill() {
@@ -501,17 +613,190 @@
         (imgs ? '<div class="ustack">' + imgs + '</div>' : '') + text + '</div></div>';
     }
     var inner = '';
-    if (m.reasoning_md) inner += reasoningHtml(m);
-    if (m._st) {
-      inner += '<div class="agbody sbody"><div class="stable"></div>' +
-        '<div class="live">' + caretHtml() + '</div></div>';
-    } else if (m.content_md) {
-      inner += '<div class="agbody">' + renderMarkdown(m.content_md) + '</div>';
-    } else if (m.status === 'streaming') {
-      inner += '<div class="skel inmsg">' + skelRows(2) + '</div>';
+    var useParts = !!(m.parts && m.parts.length && m.status !== 'streaming');
+    if (useParts) {
+      inner += partsStepsHtml(m);
+      inner += statusRowHtml(m);
+      inner += partsAnswersHtml(m);
+    } else {
+      if (m.reasoning_md) inner += reasoningHtml(m);
+      if (m._st) {
+        inner += '<div class="agbody sbody"><div class="stable"></div>' +
+          '<div class="live">' + caretHtml() + '</div></div>';
+      } else if (m.content_md) {
+        inner += '<div class="agbody">' + renderMarkdown(m.content_md) + '</div>';
+      } else if (m.status === 'streaming') {
+        inner += '<div class="skel inmsg">' + skelRows(2) + '</div>';
+      }
     }
+    if (!useParts) inner += statusRowHtml(m);
+    inner += sourceLineHtml(m);
     if (m.error) inner += msgErrorHtml(m);
     return '<div class="ag" data-key="' + esc(m._key) + '">' + inner + '</div>';
+  }
+
+  /* ── 消息状态行（思考条下方）+ 末尾来源行（契约 §5.1 / §5.2）── */
+  function numWrap(n) { return '<span class="num">' + Number(n) + '</span>'; }
+
+  function searchTimes(m) {
+    var n = Number(m._searchCount || 0);
+    if (!n && Array.isArray(m.tools)) {
+      m.tools.forEach(function (t) { if (t === 'web_search') n += 1; });
+    }
+    return n;
+  }
+
+  function stepSecs(ms) {
+    var n = Math.max(1, Math.round((Number(ms) || 0) / 1000));
+    return n + ' 秒';
+  }
+
+  // 一条消息 = 多个 part（参考 Vercel AI SDK 的 message parts / assistant-ui GroupedParts）
+  function partsSplit(m) {
+    var steps = [];
+    var reasonCount = (m.parts || []).filter(function (x) { return x && x.type === 'reasoning'; }).length;
+    var answers = [];
+    (m.parts || []).forEach(function (p) {
+      if (!p || !p.type) return;
+      if (p.type === 'reasoning') {
+        // 只有一段思考且没有分段耗时（非 DeepSeek 原生路径）时，用整轮的 thinking_ms 兜底
+        var ms = p.ms || (reasonCount === 1 ? m.thinking_ms : 0);
+        var lab = ms ? '思考 ' + stepSecs(ms) : '思考';
+        steps.push('<details class="pstep">' +
+          '<summary class="psum">' + ic('zap', 'sm') +
+          '<span class="plab">' + esc(lab) + '</span>' +
+          ic('chevron-down', 'sm pchev') + '</summary>' +
+          '<div class="pbody">' + renderMarkdown(p.text || '') + '</div></details>');
+      } else if (p.type === 'tool') {
+        var q = (p.queries && p.queries.length) ? '「' + p.queries.join('、') + '」' : '';
+        steps.push('<button type="button" class="pstep ptool" data-act="open-sources" data-key="' +
+          esc(m._key) + '">' + ic('search', 'sm') +
+          '<span class="plab">联网搜索</span>' +
+          (q ? '<span class="pval">' + esc(q) + '</span>' : '') +
+          (p.count ? '<span class="pcount">' + numWrap(p.count) + ' 条</span>' : '') +
+          ic('chevron-right', 'sm pchev') + '</button>');
+      } else if (p.type === 'text') {
+        answers.push('<div class="agbody">' + renderMarkdown(p.text || '') + '</div>');
+      }
+    });
+    return { steps: steps, answers: answers };
+  }
+
+  function partsStepsHtml(m) {
+    var sp = partsSplit(m);
+    return sp.steps.length ? '<div class="steps">' + sp.steps.join('') + '</div>' : '';
+  }
+
+  function partsAnswersHtml(m) {
+    return partsSplit(m).answers.join('');
+  }
+
+  function lastPart(m, type) {
+    var arr = m && m.parts;
+    if (!arr) return null;
+    for (var i = arr.length - 1; i >= 0; i--) {
+      if (arr[i] && arr[i].type === type) return arr[i];
+    }
+    return null;
+  }
+
+  function ensurePart(m, kind, extra) {
+    if (!m.parts) m.parts = [];
+    var p = { type: kind };
+    if (extra) for (var k in extra) p[k] = extra[k];
+    m.parts.push(p);
+    return p;
+  }
+
+  function statusRowHtml(m) {
+    var parts = [];
+    // 秒数只在思考条那一行显示（同一数字不重复占两行）
+    var mem = (m.remembered || []).length;
+    if (mem > 0) {
+      parts.push('<button type="button" class="tpill ro hit44" data-act="open-sources" data-key="' +
+        esc(m._key) + '">' + ic('database', 'sm') + '记忆 +' + numWrap(mem) + '</button>');
+    }
+    var web = searchTimes(m);
+    if (web > 0) {
+      parts.push('<button type="button" class="tpill ro hit44" data-act="open-sources" data-key="' +
+        esc(m._key) + '">' + ic('search', 'sm') + '搜索 ' + numWrap(web) + ' 次</button>');
+    }
+    if (!parts.length) return '';
+    return '<div class="statusrow" data-status="1">' + parts.join('') + '</div>';
+  }
+
+  function srcCount(m, type) {
+    return (m.sources || []).filter(function (s) { return s && s.type === type; }).length;
+  }
+
+  function sourceLineHtml(m) {
+    var mem = srcCount(m, 'memory');
+    var web = srcCount(m, 'web');
+    if (!mem && !web) return '';
+    var parts = [];
+    if (mem) parts.push(ic('database', 'sm') + '根据 ' + numWrap(mem) + ' 条记忆');
+    if (web) parts.push(ic('globe', 'sm') + '参考 ' + numWrap(web) + ' 个网页');
+    return '<button type="button" class="srcline" data-act="open-sources" data-key="' + esc(m._key) + '">' +
+      '<span class="srl">' + parts.join('<span class="dot">·</span>') + '</span>' +
+      ic('chevron-right', 'sm chev') + '</button>';
+  }
+
+  function findMessageByKey(key) {
+    for (var i = 0; i < state.messages.length; i++) {
+      if (String(state.messages[i]._key) === String(key)) return state.messages[i];
+    }
+    return null;
+  }
+
+  // 只补状态行/来源行，不动正文（memory 事件在 done 之后到达）
+  function patchMeta(m) {
+    var root = msgRoot(m);
+    if (!root) return;
+    var row = root.querySelector('[data-status]');
+    var rowHtml = statusRowHtml(m);
+    if (row) {
+      if (rowHtml) row.outerHTML = rowHtml;
+      else if (row.parentNode) row.parentNode.removeChild(row);
+    } else if (rowHtml) {
+      var body = root.querySelector('.agbody');
+      if (body) body.insertAdjacentHTML('beforebegin', rowHtml);
+      else root.insertAdjacentHTML('beforeend', rowHtml);
+    }
+    var line = root.querySelector('.srcline');
+    var lineHtml = sourceLineHtml(m);
+    if (line) {
+      if (lineHtml) line.outerHTML = lineHtml;
+      else if (line.parentNode) line.parentNode.removeChild(line);
+    } else if (lineHtml) {
+      var body2 = root.querySelector('.agbody');
+      if (body2) body2.insertAdjacentHTML('afterend', lineHtml);
+      else root.insertAdjacentHTML('beforeend', lineHtml);
+    }
+  }
+
+  function mergeWebSources(m, list) {
+    m.sources = m.sources || [];
+    var seen = {};
+    m.sources.forEach(function (s) { if (s && s.url) seen[s.url] = 1; });
+    list.forEach(function (s) {
+      if (!s || typeof s !== 'object') return;
+      var item = { type: 'web', title: s.title || '', url: s.url || '', site: s.site_name || s.site || '' };
+      if (item.url && seen[item.url]) return;
+      if (item.url) seen[item.url] = 1;
+      m.sources.push(item);
+    });
+  }
+
+  function mergeRemembered(m, list) {
+    m.remembered = m.remembered || [];
+    var seen = {};
+    m.remembered.forEach(function (x) { seen[String(x.id)] = 1; });
+    list.forEach(function (x) {
+      if (!x || x.id == null) return;
+      if (seen[String(x.id)]) return;
+      seen[String(x.id)] = 1;
+      m.remembered.push(x);
+    });
   }
 
   function caretHtml() { return '<span class="caret" aria-hidden="true"></span>'; }
@@ -859,12 +1144,85 @@ function typesetMath(el) {
     return '<div class="scrim" data-act="close-sheet"></div>' +
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cf-ttl" tabindex="-1">' +
       '<div class="grab"></div>' +
-      '<div class="shd"><div class="ttl" id="cf-ttl">断开</div>' +
+      '<div class="shd"><div class="ttl" id="cf-ttl">' + esc(o.title || '确认') + '</div>' +
       '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
-      '<div class="sheet-body"><div class="confirm-name">' + esc(o.name || '') + '</div></div>' +
+      '<div class="sheet-body"><div class="confirm-name">' + esc(o.text || '') + '</div></div>' +
       '<div class="sheet-foot"><div class="btnbar full">' +
-      '<button type="button" class="btn g" data-act="close-sheet">取消</button>' +
-      '<button type="button" class="btn d" data-act="confirm-disconnect">断开</button>' +
+      '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+      '<button type="button" class="btn d" data-act="' + esc(o.act || 'close-sheet') + '">' +
+      esc(o.actLabel || '确认') + '</button>' +
+      '</div></div></div>';
+  }
+
+  /* ── 来源浮窗（§5.2）：上半记忆、下半网页 ─────────── */
+  function sourcesSheetHtml(o) {
+    var m = findMessageByKey(o.key);
+    var mem = m ? (m.sources || []).filter(function (s) { return s && s.type === 'memory'; }) : [];
+    var web = m ? (m.sources || []).filter(function (s) { return s && s.type === 'web'; }) : [];
+    var body = '';
+    if (mem.length) {
+      body += '<div class="slabel">记忆 · ' + mem.length + '</div><div class="scard">' +
+        mem.map(function (s) {
+          return '<div class="srow"><span class="md"><span class="n1">' +
+            esc(s.text || s.title || '') + '</span></span>' +
+            '<span class="trail"><span class="val">' + esc(kindLabel(s.kind)) + '</span></span></div>';
+        }).join('') + '</div>';
+    }
+    if (web.length) {
+      body += '<div class="slabel">网页 · ' + web.length + '</div><div class="scard">' +
+        web.map(function (s) {
+          var url = s.url || '#';
+          return '<a class="srow weblink" href="' + esc(url) + '" target="_blank" rel="noreferrer">' +
+            '<span class="md"><span class="n1">' + esc(s.title || url) + '</span>' +
+            '<span class="n2 mono">' + esc(domainOf(url)) + '</span></span>' +
+            '<span class="trail">' + ic('external-link', 'sm') + '</span></a>';
+        }).join('') + '</div>';
+    }
+    if (!body) {
+      body = '<div class="empty">' + ic('database') + '<div class="t">没有来源</div></div>';
+    }
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="src-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="src-ttl">来源</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + body + '</div></div>';
+  }
+
+  function providerPickSheetHtml() {
+    var cur = (state.search && state.search.provider) || 'deepseek';
+    var rows = SEARCH_PROVIDERS.map(function (p) {
+      var on = p.id === cur;
+      return '<button type="button" class="mrow' + (on ? ' on' : '') +
+        '" data-act="set-search-provider" data-provider="' + p.id + '">' +
+        '<span class="nm">' + esc(p.label) + '</span>' +
+        '<span class="chk">' + (on ? ic('check', 'sm') : '') + '</span></button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pp-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="pp-ttl">提供方</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + rows + '</div></div>';
+  }
+
+  function searchKeySheetHtml() {
+    var tail = state.search && state.search.api_key_tail;
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sk-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="sk-ttl">API Key</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="field">' +
+      '<label class="flabel" for="s-key">API Key</label>' +
+      '<input class="fi" id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="' +
+      (tail ? '保持不变' : 'sk-…') + '">' +
+      '<div class="fmsg" data-msg="s_key"></div></div>' +
+      (tail ? '<div class="src">当前 ' + esc(keyMask(tail)) + '</div>' : '') +
+      '</div>' +
+      '<div class="sheet-foot"><div class="btnbar full">' +
+      '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+      '<button type="button" class="btn p" data-act="save-search-key">保存</button>' +
       '</div></div></div>';
   }
 
@@ -934,7 +1292,11 @@ function typesetMath(el) {
     host.hidden = false;
     var kind = state.overlay.kind;
     host.innerHTML = kind === 'confirm' ? confirmSheetHtml(state.overlay)
-      : (kind === 'model' ? modelDetailSheetHtml(state.overlay) : modelSheetHtml());
+      : kind === 'model' ? modelDetailSheetHtml(state.overlay)
+        : kind === 'sources' ? sourcesSheetHtml(state.overlay)
+          : kind === 'provider-pick' ? providerPickSheetHtml()
+            : kind === 'search-key' ? searchKeySheetHtml()
+              : modelSheetHtml();
   }
 
   /* ── 渲染：模型管理 / provider 详情 / 表单 ─────────── */
@@ -1144,6 +1506,111 @@ function typesetMath(el) {
       '</div></form>';
   }
 
+  function settingSwitch(label, act, on) {
+    return '<button type="button" class="srow swrow" role="switch" aria-checked="' + (on ? 'true' : 'false') +
+      '" data-act="' + act + '">' +
+      '<span class="md"><span class="n1">' + esc(label) + '</span></span>' +
+      '<span class="trail"><span class="sw' + (on ? ' on' : '') + '"></span></span></button>';
+  }
+
+  function searchStepper(s) {
+    var n = Number((s && s.max_results) || 5);
+    return '<div class="srow"><span class="md"><span class="n1">结果条数</span></span>' +
+      '<span class="trail"><span class="stepper c44">' +
+      '<button type="button" class="b" data-act="results-dec" aria-label="减少"' +
+      (n <= 1 ? ' disabled' : '') + '>' + ic('minus', 'sm') + '</button>' +
+      '<span class="v num">' + n + '</span>' +
+      '<button type="button" class="b" data-act="results-inc" aria-label="增加"' +
+      (n >= 10 ? ' disabled' : '') + '>' + ic('plus', 'sm') + '</button>' +
+      '</span></span></div>';
+  }
+
+  function settingsPageHtml() {
+    var nav = navbar('设置', '', 'goto-chat', '对话', false);
+    var cur = settingModel();
+
+    if (state.searchState === 'loading' && !state.search) {
+      return nav + '<div class="det"><div class="skel">' + skelRows(4) + '</div></div>';
+    }
+    if (state.searchState === 'error') {
+      return nav + '<div class="det">' +
+        pageErrorState('加载失败', state.searchError, 'reload-settings', 'goto-chat', '返回对话') + '</div>';
+    }
+
+    var s = state.search || {};
+    var provider = s.provider || 'deepseek';
+    var native = provider === 'deepseek';
+    var test = state.searchTest || { state: 'idle' };
+    var testVal = test.state === 'testing' ? '测试中'
+      : (test.state === 'done' ? (test.ok ? Number(test.latency || 0) + 'ms' : '失败') : '');
+
+    var keyRow = native ? '' :
+      '<button type="button" class="srow" data-act="search-key">' +
+      '<span class="md"><span class="n1">API Key</span></span>' +
+      '<span class="trail"><span class="val mono">' +
+      esc(s.api_key_tail ? keyMask(s.api_key_tail) : '未设置') + '</span>' +
+      ic('chevron-right', 'sm chev') + '</span></button>';
+
+    var searchCard =
+      settingSwitch('联网搜索', 'toggle-search', !!s.enabled) +
+      '<button type="button" class="srow" data-act="pick-search-provider">' +
+      '<span class="md"><span class="n1">提供方</span></span>' +
+      '<span class="trail"><span class="val">' + esc(searchProviderLabel(provider)) + '</span>' +
+      ic('chevron-right', 'sm chev') + '</span></button>' +
+      keyRow +
+      searchStepper(s) +
+      '<button type="button" class="srow" data-act="test-search">' +
+      '<span class="lead">' + ic('plug') + '</span>' +
+      '<span class="md"><span class="n1">测试</span></span>' +
+      '<span class="trail"><span class="val mono">' + esc(testVal) + '</span></span></button>';
+
+    var auto = !state.memorySetting || state.memorySetting.auto !== false;
+    var total = state.memoryStats && state.memoryStats.total != null
+      ? Number(state.memoryStats.total) : null;
+
+    var memoryCard =
+      settingSwitch('自动记忆', 'toggle-memory', auto) +
+      '<button type="button" class="srow" data-act="open-memories">' +
+      '<span class="md"><span class="n1">已存 ' + (total == null ? '—' : numWrap(total)) + ' 条</span></span>' +
+      '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>';
+
+    return nav + '<div class="det">' +
+      groupHtml('模型', '<button type="button" class="srow" data-act="open-models">' +
+        '<span class="lead">' + ic('cpu') + '</span>' +
+        '<span class="md"><span class="n1">当前模型</span></span>' +
+        '<span class="trail"><span class="val">' + esc(cur ? cur.model_key : '未配置') + '</span>' +
+        ic('chevron-right', 'sm chev') + '</span></button>') +
+      groupHtml('联网搜索', searchCard) +
+      groupHtml('记忆', memoryCard) +
+      '</div>';
+  }
+
+  function memoriesPageHtml() {
+    var nav = navbar('记忆', '设置', 'back-settings', '返回', false);
+    if (state.memoriesState === 'loading') {
+      return nav + '<div class="settings"><div class="skel">' + skelRows(4) + '</div></div>';
+    }
+    if (state.memoriesState === 'error') {
+      return nav + '<div class="settings">' +
+        pageErrorState('加载失败', state.memoriesError, 'reload-memories', 'back-settings', '返回设置') +
+        '</div>';
+    }
+    var list = state.memories || [];
+    if (!list.length) {
+      return nav + '<div class="settings"><div class="empty">' + ic('database') +
+        '<div class="t">还没有记忆</div>' +
+        '<button type="button" class="btn" data-act="back-settings">返回设置</button></div></div>';
+    }
+    var rows = list.map(function (m) {
+      return '<div class="srow">' +
+        '<span class="md"><span class="n1">' + esc(m.text || '') + '</span>' +
+        '<span class="n2 mono">' + esc(kindLabel(m.kind)) + ' · ' + esc(fmtWhen(m.created_at)) + '</span></span>' +
+        '<span class="trail"><button type="button" class="iconbtn" data-act="ask-delete-memory" data-id="' +
+        esc(m.id) + '" aria-label="删除">' + ic('x', 'sm') + '</button></span></div>';
+    }).join('');
+    return nav + '<div class="settings">' + groupHtml('已存 ' + list.length + ' 条', rows) + '</div>';
+  }
+
   function renderPage() {
     var host = q('#view-page');
     var page = state.page;
@@ -1154,6 +1621,10 @@ function typesetMath(el) {
       html = findProvider(page.providerId) ? providerPageHtml(page.providerId) : modelsPageHtml();
     } else if (page.kind === 'form') {
       html = formHtml(page);
+    } else if (page.kind === 'settings') {
+      html = settingsPageHtml();
+    } else if (page.kind === 'memories') {
+      html = memoriesPageHtml();
     }
     host.innerHTML = html;
     if (page.kind === 'form') {
@@ -1317,6 +1788,127 @@ function typesetMath(el) {
     render();
   }
 
+  /* ── 设置动作：联网搜索 / 记忆 ─────────────────────── */
+  async function patchSearch(body) {
+    var prev = state.search;
+    state.search = Object.assign({}, state.search, body);
+    render();
+    try {
+      var r = await api('/settings/search', { method: 'PATCH', json: body });
+      if (r && typeof r === 'object') state.search = Object.assign({}, state.search, r);
+    } catch (e) {
+      state.search = prev;
+      toast('未保存 · ' + e.message);
+    }
+    render();
+  }
+
+  function toggleSearchSwitch(el) {
+    var on = el.getAttribute('aria-checked') === 'true';
+    patchSearch({ enabled: !on });
+  }
+
+  function bumpResults(delta) {
+    var n = Number((state.search && state.search.max_results) || 5);
+    var next = Math.min(10, Math.max(1, n + delta));
+    if (next === n) return;
+    patchSearch({ max_results: next });
+  }
+
+  async function testSearch() {
+    state.searchTest = { state: 'testing', ok: false, latency: 0, error: '' };
+    render();
+    try {
+      var r = await api('/settings/search/test', { method: 'POST' });
+      state.searchTest = {
+        state: 'done',
+        ok: !!(r && r.ok),
+        latency: (r && r.latency_ms) || 0,
+        error: (r && r.error) || ''
+      };
+      if (!state.searchTest.ok && state.searchTest.error) toast(state.searchTest.error);
+    } catch (e) {
+      state.searchTest = { state: 'done', ok: false, latency: 0, error: e.message };
+      toast('测试失败 · ' + e.message);
+    }
+    render();
+  }
+
+  async function toggleMemorySwitch(el) {
+    var on = el.getAttribute('aria-checked') === 'true';
+    var prev = state.memorySetting;
+    state.memorySetting = Object.assign({}, state.memorySetting, { auto: !on });
+    render();
+    try {
+      var r = await api('/settings/memory', { method: 'PATCH', json: { auto: !on } });
+      if (r && typeof r === 'object') state.memorySetting = Object.assign({}, state.memorySetting, r);
+    } catch (e) {
+      state.memorySetting = prev;
+      toast('未保存 · ' + e.message);
+    }
+    render();
+  }
+
+  async function openMemories() {
+    openPage({ kind: 'memories' });
+    await Promise.all([loadMemories(), loadMemoryStats()]);
+    if (state.page && state.page.kind === 'memories') render();
+  }
+
+  function askDeleteMemory(id) {
+    var m = (state.memories || []).filter(function (x) {
+      return String(x.id) === String(id);
+    })[0];
+    setOverlay({
+      kind: 'confirm', title: '删除记忆', text: m ? m.text : '',
+      act: 'confirm-delete-memory', actLabel: '删除', id: id
+    });
+  }
+
+  async function doDeleteMemory() {
+    var o = state.overlay;
+    if (!o || o.id == null) return;
+    var id = o.id;
+    closeOverlay();
+    try {
+      await api('/memories/' + encodeURIComponent(id), { method: 'DELETE' });
+      await Promise.all([loadMemories(), loadMemoryStats()]);
+      render();
+      toast('已删除');
+    } catch (e) {
+      toast('未删除 · ' + e.message);
+    }
+  }
+
+  async function saveSearchKey() {
+    var host = q('#overlay');
+    var input = q('#s-key', host);
+    var v = input ? (input.value || '').trim() : '';
+    if (!v) {
+      var slot = q('[data-msg="s_key"]', host);
+      if (slot) slot.textContent = '必填';
+      if (input) input.focus();
+      return;
+    }
+    var btn = q('[data-act="save-search-key"]', host);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+    }
+    try {
+      await api('/settings/search', { method: 'PATCH', json: { api_key: v } });
+      await loadSearchSettings();
+      closeOverlay();
+      render();
+    } catch (e) {
+      toast('未保存 · ' + e.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '保存';
+      }
+    }
+  }
+
   /* ── 动作 ─────────────────────────────────────────── */
   async function setThinking(v) {
     var val = THINK.indexOf(v) >= 0 ? v : 'med';
@@ -1372,7 +1964,10 @@ function typesetMath(el) {
 
   function askDisconnect(pid) {
     var p = findProvider(pid);
-    setOverlay({ kind: 'confirm', pid: pid, name: p ? p.name : '' });
+    setOverlay({
+      kind: 'confirm', title: '断开', text: p ? p.name : '',
+      act: 'confirm-disconnect', actLabel: '断开', pid: pid
+    });
   }
 
   async function doDisconnect() {
@@ -1530,23 +2125,63 @@ function typesetMath(el) {
           if (ev.model_key) asst.model_key = ev.model_key;
           if (ev.thinking) asst.thinking = ev.thinking;
           // 只回填 id：DOM 靠 _key 跟踪，不重刷（重刷会打断渐显）
+        } else if (ev.type === 'part') {
+          if (ev.kind === 'reasoning') {
+            var rp = ensurePart(asst, 'reasoning', { text: '', ms: 0, _t0: nowMs() });
+          } else if (ev.kind === 'tool') {
+            ensurePart(asst, 'tool', { name: 'web_search', queries: ev.queries || [], count: 0 });
+          } else if (ev.kind === 'text') {
+            ensurePart(asst, 'text', { text: '' });
+          }
+        } else if (ev.type === 'part_end') {
+          var pend = lastPart(asst, 'reasoning');
+          if (pend && pend._t0) { pend.ms = nowMs() - pend._t0; pend._t0 = null; }
+        } else if (ev.type === 'part_update') {
+          var pt = lastPart(asst, 'tool');
+          if (pt) pt.count = (pt.count || 0) + 1;
         } else if (ev.type === 'reasoning') {
           if (!asst._thinkStart) asst._thinkStart = nowMs();
           asst.reasoning_md += ev.delta || '';
+          var rpart = lastPart(asst, 'reasoning');
+          if (rpart) rpart.text = (rpart.text || '') + (ev.delta || '');
           paintReasoning(asst);
         } else if (ev.type === 'text') {
           if (asst._thinkStart && asst._thinkMs == null) asst._thinkMs = nowMs() - asst._thinkStart;
           asst.content_md += ev.delta || '';
+          var tpart = lastPart(asst, 'text');
+          if (tpart) tpart.text = (tpart.text || '') + (ev.delta || '');
           if (!asst._st) startLive(asst);
           if (asst._st) {
             asst._st.target = asst.content_md;
             pumpReveal(asst);
+          }
+        } else if (ev.type === 'tool') {
+          var tname = ev.name || '';
+          if (tname === 'web_search' || !tname) {
+            var curCount = Number(asst._searchCount || 0);
+            var evCount = Number(ev.count || 0);
+            if (evCount > 0) asst._searchCount = Math.max(curCount, evCount);
+            else if (ev.state === 'end') asst._searchCount = curCount + 1;
+            if (Array.isArray(ev.sources) && ev.sources.length) mergeWebSources(asst, ev.sources);
+            patchMeta(asst);
+          }
+        } else if (ev.type === 'memory') {
+          if (Array.isArray(ev.items) && ev.items.length) {
+            mergeRemembered(asst, ev.items);
+            patchMeta(asst);
           }
         } else if (ev.type === 'done') {
           sawDone = true;
           asst.status = 'done';
           asst.usage = ev.usage || null;
           if (ev.thinking_ms) { asst.thinking_ms = ev.thinking_ms; asst._thinkMs = ev.thinking_ms; }
+          if (ev.parts && ev.parts.length) asst.parts = ev.parts;
+          if (Array.isArray(ev.tools)) asst.tools = ev.tools.slice();
+          if (Array.isArray(ev.sources)) asst.sources = ev.sources.slice();
+          if (Array.isArray(ev.remembered)) mergeRemembered(asst, ev.remembered);
+          if (asst._searchCount == null && asst.tools.indexOf('web_search') >= 0) {
+            asst._searchCount = asst.tools.filter(function (t) { return t === 'web_search'; }).length;
+          }
           if (ev.message_id != null) asst.id = ev.message_id;
           if (asst._st) {
             asst._st.final = true;
@@ -1794,6 +2429,28 @@ function typesetMath(el) {
     },
     'connect-catalog': function (el) { openPage({ kind: 'form', catalogId: el.getAttribute('data-cid') }); },
     'reload-catalog': function () { reloadCatalog(); },
+    'rail-chat': function () { openPage(null); },
+    'rail-settings': function () { openSettings(); },
+    'back-settings': function () { openPage({ kind: 'settings' }); render(); },
+    'reload-settings': function () { openSettings(); },
+    'toggle-search': function (el) { toggleSearchSwitch(el); },
+    'pick-search-provider': function () { setOverlay({ kind: 'provider-pick' }); },
+    'set-search-provider': function (el) {
+      patchSearch({ provider: el.getAttribute('data-provider') }).then(function () { closeOverlay(); });
+    },
+    'search-key': function () { setOverlay({ kind: 'search-key' }); },
+    'save-search-key': function () { saveSearchKey(); },
+    'results-dec': function () { bumpResults(-1); },
+    'results-inc': function () { bumpResults(1); },
+    'test-search': function () { testSearch(); },
+    'toggle-memory': function (el) { toggleMemorySwitch(el); },
+    'open-memories': function () { openMemories(); },
+    'reload-memories': function () { loadMemories().then(function () { render(); }); },
+    'ask-delete-memory': function (el) { askDeleteMemory(el.getAttribute('data-id')); },
+    'confirm-delete-memory': function () { doDeleteMemory(); },
+    'open-sources': function (el) {
+      setOverlay({ kind: 'sources', key: el.getAttribute('data-key') });
+    },
     'model-settings': function (el) {
       openModelDetails(el.getAttribute('data-pid'), el.getAttribute('data-mid'));
     },

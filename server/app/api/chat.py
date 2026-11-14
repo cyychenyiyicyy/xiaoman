@@ -46,6 +46,7 @@ def _msg_out(m: Message) -> dict:
         "sources": m.sources or [],
         "tools": m.tools or [],
         "remembered": m.remembered or [],
+        "parts": m.parts or [],
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -225,6 +226,10 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         think_ms = 0
         sources: list[dict] = list(initial_sources)
         tools: list[str] = ["web_search"] if web_sources else []
+        parts: list[dict] = []
+        cur_reason: dict | None = None
+        cur_text: dict | None = None
+        reason_t0: float | None = None
         seen_urls = {s.get("url") for s in sources if s.get("url")}
 
         yield _sse(
@@ -256,13 +261,32 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 if kind == "text":
                     if t_think_start is not None and t_think_end is None:
                         t_think_end = time.monotonic()
+                    if cur_text is None:
+                        cur_text = {"type": "text", "text": ""}
+                        parts.append(cur_text)
+                        yield _sse({"type": "part", "kind": "text"})
+                    cur_text["text"] += ev["delta"]
                     text_parts.append(ev["delta"])
                     yield _sse({"type": "text", "delta": ev["delta"]})
                 elif kind == "reasoning":
                     if t_think_start is None:
                         t_think_start = time.monotonic()
+                    fresh = cur_reason is None
+                    if fresh:
+                        cur_reason = {"type": "reasoning", "text": "", "ms": 0}
+                        reason_t0 = time.monotonic()
+                        parts.append(cur_reason)
+                        yield _sse({"type": "part", "kind": "reasoning"})
+                    cur_reason["text"] += ev["delta"]
                     reason_parts.append(ev["delta"])
                     yield _sse({"type": "reasoning", "delta": ev["delta"]})
+                elif kind == "step_end":
+                    if cur_reason is not None:
+                        if reason_t0 is not None:
+                            cur_reason["ms"] = int((time.monotonic() - reason_t0) * 1000)
+                        cur_reason = None
+                        reason_t0 = None
+                        yield _sse({"type": "part_end", "kind": "reasoning"})
                 elif kind == "usage":
                     usage = {
                         "prompt_tokens": int(ev.get("prompt_tokens") or 0),
@@ -270,7 +294,25 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     }
                 elif kind == "tool":
                     if ev.get("state") == "start":
+                        cur_reason = None
                         tools.append("web_search")
+                        parts.append(
+                            {
+                                "type": "tool",
+                                "name": ev.get("name") or "web_search",
+                                "queries": ev.get("queries") or [],
+                                "kind": ev.get("kind") or "search",
+                                "count": 0,
+                            }
+                        )
+                        yield _sse({"type": "part", "kind": "tool", "index": len(parts) - 1,
+                                    "queries": ev.get("queries") or []})
+                    elif ev.get("state") == "end":
+                        for p in reversed(parts):
+                            if p.get("type") == "tool" and p.get("count", 0) == 0:
+                                p["count"] = 1
+                                break
+                        yield _sse({"type": "part_update", "kind": "tool"})
                     yield _sse({"type": "tool", **{k: v for k, v in ev.items() if k != "type"}})
                 elif kind == "source":
                     item = ev.get("item") or {}
@@ -306,6 +348,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     row.thinking_ms = think_ms
                     row.sources = sources
                     row.tools = tools
+                    row.parts = parts
                     row.prompt_tokens = usage["prompt_tokens"]
                     row.completion_tokens = usage["completion_tokens"]
                     current = s.get(Conversation, conv_id)
@@ -322,6 +365,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     "thinking_ms": think_ms,
                     "sources": sources,
                     "tools": tools,
+                    "parts": parts,
                 }
             )
 

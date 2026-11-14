@@ -174,7 +174,7 @@ body{margin:0;background:#111110;color:#EDEAE3;font-family:var(--sans);font-size
 .sw.on{background:var(--clay)}
 .sw.on::after{left:20px}
 .stepper{display:flex;align-items:center;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
-.stepper .b{width:28px;height:28px;display:grid;place-items:center;color:var(--ink2);background:var(--card)}
+.stepper .b{width:28px;height:28px;display:grid;place-items:center;color:var(--ink2);background:var(--card);border:0;cursor:pointer;font-family:inherit;font-size:var(--s5)}
 .stepper .v{min-width:38px;text-align:center;font-size:var(--s5);font-weight:500;font-variant-numeric:tabular-nums;
   border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:28px}
 .slider{display:flex;align-items:center;gap:var(--q2);width:180px}
@@ -601,6 +601,46 @@ button.mitem:focus-visible{outline:2px solid var(--clay);outline-offset:-2px}
 .formpane .scard .srow{min-height:52px}
 .sheet .errbar{margin:var(--q2) 0 0}
 
+/* ── 消息状态行 / 来源行（契约 §5.1 §5.2）────────────── */
+.statusrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--q2);margin:0 0 var(--q3);line-height:1}
+.statusrow .ic{display:block}
+.tpill.ro{color:var(--ink3);cursor:default}
+.tpill.ro .num{color:inherit}
+button.tpill.ro{cursor:pointer;font-family:inherit;border:0}
+button.tpill.ro:active{background:var(--fill2)}
+.srcline{display:flex;align-items:center;gap:var(--q2);width:100%;min-height:44px;margin:0 0 var(--q3);
+  padding:0;border:0;background:transparent;color:var(--ink3);font-family:inherit;
+  font-size:var(--s6);line-height:var(--l6);cursor:pointer;text-align:left}
+.srcline .srl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1}
+.srcline>.ic{flex:none;display:block}
+.srcline .srl .ic{display:inline-block;vertical-align:-2px}
+.srcline .dot{color:var(--ink3);margin:0 var(--q1)}
+.srcline .chev{margin-left:auto}
+.srcline:active{background:var(--fill)}
+
+/* ── 来源浮窗 / 记忆列表（契约 §5.2 §5.3）────────────── */
+.sheet-body .slabel{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500;
+  padding:var(--q3) 0 var(--q2)}
+.sheet-body .slabel:first-child{padding-top:0}
+.srow .n2{display:block;font-size:var(--s5);line-height:var(--l5);color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+a.srow{text-decoration:none;cursor:pointer}
+a.srow:active{background:var(--fill)}
+.weblink .trail .ic{color:var(--ink3)}
+.weblink,.weblink .n1{color:var(--ink)}
+.weblink .n1{font-weight:500}
+.weblink:active .n1{color:var(--clay)}
+.iconbtn{width:44px;height:44px;border:0;background:transparent;display:grid;place-items:center;
+  color:var(--ink3);cursor:pointer;border-radius:var(--rp)}
+.iconbtn:active{background:var(--fill)}
+.stepper.c44 .b{width:44px;height:44px}
+.stepper.c44 .v{min-width:44px;line-height:44px}
+.stepper.c44 .b:disabled{color:var(--ink3);cursor:default}
+/* rail：对话 / 设置 两格可点（其余仍是占位） */
+button.it{border:0;background:transparent;font-family:inherit;cursor:pointer}
+button.it:active{background:var(--fill)}
+#view-page:focus,#view-page:focus-visible{outline:none}
+
 /* ── 响应式 ───────────────────────────────────────── */
 @media (max-width:600px){
   .rail{display:none}
@@ -633,7 +673,7 @@ button.mitem:focus-visible{outline:2px solid var(--clay);outline-offset:-2px}
 :focus-visible{outline:2px solid var(--clay);outline-offset:2px}
 /* 公式：display 公式给上下呼吸空间，超宽可横滚，不被容器切掉半个字形 */
 .agbody .katex-display{margin:var(--q3) 0;padding:2px 0;overflow-x:auto;overflow-y:hidden}
-.agbody .katex{font-size:1.02em}
+.agbody .katex{font-size:calc(1em * 1.02)}
 .agbody .katex-display>.katex{max-width:100%}
 /* 消息流底部留白：让最后一行不贴着输入框边被切 */
 .stream{padding-bottom:var(--q5)}
@@ -641,7 +681,26 @@ button.mitem:focus-visible{outline:2px solid var(--clay);outline-offset:-2px}
 /* 思考折叠条：标签 + 最新尾巴预览（折叠态就能看到实时，参考 CopilotKit / smoothui / DeepSeek-Reasonix） */
 .rsum .rlabel{color:var(--ink2);font-size:var(--s5);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums}
 .rsum .rpeek{flex:1;min-width:0;color:var(--ink3);font-size:var(--s6);white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;-webkit-mask-image:linear-gradient(to right,#000 72%,transparent 100%);
-  mask-image:linear-gradient(to right,#000 72%,transparent 100%)}
+  text-overflow:ellipsis;-webkit-mask-image:linear-gradient(to right,var(--ink) 72%,transparent 100%);
+  mask-image:linear-gradient(to right,var(--ink) 72%,transparent 100%)}
 .rsum .rpeek[hidden]{display:none}
 .rsum .rcar{margin-left:auto}
+
+
+/* ── 分步时间线：思考 → 工具 → 再思考 → 回答（message parts）─────── */
+.steps{display:flex;flex-direction:column;gap:var(--q1);margin:0 0 var(--q3)}
+.pstep{display:block;width:100%;min-height:32px;padding:0;
+  border:0;background:transparent;color:var(--ink2);font-family:inherit;font-size:var(--s5);
+  text-align:left;cursor:pointer}
+.pstep>summary{display:flex;align-items:center;gap:var(--q2);width:100%;min-height:32px;list-style:none;cursor:pointer}
+.pstep.ptool{display:flex;align-items:center}
+.pstep summary::-webkit-details-marker{display:none}
+.pstep.det{display:block}
+.plab{color:var(--ink2);white-space:nowrap;flex:none}
+.pval{color:var(--ink3);font-size:var(--s6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.pcount{color:var(--ink3);font-size:var(--s6);margin-left:auto;white-space:nowrap;flex:none}
+.pchev{margin-left:auto;color:var(--ink3);flex:none;transition:transform .15s ease}
+.pbody{padding:var(--q2) 0 var(--q2) var(--q5);color:var(--ink2);font-size:var(--s5);line-height:var(--l5)}
+.pbody p{margin:0 0 var(--q2);font-size:var(--s5);line-height:var(--l5)}
+.pbody p:last-child{margin-bottom:0}
+.steps .ic{display:block}

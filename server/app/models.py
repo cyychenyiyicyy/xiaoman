@@ -90,6 +90,7 @@ class Message(Base):
     sources: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     tools: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     remembered: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    parts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
