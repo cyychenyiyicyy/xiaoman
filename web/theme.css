@@ -367,6 +367,7 @@ body{margin:0;padding:0;background:var(--paper);color:var(--ink);
 
 /* 你的话：右侧胶囊 */
 .ubx{display:flex;flex-direction:column;align-items:flex-end;gap:var(--q2);max-width:80%}
+.me span{max-width:100%}
 .utext{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
 .ustack{display:flex;flex-wrap:wrap;gap:var(--q2);justify-content:flex-end}
 
@@ -557,6 +558,11 @@ button.srow:active{background:var(--fill)}
 /* ── 响应式 ───────────────────────────────────────── */
 @media (max-width:600px){
   .rail{display:none}
+  /* 窄屏：模型胶囊独占一行，思考档位落到第二行右对齐，避免被挤掉 */
+  .tools{flex-wrap:wrap;row-gap:var(--q1)}
+  .tools .sp{display:none}
+  .think{margin-left:auto}
+  .mpill{max-width:100%}
   .stream{padding:var(--q4) var(--q3) var(--q4)}
   .composer{padding:0 var(--q3) var(--q3)}
   .settings,.det{padding:var(--q4) var(--q3) var(--q4)}
@@ -574,3 +580,8 @@ button.srow:active{background:var(--fill)}
   *{animation-duration:.01ms!important;animation-iteration-count:1!important;
     transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+/* 弹层容器获得焦点时不要画默认焦点圈（打开时 .focus() 会触发，深色下是刺眼白边） */
+.sheet:focus,.sheet:focus-visible,.overlay:focus{outline:none}/* 焦点：鼠标点击不画圈，键盘导航才画赤陶圈。
+   UA 默认的 outline:auto 在深色下是刺眼的白色方框（返回/关闭按钮踩过）。 */
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--clay);outline-offset:2px}

@@ -105,6 +105,17 @@ app_setting(key pk, value jsonb)                            -- 当前 model / th
 
 `GET /health` → `{ok, db:"ok", schema_version, version}`
 
+### 4.6 契约补遗（实现先于文档，2026-11-14 补记）
+
+前端在实现时用到了三处原文没写死的形状，**以本节为准**：
+
+| 端点 | 补充定义 |
+|---|---|
+| `PATCH /providers/{id}` | 可传 `connected: false` 表示临时断开（不删 key）；传 `api_key` 会同时更新 `api_key_tail` 并置 `connected=false` |
+| `POST /providers` | 返回**完整 `ProviderOut`**（含 `id` 与 `api_key_tail`），不是 204 |
+| `PATCH /settings` | 请求体三个字段全部可选：`{provider_id?, model_id?, thinking?}`；只传 `thinking` 表示只改档位 |
+| `POST /chat` | 请求体**只有** `text` 与 `image_ids`；模型与思考档位一律读 `app_setting` |
+
 ---
 
 ## 5. 内置 mock provider（验收用）
@@ -131,3 +142,35 @@ app_setting(key pk, value jsonb)                            -- 当前 model / th
 页面私有类（`.pgrp/.mrow/.au/.chk` 等）在 v6 稿 `<style>` 里，取过来放进 `theme.css` 末尾。
 
 **必须对上的视觉硬约束**：无 emoji 图标 · 图标 14/18/22 且描边 1.7 · 字号只用 s1–s6 · 间距只用 q1–q6 · 一屏最多一个 filled · 返回/关闭用 `ink2` 且 44×44 · 不写解释性副标题 · 数字 tabular-nums。
+---
+
+## 7. 已知限制（MVP 有意不做）
+
+| 项 | 说明 |
+|---|---|
+| **无 regenerate 接口** | 「重试」是把上一条重发一次，库里会多一条 user 消息 |
+| `next_before` 未使用 | 前端只加载最近 50 条，没有「加载更早」 |
+| **单会话** | 没有会话列表（产品定义），也还没做九科空间切换 |
+| **无鉴权** | `APP_TOKEN` 留空时不校验；**部署到公网前必须设一个长随机串** |
+| 不能中途取消 | 流式开始后没有 abort 按钮 |
+| pgvector 未接 | MVP 不做检索，M3 才引入 |
+
+## 8. 怎么跑
+
+```powershell
+# 1. 起库 + 跑迁移 + 起 API（一条命令，幂等）
+pwsh -File scripts/dev.ps1
+
+# 2. 打开
+http://127.0.0.1:8787          # 本机
+http://192.168.66.103:8787     # 同网段平板（IP 会变，用 ipconfig 查）
+
+# 3. 验收（必须能红）
+cd server
+.venv\Scripts\python.exe -m tests.verify
+.venv\Scripts\python.exe -m tests.verify --selftest    # 必须 exit 1
+```
+
+首次启动会 seed 一个**内置演示模型**（不需要 API Key），用来验证流式、图片、上下文。
+接真模型：点输入框左上角胶囊 → 模型管理 → 添加 OpenAI 兼容端点（`baseUrl` + `API Key`）。
+`baseUrl` 要带版本段，例如 DeepSeek 填 `https://api.deepseek.com/v1`。

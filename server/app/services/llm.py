@@ -125,7 +125,21 @@ async def stream_chat(
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
-            async with client.stream("POST", url, headers=headers, json=payload) as resp:
+            # 有些 provider 不认 reasoning_effort，会直接 400。降级重试一次（去掉该参数）。
+            payloads = [payload]
+            if "reasoning_effort" in payload:
+                payloads.append({k: v for k, v in payload.items() if k != "reasoning_effort"})
+            resp = None
+            for attempt, body in enumerate(payloads):
+                req = client.build_request("POST", url, headers=headers, json=body)
+                resp = await client.send(req, stream=True)
+                if resp.status_code == 400 and attempt + 1 < len(payloads):
+                    await resp.aread()
+                    await resp.aclose()
+                    continue
+                break
+            assert resp is not None
+            try:
                 if resp.status_code >= 400:
                     raw = (await resp.aread()).decode(errors="replace")[:800]
                     yield {"type": "error", "code": f"http_{resp.status_code}", "message": raw}
@@ -155,6 +169,8 @@ async def stream_chat(
                         content = delta.get("content")
                         if content:
                             yield {"type": "text", "delta": content}
+            finally:
+                await resp.aclose()
     except httpx.HTTPError as exc:
         yield {"type": "error", "code": "network", "message": str(exc)[:500]}
 

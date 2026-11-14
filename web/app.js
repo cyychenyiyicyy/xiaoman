@@ -262,7 +262,11 @@
     try {
       var data = await api('/messages?limit=50');
       var items = data && Array.isArray(data.items) ? data.items : [];
-      state.messages = items.map(normalizeMessage);
+      // 首屏加载慢于发送时，保留尚在流式中的本地占位消息（id 前缀 tmp-）
+      var local = state.messages.filter(function (m) {
+        return String(m.id).indexOf('tmp-') === 0;
+      });
+      state.messages = local.length ? items.map(normalizeMessage).concat(local) : items.map(normalizeMessage);
       state.msgState = 'ready';
     } catch (e) {
       state.msgState = 'error';
@@ -449,6 +453,7 @@
     var live = m.status === 'streaming' && !m.content_md;
     var open = m._open !== undefined ? m._open : live;
     var label = m.status === 'streaming' ? '思考中' : '思考';
+    m._renderOpen = open;
     return '<details class="rbox" data-mid="' + esc(m.id) + '"' + (open ? ' open' : '') + '>' +
       '<summary class="rsum">' + ic('zap', 'sm') + '<span>' + label + '</span>' + ic('chevron-down', 'sm rcar') +
       '</summary><div class="rbody">' + renderMarkdown(m.reasoning_md) + '</div></details>';
@@ -725,11 +730,11 @@
   function openModelSheet() {
     setOverlay({ kind: 'models' });
     if (state.providersState !== 'ready' || !state.providers) return;
-    var todo = state.providers.filter(function (p) {
+    var needIds = state.providers.filter(function (p) {
       return p.connected && state.models[p.id] === undefined;
     }).map(function (p) { return p.id; });
-    if (!todo.length) return;
-    Promise.all(todo.map(loadModelsFor)).then(function () {
+    if (!needIds.length) return;
+    Promise.all(needIds.map(loadModelsFor)).then(function () {
       if (state.overlay && state.overlay.kind === 'models') renderOverlay();
     });
   }
@@ -1168,7 +1173,12 @@
     if (!d || d.tagName !== 'DETAILS') return;
     var mid = d.getAttribute('data-mid');
     for (var i = 0; i < state.messages.length; i++) {
-      if (String(state.messages[i].id) === String(mid)) { state.messages[i]._open = d.open; return; }
+      var m = state.messages[i];
+      if (String(m.id) !== String(mid)) continue;
+      // 重建 DOM 时带 open 属性也会触发 toggle：只记“用户按下”的差异
+      if (m._renderOpen !== undefined && d.open === m._renderOpen) return;
+      m._open = d.open;
+      return;
     }
   }
 
