@@ -102,3 +102,32 @@ class ChatIn(BaseModel):
     image_ids: list[str] = Field(default_factory=list)
 
 
+
+
+class MemoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    text: str
+    kind: str
+    subject: str = ""
+    status: str
+    use_count: int = 0
+    last_used_at: datetime | None = None
+    created_at: datetime
+
+
+class MemoryPatch(BaseModel):
+    text: str | None = None
+    status: str | None = None
+
+
+class SearchCfgPatch(BaseModel):
+    enabled: bool | None = None
+    provider: str | None = None
+    api_key: str | None = None
+    max_results: int | None = None
+
+
+class MemoryCfgPatch(BaseModel):
+    auto: bool | None = None

@@ -45,9 +45,11 @@ def build_openai_messages(
     history: list[Message],
     user_text: str,
     attachments: list[Attachment],
+    memory_block: str = "",
+    web_block: str = "",
 ) -> list[dict]:
     """把历史 + 本轮拼成 OpenAI messages。历史只取文本，图片仅本轮带。"""
-    msgs: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    msgs: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + (memory_block or "") + (web_block or "")}]
     cap = settings.message_char_cap
     for m in history[-settings.history_limit :]:
         body = (m.content_md or "")[:cap]
@@ -100,6 +102,9 @@ async def stream_chat(
     user_text: str,
     attachments: list[Attachment],
     thinking: str,
+    memory_block: str = "",
+    web_block: str = "",
+    native_search: bool = False,
 ) -> AsyncIterator[dict]:
     """统一入口。provider.kind == 'mock' 走内置回显。"""
     if provider.kind == "mock" or provider.base_url.startswith("mock://"):
@@ -111,7 +116,7 @@ async def stream_chat(
     url = f"{base}/chat/completions"
     payload: dict = {
         "model": model.model_key,
-        "messages": build_openai_messages(history, user_text, attachments),
+        "messages": build_openai_messages(history, user_text, attachments, memory_block, web_block),
         "stream": True,
         "stream_options": {"include_usage": True},
     }
@@ -119,6 +124,11 @@ async def stream_chat(
         payload["reasoning_effort"] = THINKING_MAP[thinking]
     if model.context_len:
         payload["max_tokens"] = min(settings.default_max_tokens, max(512, model.context_len // 8))
+    if native_search:
+        # DeepSeek 服务端工具：声明后由模型自己决定何时搜。注意同一请求不能再声明别的工具。
+        payload["tools"] = [{"type": "deepseek_web_search"}]
+        if model.supports_thinking and thinking != "off":
+            payload["thinking"] = {"type": "enabled"}
 
     headers = {"Content-Type": "application/json"}
     if provider.api_key:
@@ -128,8 +138,10 @@ async def stream_chat(
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
             # 有些 provider 不认 reasoning_effort，会直接 400。降级重试一次（去掉该参数）。
             payloads = [payload]
-            if "reasoning_effort" in payload:
-                payloads.append({k: v for k, v in payload.items() if k != "reasoning_effort"})
+            if "reasoning_effort" in payload or "thinking" in payload:
+                payloads.append(
+                    {k: v for k, v in payload.items() if k not in ("reasoning_effort", "thinking")}
+                )
             resp = None
             for attempt, body in enumerate(payloads):
                 req = client.build_request("POST", url, headers=headers, json=body)
@@ -163,6 +175,24 @@ async def stream_chat(
                             "completion_tokens": int(usage.get("completion_tokens") or 0),
                         }
                     for choice in chunk.get("choices") or []:
+                        ste = choice.get("server_tool_event")
+                        if isinstance(ste, dict):
+                            ev_type = ste.get("type")
+                            call = ste.get("call") or {}
+                            kind = (call.get("kind") or "search")
+                            if ev_type == "call_started":
+                                action = call.get("action") or {}
+                                yield {
+                                    "type": "tool",
+                                    "name": "web_search",
+                                    "state": "start",
+                                    "queries": action.get("queries") or ([action.get("url")] if action.get("url") else []),
+                                    "kind": kind,
+                                }
+                            elif ev_type == "call_completed":
+                                yield {"type": "tool", "name": "web_search", "state": "end", "kind": kind}
+                                for src in _norm_web(call.get("sources") or []):
+                                    yield {"type": "source", "item": src}
                         delta = choice.get("delta") or {}
                         reason = delta.get("reasoning_content") or delta.get("reasoning")
                         if reason:
@@ -170,6 +200,11 @@ async def stream_chat(
                         content = delta.get("content")
                         if content:
                             yield {"type": "text", "delta": content}
+                        # 兜底：有些实现只在最后一个 chunk 给完整 server_tool_calls
+                        for step in delta.get("server_tool_calls") or []:
+                            for call in step.get("calls") or []:
+                                for src in _norm_web(call.get("sources") or []):
+                                    yield {"type": "source", "item": src}
             finally:
                 await resp.aclose()
     except httpx.HTTPError as exc:
@@ -203,3 +238,56 @@ async def fetch_models(provider: LLMProvider) -> list[dict]:
             }
         )
     return out
+
+
+def _norm_web(items: list) -> list[dict]:
+    """把 DeepSeek 的 sources 归一成界面要的形状。"""
+    out = []
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        url = (it.get("url") or "").strip()
+        if not url:
+            continue
+        out.append(
+            {
+                "type": "web",
+                "title": (it.get("title") or url)[:200],
+                "url": url,
+                "snippet": (it.get("snippet") or "")[:400],
+                "site": (it.get("site_name") or "")[:80],
+            }
+        )
+    return out
+
+
+async def complete_text(
+    provider: LLMProvider,
+    model: LLMModel,
+    system: str,
+    user: str,
+    max_tokens: int = 400,
+) -> str:
+    """非流式一次性调用，用于回合后的记忆抽取。"""
+    base = provider.base_url.rstrip("/")
+    url = f"{base}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if provider.api_key:
+        headers["Authorization"] = f"Bearer {provider.api_key}"
+    payload = {
+        "model": model.model_key,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "stream": False,
+        "max_tokens": max_tokens,
+    }
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+    choices = data.get("choices") or []
+    if not choices:
+        return ""
+    return ((choices[0].get("message") or {}).get("content") or "").strip()

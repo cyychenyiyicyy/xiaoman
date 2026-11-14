@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
-from .api import catalog_api, chat, providers, settings as settings_api, uploads
+from .api import catalog_api, chat, memories, providers, settings as settings_api, uploads
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .seed import ensure_seed
@@ -42,6 +42,7 @@ async def token_guard(request: Request, call_next):
 
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(catalog_api.router, prefix="/api/v1")
+app.include_router(memories.router, prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(settings_api.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")

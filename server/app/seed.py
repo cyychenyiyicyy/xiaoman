@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from .models import AppSetting, Conversation, LLMModel, LLMProvider
 
 SETTING_KEY = "current"
+SEARCH_KEY = "search"
+MEMORY_KEY = "memory"
 
 
 def ensure_seed(db: Session) -> None:
@@ -91,3 +93,68 @@ def set_current(db: Session, provider_id: str | None, model_id: str | None, thin
         setting.value = value
     db.commit()
     return value
+
+# ── 联网搜索 / 记忆 设置 ────────────────────────────────
+SEARCH_DEFAULTS = {
+    "enabled": False,
+    "provider": "deepseek",
+    "api_key": "",
+    "api_key_tail": "",
+    "max_results": 5,
+}
+
+
+def _get_json(db: Session, key: str, defaults: dict) -> dict:
+    row = db.get(AppSetting, key)
+    value = dict(defaults)
+    if row and isinstance(row.value, dict):
+        value.update(row.value)
+    return value
+
+
+def _set_json(db: Session, key: str, patch: dict) -> dict:
+    row = db.get(AppSetting, key)
+    value = dict(row.value) if row and isinstance(row.value, dict) else {}
+    value.update(patch)
+    if row is None:
+        db.add(AppSetting(key=key, value=value))
+    else:
+        row.value = value
+    db.commit()
+    return value
+
+
+def get_search_cfg(db: Session) -> dict:
+    cfg = _get_json(db, SEARCH_KEY, SEARCH_DEFAULTS)
+    cfg.pop("api_key_raw", None)
+    return cfg
+
+
+def public_search_cfg(cfg: dict) -> dict:
+    return {
+        "enabled": bool(cfg.get("enabled")),
+        "provider": cfg.get("provider") or "deepseek",
+        "api_key_tail": cfg.get("api_key_tail") or "",
+        "max_results": int(cfg.get("max_results") or 5),
+    }
+
+
+def set_search_cfg(db: Session, patch: dict) -> dict:
+    clean = {}
+    for k in ("enabled", "provider", "max_results"):
+        if k in patch and patch[k] is not None:
+            clean[k] = patch[k]
+    if patch.get("api_key"):
+        key = str(patch["api_key"]).strip()
+        clean["api_key"] = key
+        clean["api_key_tail"] = key[-4:] if len(key) >= 8 else ""
+    return _get_json(db, SEARCH_KEY, SEARCH_DEFAULTS) if not clean else _set_json(db, SEARCH_KEY, clean)
+
+
+def get_memory_cfg(db: Session) -> dict:
+    return _get_json(db, MEMORY_KEY, {"auto": True})
+
+
+def set_memory_cfg(db: Session, patch: dict) -> dict:
+    clean = {k: patch[k] for k in ("auto",) if k in patch and patch[k] is not None}
+    return _set_json(db, MEMORY_KEY, clean) if clean else get_memory_cfg(db)

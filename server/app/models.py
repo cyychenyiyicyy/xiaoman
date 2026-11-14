@@ -87,6 +87,9 @@ class Message(Base):
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="done")
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     thinking_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sources: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    tools: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    remembered: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
@@ -109,3 +112,19 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(60), primary_key=True)
     value: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class Memory(Base):
+    """长期记忆：一句稳定的学习事实或偏好。对应 docs/07 §6 第 2/3 层的落地。"""
+
+    __tablename__ = "memory"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, default="fact")  # fact | pref
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    source_message_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="active")  # active | archived
+    use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

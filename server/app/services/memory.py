@@ -1,0 +1,182 @@
+"""长期记忆：检索（回合前注入）+ 抽取（回合后写入）。
+
+设计依据 docs/22 §2：
+- 存 PG 的 memory 表，不上向量库（单用户、几百条，2-gram 交集足够）
+- 写入走「回合后抽取」，不给模型开 memory_save 工具（DeepSeek 原生搜索一轮不能再声明别的工具）
+- 读取把命中的 id 记到该条回复上，让「根据记忆生成」是可核查的事实
+"""
+from __future__ import annotations
+
+import json
+import re
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..models import LLMModel, LLMProvider, Memory
+from .llm import complete_text
+
+MAX_PER_TURN = 2
+MAX_INJECT = 8
+DEDUPE_JACCARD = 0.7
+
+_SPACE = re.compile(r"\s+")
+
+
+def bigrams(text: str) -> set[str]:
+    t = _SPACE.sub("", text or "")
+    if not t:
+        return set()
+    if len(t) < 2:
+        return {t}
+    return {t[i : i + 2] for i in range(len(t) - 1)}
+
+
+def jaccard(a: str, b: str) -> float:
+    A, B = bigrams(a), bigrams(b)
+    if not A or not B:
+        return 0.0
+    return len(A & B) / len(A | B)
+
+
+def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memory]:
+    """与本轮文本有 2-gram 交集的优先，再用最近 2 条补位。"""
+    rows = list(
+        db.scalars(
+            select(Memory).where(Memory.status == "active").order_by(Memory.created_at.desc()).limit(400)
+        ).all()
+    )
+    if not rows:
+        return []
+    q = bigrams(user_text)
+    scored: list[tuple[float, Memory]] = []
+    for r in rows:
+        hit = len(q & bigrams(r.text))
+        scored.append((hit, r))
+    matched = [r for hit, r in sorted(scored, key=lambda x: -x[0]) if hit > 0]
+    recent = rows[:2]
+
+    out: list[Memory] = []
+    seen: set[str] = set()
+    for r in matched + recent:
+        if r.id in seen:
+            continue
+        seen.add(r.id)
+        out.append(r)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def prompt_block(memories: list[Memory]) -> str:
+    if not memories:
+        return ""
+    lines = "\n".join(f"- {m.text}" for m in memories)
+    return (
+        "\n\n你长期记得的关于她的事（不是本轮说的，是过去留下的；用得上就用，不要硬提）：\n"
+        f"{lines}\n"
+    )
+
+
+def touch(db: Session, memories: list[Memory]) -> None:
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    for m in memories:
+        m.use_count = (m.use_count or 0) + 1
+        m.last_used_at = now
+
+
+def sources_payload(memories: list[Memory]) -> list[dict]:
+    return [
+        {"type": "memory", "id": m.id, "text": m.text, "kind": m.kind, "subject": m.subject}
+        for m in memories
+    ]
+
+
+def _clean(text: str) -> str:
+    t = _SPACE.sub(" ", (text or "").strip())
+    return t[:60]
+
+
+_EXTRACT_SYS = """你从一段学习对话里抽取「值得长期记住的事」。
+规则：
+- 只抽稳定的学习事实或稳定偏好，例如薄弱点、习惯、目标、明确的个人设定。
+- 不要抽寒暄、情绪、一次性提问、模型自己的话。
+- 每条不超过 40 字，用第三人称「她」，不要引号。
+- 最多 2 条。没有就返回空数组。
+只输出 JSON：{"memory":[{"text":"…","kind":"fact"或"pref","subject":"学科或空串"}]}"""
+
+
+async def extract(
+    provider: LLMProvider,
+    model: LLMModel,
+    user_text: str,
+    answer: str,
+    existing: list[Memory] | None = None,
+) -> list[dict]:
+    """回合后抽取。任何异常都返回空列表——宁可漏，不可脏。"""
+    if not (user_text or "").strip() or not (answer or "").strip():
+        return []
+    user = f"用户说：{user_text[:800]}\n\n小满回答：{answer[:2000]}"
+    try:
+        raw = await complete_text(provider, model, _EXTRACT_SYS, user, max_tokens=400)
+    except Exception:  # noqa: BLE001
+        return []
+    data = _parse_json(raw)
+    items = data.get("memory") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return []
+
+    pool = existing or []
+    out: list[dict] = []
+    for it in items[:4]:
+        if not isinstance(it, dict):
+            continue
+        text = _clean(it.get("text") or "")
+        if len(text) < 4:
+            continue
+        if any(bad in text for bad in ("无法", "不确定", "小满自己")):
+            continue
+        if any(jaccard(text, m.text) > DEDUPE_JACCARD for m in pool):
+            continue
+        if any(jaccard(text, o["text"]) > DEDUPE_JACCARD for o in out):
+            continue
+        kind = "pref" if it.get("kind") == "pref" else "fact"
+        subject = str(it.get("subject") or "")[:20]
+        out.append({"text": text, "kind": kind, "subject": subject})
+        if len(out) >= MAX_PER_TURN:
+            break
+    return out
+
+
+def _parse_json(raw: str) -> dict:
+    t = (raw or "").strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```[a-zA-Z]*\n?", "", t)
+        t = re.sub(r"\n?```$", "", t)
+    start, end = t.find("{"), t.rfind("}")
+    if start < 0 or end <= start:
+        return {}
+    try:
+        return json.loads(t[start : end + 1])
+    except json.JSONDecodeError:
+        return {}
+
+
+def save(db: Session, items: list[dict], source_message_id: str | None) -> list[dict]:
+    """写入并返回给前端展示的载荷。"""
+    saved = []
+    for it in items:
+        row = Memory(
+            text=it["text"],
+            kind=it.get("kind", "fact"),
+            subject=it.get("subject", ""),
+            source_message_id=source_message_id,
+        )
+        db.add(row)
+        saved.append(row)
+    db.commit()
+    for row in saved:
+        db.refresh(row)
+    return [{"id": r.id, "text": r.text, "kind": r.kind, "subject": r.subject} for r in saved]
