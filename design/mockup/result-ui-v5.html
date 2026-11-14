@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小满 · 界面 v5（模型在输入框 · 设置规范化）</title>
+<style>
+@font-face{font-family:"ISans";font-weight:400;font-display:swap;src:url("fonts/instrument-sans-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"ISans";font-weight:500;font-display:swap;src:url("fonts/instrument-sans-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"ISans";font-weight:600;font-display:swap;src:url("fonts/instrument-sans-latin-600-normal.woff2") format("woff2")}
+:root{
+  --paper:#FBFAF7; --card:#FFFFFF; --fill:#F4F1EA; --fill2:#EDE9E0;
+  --ink:#1A1917; --ink2:#6E6A62; --ink3:#A09B90;
+  --line:#E8E4DA; --line2:#DCD7CA;
+  --clay:#B0563A; --claybg:#F8EDE8; --clayline:#EAD5CB;
+  --sage:#5F7355;
+  --sans:"ISans","Inter","Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  /* 字号 6 级 */
+  --s1:34px;--l1:1.24; --s2:24px;--l2:1.30; --s3:19px;--l3:1.50;
+  --s4:15px;--l4:1.72; --s5:13px;--l5:1.60; --s6:11px;--l6:1.45;
+  /* 间距 7 档 */
+  --q1:4px;--q2:8px;--q3:12px;--q4:20px;--q5:32px;--q6:52px;
+  /* 图标 3 档 + 单描边 */
+  --i-sm:14px; --i-md:18px; --i-lg:22px; --stroke:1.7px;
+  --rc:10px;--rb:8px;--rp:999px;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#111110;color:#EDEAE3;font-family:var(--sans);font-size:var(--s4);line-height:var(--l4);padding:40px 24px 80px}
+.d1{font-size:var(--s1);line-height:var(--l1);font-weight:500;letter-spacing:-.02em}
+.d2{font-size:var(--s2);line-height:var(--l2);font-weight:500;letter-spacing:-.015em}
+.d3{font-size:var(--s3);line-height:var(--l3);font-weight:500;letter-spacing:-.005em}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.ic{width:var(--i-md);height:var(--i-md);stroke:currentColor;fill:none;stroke-width:var(--stroke);stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.sm{width:var(--i-sm);height:var(--i-sm)}
+.ic.lg{width:var(--i-lg);height:var(--i-lg)}
+
+.head{max-width:1600px;margin:0 auto 12px}
+.head h1{margin:0 0 var(--q3)}
+.head p{margin:0 0 var(--q2);color:#8E8A80;font-size:var(--s5);line-height:1.85;max-width:920px}
+.head b{color:#EDEAE3;font-weight:500}
+.head code{background:#232220;padding:2px 6px;border-radius:4px;font-size:var(--s6);color:#C98B6E}
+.tag{display:inline-block;border:1px solid #2E2C28;color:#B8B2A6;border-radius:var(--rp);padding:3px 10px;font-size:var(--s6);margin:0 6px 6px 0}
+.tag.hi{border-color:#4A3A32;color:#C98B6E}
+
+.grid{max-width:1600px;margin:var(--q5) auto 0;display:flex;flex-wrap:wrap;gap:52px 44px;align-items:flex-start}
+.frame{width:845px}
+.cap{color:#8E8A80;margin:0 0 var(--q3);display:flex;gap:var(--q2);align-items:baseline;flex-wrap:wrap;font-size:var(--s5)}
+.cap b{color:#EDEAE3;font-weight:500;font-size:var(--s5)}
+.cap i{font-style:normal;border:1px solid #2E2C28;color:#C98B6E;border-radius:4px;padding:0 5px;font-size:var(--s6)}
+.cap em{font-style:normal;color:#6B6760;font-size:var(--s6)}
+.wrap{width:845px;height:528px;overflow:hidden;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 0 1px #26241F}
+.tab{width:1280px;height:800px;transform:scale(.66);transform-origin:top left;background:var(--paper);
+  color:var(--ink);display:flex;overflow:hidden;font-family:var(--sans);position:relative}
+
+.rail{width:72px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;
+  padding:var(--q4) 0;gap:2px;flex:none}
+.rail .logo{width:30px;height:30px;border-radius:9px;background:var(--clay);color:#fff;display:grid;place-items:center;
+  font-size:var(--s4);margin-bottom:var(--q4);flex:none;font-weight:500}
+.rail .it{width:54px;padding:9px 0 7px;border-radius:var(--rc);display:flex;flex-direction:column;align-items:center;
+  gap:var(--q1);color:var(--ink3);font-size:var(--s6);line-height:1;letter-spacing:.01em}
+.rail .it.on{color:var(--clay);background:var(--claybg);font-weight:500}
+.rail .sp{flex:1}
+
+.paneL{width:452px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.paneR{flex:1;display:flex;flex-direction:column;background:var(--card);min-width:0}
+.paneM{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--card)}
+
+.top{padding:var(--q3) var(--q4);border-bottom:1px solid var(--line);flex:none}
+.top .l1{display:flex;align-items:center;gap:6px;color:var(--ink3);font-size:var(--s6);letter-spacing:.09em;margin-bottom:3px}
+.top .l2{display:flex;align-items:center;gap:var(--q2)}
+.top .subj{display:flex;align-items:center;gap:7px;font-size:var(--s2);line-height:1.2;font-weight:500;letter-spacing:-.015em}
+.top .subj .ic{width:20px;height:20px;color:var(--clay)}
+.top .subj .car{width:13px;height:13px;color:var(--ink3);stroke-width:var(--stroke)}
+.top .sp{flex:1}
+.top .more{color:var(--ink3);display:grid;place-items:center;width:26px;height:26px;border-radius:var(--rb)}
+
+.stream{flex:1;overflow:hidden;padding:var(--q4) var(--q4) 0}
+.day{display:flex;align-items:center;gap:var(--q2);color:var(--ink3);font-size:var(--s6);letter-spacing:.1em;margin:0 0 var(--q4)}
+.day .ic{width:13px;height:13px;stroke-width:var(--stroke)}
+.ag{margin:0 0 var(--q4)}
+.ag p{margin:0 0 var(--q3);font-size:var(--s4);line-height:var(--l4)}
+.ag .lead{font-size:var(--s3);line-height:var(--l3);font-weight:500;margin:0 0 var(--q3)}
+.ag .note{color:var(--ink2);font-size:var(--s5);line-height:var(--l5)}
+.me{display:flex;justify-content:flex-end;margin:0 0 var(--q4)}
+.me span{background:var(--fill);padding:9px var(--q3);border-radius:14px 14px 3px 14px;font-size:var(--s4);line-height:1.6;max-width:80%}
+.c-out{border:1px solid var(--line);background:var(--card);border-radius:var(--rc);padding:var(--q3) 14px;margin:0 0 var(--q3)}
+.c-out .h{font-size:var(--s4);line-height:var(--l5);font-weight:500;margin:0 0 var(--q1);display:flex;align-items:center;gap:6px}
+.c-out .s{font-size:var(--s5);line-height:var(--l5);color:var(--ink2);margin:0}
+.btnrow{display:flex;gap:var(--q2);margin-top:var(--q3)}
+
+/* ═══ 输入框：模型在框里 ═══════════════════════════ */
+.composer{padding:0 var(--q4) var(--q4);flex:none}
+.cbox{border:1px solid var(--line2);background:var(--card);border-radius:16px;overflow:hidden}
+.cbox .tools{display:flex;align-items:center;gap:var(--q2);padding:var(--q2) var(--q2) 0 var(--q3)}
+.mpill{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:var(--rp);
+  border:1px solid var(--line2);background:var(--card);font-size:var(--s6);font-weight:500;color:var(--ink)}
+.mpill .ic{width:13px;height:13px;color:var(--clay);stroke-width:var(--stroke)}
+.mpill .car{width:11px;height:11px;color:var(--ink3);stroke-width:var(--stroke)}
+.tpill{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border-radius:var(--rp);
+  background:var(--fill);font-size:var(--s6);color:var(--ink2)}
+.tpill .ic{width:12px;height:12px;stroke-width:var(--stroke)}
+.ctx{margin-left:auto;font-size:var(--s6);color:var(--ink3);padding-right:4px}
+.crow{display:flex;align-items:center;gap:2px;padding:var(--q2) 6px var(--q2) var(--q3)}
+.crow .ib{width:30px;height:30px;display:grid;place-items:center;color:var(--ink3);flex:none;border-radius:50%}
+.crow .ib.act{color:var(--clay)}
+.crow .ph{flex:1;font-size:var(--s4);color:var(--ink3);padding:0 var(--q1)}
+.crow .send{width:30px;height:30px;border-radius:50%;background:var(--clay);color:#fff;display:grid;place-items:center;flex:none;margin-right:2px}
+
+/* ═══ 模型 sheet ════════════════════════════════ */
+.scrim{position:absolute;inset:0;background:rgba(25,25,25,.28);z-index:4}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:18px 18px 0 0;
+  box-shadow:0 -12px 40px rgba(25,25,25,.16);z-index:5}
+.sheet .grab{width:34px;height:3px;border-radius:2px;background:var(--line2);margin:var(--q3) auto}
+.sheet .inner{padding:0 var(--q5) var(--q5)}
+.lbl{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500}
+
+/* 模型行 */
+.mrow{display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q3);border-radius:var(--rc)}
+.mrow.on{background:var(--claybg)}
+.mrow .ibx{width:30px;height:30px;border-radius:8px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none}
+.mrow.on .ibx{background:#fff;color:var(--clay)}
+.mrow .md{flex:1;min-width:0}
+.mrow .n1{font-size:var(--s4);font-weight:500}
+.mrow .n2{font-size:var(--s6);color:var(--ink3);margin-top:2px}
+.mrow .chk{color:var(--clay);flex:none;width:18px;display:grid;place-items:center}
+.seg{display:flex;gap:6px}
+
+/* ═══ 设置：规范化分组列表 ═══════════════════════ */
+.settings{flex:1;overflow:hidden;padding:0 var(--q5) var(--q5)}
+.sgroup{margin-bottom:var(--q5)}
+.sgroup .slabel{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500;
+  padding:0 var(--q1) var(--q2)}
+.scard{border:1px solid var(--line);border-radius:var(--rc);background:var(--card);overflow:hidden}
+.srow{display:flex;align-items:center;gap:var(--q3);min-height:56px;padding:0 14px;position:relative}
+.srow + .srow::before{content:"";position:absolute;top:0;left:14px;right:0;height:1px;background:var(--line)}
+.srow .lead{width:24px;display:grid;place-items:center;color:var(--ink2);flex:none}
+.srow .md{flex:1;min-width:0;padding:9px 0}
+.srow .n1{font-size:var(--s4);line-height:1.4}
+.srow .n2{font-size:var(--s6);color:var(--ink3);margin-top:2px;line-height:1.45}
+.srow .trail{display:flex;align-items:center;gap:var(--q2);flex:none;color:var(--ink3)}
+.srow .val{font-size:var(--s5);color:var(--ink2)}
+.srow .val.num{font-variant-numeric:tabular-nums}
+.srow.danger .n1{color:var(--clay)}
+.srow .chev{width:14px;height:14px;stroke-width:var(--stroke);color:var(--ink3)}
+
+/* 控件 */
+.sw{width:42px;height:25px;border-radius:var(--rp);background:var(--fill2);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(25,25,25,.2)}
+.sw.on{background:var(--clay)}
+.sw.on::after{left:20px}
+.stepper{display:flex;align-items:center;gap:0;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.stepper .b{width:28px;height:28px;display:grid;place-items:center;color:var(--ink2);background:var(--card)}
+.stepper .v{min-width:38px;text-align:center;font-size:var(--s5);font-weight:500;font-variant-numeric:tabular-nums;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:28px}
+.slider{display:flex;align-items:center;gap:var(--q2);width:190px}
+.slider .track{flex:1;height:4px;border-radius:2px;background:var(--fill2);position:relative}
+.slider .track i{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:var(--clay)}
+.slider .track b{position:absolute;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;
+  border:1.5px solid var(--clay);left:62%}
+.slider .n{font-size:var(--s6);color:var(--ink2);font-variant-numeric:tabular-nums;width:30px;text-align:right}
+
+.footer{max-width:1600px;margin:var(--q6) auto 0;color:#6B6760;font-size:var(--s5);line-height:1.9}
+.footer b{color:#8E8A80}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-atom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></symbol>
+<symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20a10 10 0 0010-10 25.9 25.9 0 00-1.04-7.281 1 1 0 00-1.755-.325C15.833 5.5 13 5.5 9.8 6.1A7 7 0 0011 20"/><path d="M2 21a5 5 0 012.911-4.544C7.613 15.212 8.351 15.24 11 13"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></symbol>
+<symbol id="i-land" viewBox="0 0 24 24"><path d="M10 18v-7"/><path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chevR" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-cam" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+<symbol id="i-pal" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v16"/><path d="M16 13h2"/><path d="M16 9h2"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/><path d="M6 13h2"/><path d="M6 9h2"/></symbol>
+</defs></svg>
+
+<div class="head">
+  <h1 class="d1">界面 v5</h1>
+  <p>两处按你说的改：<b>① 模型选择挪进输入框</b>（点胶囊起弹层，不再是一个独立页面）；<b>② 设置页按组件规范重排</b>（分组卡片 / 56dp 行高 / 描边内缩分隔线 / switch / stepper / slider / 危险区单独一组）。</p>
+  <div style="margin-top:var(--q3)">
+    <span class="tag hi">输入框：模型胶囊 + 思考档位 + 上下文占用</span>
+    <span class="tag hi">设置：分组 → 卡片 → 行（图标 24 槽 / 标题 / 副标题 / 尾控件）</span>
+    <span class="tag">图标 3 档（14/18/22）· 描边统一 1.7</span>
+    <span class="tag">触控 ≥ 48dp（行高 56）</span>
+    <span class="tag">间距 4·8·12·20·32·52</span>
+  </div>
+</div>
+
+<div class="grid">
+
+<!-- V1 对话 + 输入框模型 -->
+<div class="frame">
+  <div class="cap"><i>V1</i><b>对话 · 模型在输入框里</b><em>胶囊常驻，不占正文</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneL">
+      <div class="top">
+        <div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="sp"></div><div class="more"><svg class="ic sm"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="stream">
+        <div class="day"><svg class="ic"><use href="#i-sun"/></svg>今天 · 11 月 14 日 周五</div>
+        <div class="ag"><p class="lead">物理这块，今天两件事。</p>
+          <p>复习 <b class="num">12</b> 张 —— 受力分析占一半；再把昨天那道斜面题重做一遍。</p></div>
+        <div class="c-out"><div class="h">开始 <span style="color:var(--clay)">12 张 →</span></div><div class="s">预计 9 分钟 · 3 张是重犯错题</div></div>
+        <div class="me"><span>牛顿第二定律到底怎么用？</span></div>
+        <div class="ag"><p>它是「合外力 → 加速度」的桥。但你的问题不在这一步。</p>
+          <div class="c-out" style="padding:0">
+            <div style="padding:var(--q3) 14px var(--q1);font-size:var(--s6);letter-spacing:.1em;color:var(--ink3)">先修链</div>
+            <div style="display:flex;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--line);font-size:var(--s5)"><span>受力分析</span><b class="num" style="color:var(--clay)">0.31</b></div>
+            <div style="display:flex;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--line);font-size:var(--s5)"><span style="padding-left:14px">牛顿第二定律</span><b class="num">0.58</b></div>
+          </div>
+          <p class="note">10-21 那道斜面题，你漏的是摩擦力。</p></div>
+      </div>
+      <div class="composer">
+        <div class="cbox">
+          <div class="tools">
+            <div class="mpill"><svg class="ic"><use href="#i-zap"/></svg>v4-flash<svg class="ic car"><use href="#i-chev"/></svg></div>
+            <div class="tpill"><svg class="ic"><use href="#i-spark"/></svg>思考·中</div>
+            <div class="ctx num">8.2k / 1M</div>
+          </div>
+          <div class="crow">
+            <div class="ib"><svg class="ic"><use href="#i-plus"/></svg></div>
+            <div class="ib act"><svg class="ic"><use href="#i-cam"/></svg></div>
+            <div class="ib"><svg class="ic sm"><use href="#i-mic"/></svg></div>
+            <div class="ph">说点什么…</div>
+            <div class="send"><svg class="ic sm"><use href="#i-up"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="paneR">
+      <div style="padding:var(--q4) var(--q4) var(--q3);border-bottom:1px solid var(--line);display:flex;align-items:center">
+        <div style="font-size:var(--s3);font-weight:500">今日</div><div style="flex:1"></div>
+        <div style="font-size:var(--s5);color:var(--ink3)" class="num">共 22 张</div>
+      </div>
+      <div style="flex:1;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--claybg);display:grid;place-items:center;color:var(--clay);flex:none"><svg class="ic"><use href="#i-atom"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">物理</div><div style="font-size:var(--s5);color:var(--ink2)">12 张 · 受力分析占一半</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500;color:var(--clay)">0.31</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-sigma"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">数学</div><div style="font-size:var(--s5);color:var(--ink2)">5 张 · 集合的包含关系</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.34</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-lang"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">英语</div><div style="font-size:var(--s5);color:var(--ink2)">3 个词到期</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.62</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-flask"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">化学</div><div style="font-size:var(--s5);color:var(--ink2)">2 道 · 方程式配平</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.55</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V2 模型弹层 -->
+<div class="frame">
+  <div class="cap"><i>V2</i><b>点开模型胶囊 → 弹层</b><em>价格写在列表里 · 思考档位同层</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneL">
+      <div class="top">
+        <div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="sp"></div><div class="more"><svg class="ic sm"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="stream">
+        <div class="ag"><p class="lead">物理这块，今天两件事。</p>
+          <p>复习 <b class="num">12</b> 张 —— 受力分析占一半。</p></div>
+      </div>
+      <div class="composer">
+        <div class="cbox" style="border-color:var(--clayline)">
+          <div class="tools">
+            <div class="mpill" style="border-color:var(--clayline);background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-zap"/></svg>v4-flash<svg class="ic car" style="color:var(--clay)"><use href="#i-chev"/></svg></div>
+            <div class="ctx num">8.2k / 1M</div>
+          </div>
+          <div class="crow"><div class="ph">说点什么…</div><div class="send"><svg class="ic sm"><use href="#i-up"/></svg></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="paneR" style="background:var(--paper)"></div>
+    <div class="scrim"></div>
+    <div class="sheet" style="left:72px">
+      <div class="grab"></div>
+      <div class="inner">
+        <div class="lbl" style="margin-bottom:var(--q2)">对话模型</div>
+        <div class="mrow on"><div class="ibx"><svg class="ic sm"><use href="#i-zap"/></svg></div>
+          <div class="md"><div class="n1">deepseek-v4-flash</div><div class="n2 num">¥1 / ¥2 每百万 · 1M 上下文 · 快</div></div>
+          <div class="chk"><svg class="ic sm"><use href="#i-check"/></svg></div></div>
+        <div class="mrow"><div class="ibx"><svg class="ic sm"><use href="#i-spark"/></svg></div>
+          <div class="md"><div class="n1">deepseek-v4-pro</div><div class="n2 num">¥4.5 / ¥13.5 每百万 · 1M 上下文 · 讲题更稳</div></div>
+          <div class="chk"></div></div>
+        <div class="mrow"><div class="ibx"><svg class="ic sm"><use href="#i-globe"/></svg></div>
+          <div class="md"><div class="n1">qwen3.8-flash</div><div class="n2 num">¥0.03 / ¥0.11 每百万 · 262K 上下文</div></div>
+          <div class="chk"></div></div>
+        <div class="mrow"><div class="ibx"><svg class="ic sm"><use href="#i-cpu"/></svg></div>
+          <div class="md"><div class="n1">本地 · llama.cpp</div><div class="n2">未连接</div></div>
+          <div class="chk"></div></div>
+
+        <div style="display:flex;align-items:center;gap:var(--q3);margin-top:var(--q4)">
+          <div class="lbl" style="flex:none">思考档位</div>
+          <div class="seg">
+            <span class="tpill">关</span><span class="tpill" style="background:var(--claybg);color:var(--clay);font-weight:500"><svg class="ic" style="width:12px;height:12px"><use href="#i-zap"/></svg>中</span><span class="tpill">高</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--q3);margin-top:var(--q3)">
+          <div class="lbl" style="flex:none">只对这一科</div>
+          <div style="font-size:var(--s5);color:var(--ink2)">物理用这个模型，其它学科跟随默认</div>
+          <div style="flex:1"></div>
+          <div class="sw on"></div>
+        </div>
+        <div style="font-size:var(--s6);color:var(--ink3);margin-top:var(--q4)">模型目录来自 Pi（<span style="font-family:monospace">pi update --models</span>），这里只是选。</div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V3 设置规范化 -->
+<div class="frame">
+  <div class="cap"><i>V3</i><b>设置 · 规范化</b><em>分组卡片 / 56dp 行 / 内缩分隔线 / 四种尾控件</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneM">
+      <div class="top"><div class="l1">小满 · 0.1.0</div><div class="l2"><div class="subj">设置</div></div></div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="slabel">她</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-user"/></svg></div>
+              <div class="md"><div class="n1">名字</div></div>
+              <div class="trail"><span class="val">小满</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-msg"/></svg></div>
+              <div class="md"><div class="n1">说话方式</div><div class="n2">先给提示，再给详解</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+
+        <div class="sgroup">
+          <div class="slabel">复习</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-clock"/></svg></div>
+              <div class="md"><div class="n1">每日上限</div><div class="n2">超出的顺延到明天</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">20</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-zap"/></svg></div>
+              <div class="md"><div class="n1">目标保留率</div></div>
+              <div class="trail"><div class="slider"><div class="track"><i style="width:62%"></i><b></b></div><span class="n">0.90</span></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-spark"/></svg></div>
+              <div class="md"><div class="n1">先修未达标时冻结后继</div><div class="n2">没学会前置，后面的卡先不出现</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+          </div>
+        </div>
+
+        <div class="sgroup">
+          <div class="slabel">通知</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-bell"/></svg></div>
+              <div class="md"><div class="n1">每日开场</div><div class="n2">07:30</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-bell"/></svg></div>
+              <div class="md"><div class="n1">一天最多打扰</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">2</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+          </div>
+        </div>
+
+        <div class="sgroup">
+          <div class="slabel">系统</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-pal"/></svg></div>
+              <div class="md"><div class="n1">外观</div></div>
+              <div class="trail"><span class="val">跟随系统</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cpu"/></svg></div>
+              <div class="md"><div class="n1">模型</div><div class="n2">在输入框里点胶囊也能改</div></div>
+              <div class="trail"><span class="val">v4-flash</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-db"/></svg></div>
+              <div class="md"><div class="n1">数据与导出</div><div class="n2">Anki apkg · 全量 JSON</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+
+        <div class="sgroup" style="margin-bottom:0">
+          <div class="slabel">危险操作</div>
+          <div class="scard">
+            <div class="srow danger"><div class="lead"><svg class="ic"><use href="#i-x"/></svg></div>
+              <div class="md"><div class="n1">清空所有复习记录</div><div class="n2">不动题目与知识点，只删调度历史</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V4 设置子页 -->
+<div class="frame">
+  <div class="cap"><i>V4</i><b>设置 · 子页示范</b><em>返回 + 同构分组 · 不另起一套样式</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneM">
+      <div class="top">
+        <div class="l1"><svg class="ic" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-chevL"/></svg> 设置</div>
+        <div class="l2"><div class="subj">通知</div></div>
+      </div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="slabel">主动消息</div>
+          <div class="scard">
+            <div class="srow"><div class="md" style="padding-left:var(--q,0)"><div class="n1">每日开场</div><div class="n2">今天三件事，一条消息说完</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+            <div class="srow"><div class="md"><div class="n1">遗忘预警</div><div class="n2">某个知识点 14 天没碰、掌握度掉到 0.4 以下时提醒</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+            <div class="srow"><div class="md"><div class="n1">周报</div><div class="n2">周日 20:00</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">静默</div>
+          <div class="scard">
+            <div class="srow"><div class="md"><div class="n1">一天最多打扰</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">2</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+            <div class="srow"><div class="md"><div class="n1">断签提醒</div><div class="n2">第 3 天提醒一次，之后静默</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup" style="margin-bottom:0">
+          <div class="slabel">推送通道</div>
+          <div class="scard">
+            <div class="srow"><div class="md"><div class="n1">ntfy 主题</div><div class="n2">自建服务器 · ntfy.e1e.site</div></div>
+              <div class="trail"><span class="val">xiaoman</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</div>
+
+<div class="footer">
+  <b>设置行的组件规格（对齐 design-system 的 component spec 模式）</b>：行高 56dp（≥48dp 触控）· 左右内边距 14 · 图标槽 24（图标 18）· 标题 15/400 · 副标题 11.5/ink3 · 尾控件右对齐 · 分隔线 1px 且 <b>左缩 14、右缩 0</b>（Material 的 inset divider）。<br>
+  <b>四种尾控件各管一类</b>：布尔 → <code>switch</code>（不再写"已开启"文字）；数值 → <code>stepper</code>；区间 → <code>slider</code> + 数值；枚举/跳转 → 值 + <code>chevron</code>。<b>危险操作单独一组</b>，标题用赤陶。<br>
+  <b>模型为什么放进输入框</b>：它是"这次用什么"的临时选择，不是"设置"。所以常驻胶囊 + 弹层；设置页只留一个只读入口（"在输入框里点胶囊也能改"）。
+</div>
+
+</body>
+</html>

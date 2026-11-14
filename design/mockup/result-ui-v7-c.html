@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+<title>小满 · v7-C 外围（引导 / 队列 / 导出 / 诊断 / 学科 / 自定义端点）</title>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v16"/><path d="M16 13h2"/><path d="M16 9h2"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/><path d="M6 13h2"/><path d="M6 9h2"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-atom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></symbol>
+<symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></symbol>
+<symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20a10 10 0 0010-10 25.9 25.9 0 00-1.04-7.281 1 1 0 00-1.755-.325C15.833 5.5 13 5.5 9.8 6.1A7 7 0 0011 20"/><path d="M2 21a5 5 0 012.911-4.544C7.613 15.212 8.351 15.24 11 13"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></symbol>
+<symbol id="i-land" viewBox="0 0 24 24"><path d="M10 18v-7"/><path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M3 22h18"/><path d="M6 18v-7"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-chevR" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-.5-8.98A6 6 0 1 0 6 15.5"/><path d="M12 12v9"/><path d="m8 17 4-4 4 4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h6"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></symbol>
+</defs></svg>
+
+<div class="head">
+  <h1 class="d1">v7-C · 外围</h1>
+  <p>引导 → 上传队列 → 数据与导出 → 关于与诊断 → 学科选择 → 自定义端点。同一个 <code>theme.css</code>；设置类页面统一 56dp 行 + 内缩分隔线 + 四类尾控件；危险操作单独一组。</p>
+</div>
+
+<div class="grid">
+
+<!-- C1 引导 -->
+<div class="frame">
+  <div class="cap"><i>C1</i><b>P11 引导</b><em>只问三个问题 · 不解释</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="paneM" style="background:var(--paper)">
+      <div style="padding:var(--q6) 0 0;display:flex;justify-content:center">
+        <div style="width:680px">
+          <div class="lbl" style="color:var(--clay)">1 / 3</div>
+          <div class="d1" style="margin:var(--q3) 0 var(--q5)">先认识一下你。</div>
+          <div style="margin-bottom:var(--q4)">
+            <div class="lbl" style="margin-bottom:var(--q2)">在学什么</div>
+            <div class="chips"><span class="chip">语文</span><span class="chip on">数学</span><span class="chip">英语</span><span class="chip on">物理</span><span class="chip on">化学</span><span class="chip">生物</span><span class="chip">政治</span><span class="chip">历史</span><span class="chip">地理</span></div>
+          </div>
+          <div style="margin-bottom:var(--q4)">
+            <div class="lbl" style="margin-bottom:var(--q2)">什么时候考</div>
+            <div style="border:1px solid var(--line2);border-radius:var(--rb);background:var(--card);padding:11px var(--q3);font-size:var(--s4);color:var(--ink3)">2028 年 6 月</div>
+          </div>
+          <div style="margin-bottom:var(--q5)">
+            <div class="lbl" style="margin-bottom:var(--q2)">每天几分钟</div>
+            <div class="chips"><span class="chip">5</span><span class="chip on">15</span><span class="chip">30</span><span class="chip">60</span></div>
+          </div>
+          <div class="btnbar" style="padding:0;justify-content:flex-end"><div class="btn p" style="min-width:120px">下一步</div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- C2 上传队列 -->
+<div class="frame">
+  <div class="cap"><i>C2</i><b>P13 上传队列</b><em>状态即值 · 失败可重试</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1">来自手机</div><div class="l2"><div class="subj">上传队列</div><div class="sp"></div>
+        <div class="num" style="font-size:var(--s5);color:var(--ink3)">4 项</div></div></div>
+      <div class="det">
+        <div class="scard" style="margin-top:var(--q3)">
+          <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--sage)"><use href="#i-check"/></svg></div>
+            <div class="md"><div class="n1">物理周末作业 第 1 页</div></div>
+            <div class="trail"><span class="val">3 题</span><svg class="ic sm"><use href="#i-chevR"/></svg></div></div>
+          <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--sage)"><use href="#i-check"/></svg></div>
+            <div class="md"><div class="n1">物理周末作业 第 2 页</div></div>
+            <div class="trail"><span class="val">2 题</span><svg class="ic sm"><use href="#i-chevR"/></svg></div></div>
+          <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--clay)"><use href="#i-activity"/></svg></div>
+            <div class="md"><div class="n1">物理周末作业 第 3 页</div></div>
+            <div class="trail"><span class="val">识别中 62%</span></div></div>
+          <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--clay)"><use href="#i-x"/></svg></div>
+            <div class="md"><div class="n1">数学 错题集 第 4 页</div></div>
+            <div class="trail"><span class="val">失败</span><span class="chip on">重试</span></div></div>
+        </div>
+        <div class="btnbar" style="padding:var(--q4) 0 0"><div class="btn g"><svg class="ic"><use href="#i-refresh"/></svg>全部重试</div></div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- C3 数据与导出 -->
+<div class="frame">
+  <div class="cap"><i>C3</i><b>P16 数据与导出</b><em>导出 / 备份 / 存储 三组</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1"><svg class="ic sm" style="vertical-align:-3px;color:var(--ink3)"><use href="#i-chevL"/></svg> 设置</div>
+        <div class="l2"><div class="subj">数据与导出</div></div></div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="lbl">导出</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-upload"/></svg></div>
+              <div class="md"><div class="n1">Anki apkg</div></div>
+              <div class="trail"><span class="val num">1 842 张</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-db"/></svg></div>
+              <div class="md"><div class="n1">全量 JSON + Markdown</div></div>
+              <div class="trail"><span class="val num">216 MB</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="lbl">备份</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cloud"/></svg></div>
+              <div class="md"><div class="n1">自动备份</div></div>
+              <div class="trail"><span class="val">每天 03:00</span><div class="sw on"></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-clock"/></svg></div>
+              <div class="md"><div class="n1">最近一次</div></div>
+              <div class="trail"><span class="val num">今天 03:00</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-download"/></svg></div>
+              <div class="md"><div class="n1">从备份恢复</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup flat">
+          <div class="lbl">存储</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-db"/></svg></div>
+              <div class="md"><div class="n1">题目</div></div><div class="trail"><span class="val num">3 214</span></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-image" /></svg></div>
+              <div class="md"><div class="n1">图片</div></div><div class="trail"><span class="val num">1.8 GB</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- C4 关于与诊断 -->
+<div class="frame">
+  <div class="cap"><i>C4</i><b>P18 关于与诊断</b><em>版本 · 延迟 · 自检 · 日志</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1"><svg class="ic sm" style="vertical-align:-3px;color:var(--ink3)"><use href="#i-chevL"/></svg> 设置</div>
+        <div class="l2"><div class="subj">关于与诊断</div></div></div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="lbl">版本</div>
+          <div class="scard">
+            <div class="srow"><div class="md"><div class="n1">小满</div></div><div class="trail"><span class="val num">0.1.0</span></div></div>
+            <div class="srow"><div class="md"><div class="n1">Pi</div></div><div class="trail"><span class="val num">1.5.2</span></div></div>
+            <div class="srow"><div class="md"><div class="n1">模型目录</div></div><div class="trail"><span class="val num">11-14</span><span class="chip on">更新</span></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="lbl">自检</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--sage)"><use href="#i-check"/></svg></div>
+              <div class="md"><div class="n1">服务器</div></div><div class="trail"><span class="val num">42 ms</span></div></div>
+            <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--sage)"><use href="#i-check"/></svg></div>
+              <div class="md"><div class="n1">数据库</div></div><div class="trail"><span class="val num">8 ms</span></div></div>
+            <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--sage)"><use href="#i-check"/></svg></div>
+              <div class="md"><div class="n1">模型</div></div><div class="trail"><span class="val">已连接</span></div></div>
+            <div class="srow"><div class="lead"><svg class="ic sm" style="color:var(--clay)"><use href="#i-x"/></svg></div>
+              <div class="md"><div class="n1">推送</div></div><div class="trail"><span class="val">未连接</span><span class="chip on">重连</span></div></div>
+          </div>
+        </div>
+        <div class="sgroup flat">
+          <div class="lbl">日志</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-file" /></svg></div>
+              <div class="md"><div class="n1">最近 7 天</div></div>
+              <div class="trail"><span class="val num">186 条</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- C5 学科选择 -->
+<div class="frame">
+  <div class="cap"><i>C5</i><b>学科选择</b><em>四列图标网格 · 全部横跨两格</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj" style="color:var(--clay)"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car" style="color:var(--clay)"><use href="#i-chev"/></svg></div></div></div>
+      <div class="stream"><div class="ag"><p class="lead">物理这块，今天两件事。</p>
+        <p>复习 12 张 —— 受力分析占一半。</p></div></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet" style="left:72px">
+      <div class="grab"></div>
+      <div class="inner">
+        <div class="d3" style="margin-bottom:var(--q4)">在哪一科</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--q2)">
+          <div style="grid-column:span 2;display:flex;align-items:center;gap:var(--q3);border:1px solid var(--clayline);background:var(--claybg);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--clay);color:#fff;display:grid;place-items:center;flex:none"><svg class="ic"><use href="#i-sun"/></svg></div>
+            <div><div style="font-weight:500;color:var(--clay)">全部</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">4 科 · 22 张</div></div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-book"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">语文</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">空</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-sigma"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">数学</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">5 张</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-lang"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">英语</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">3 个词</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-flask"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">化学</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">2 道</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-leaf"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">生物</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">空</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-scale"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">政治</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">空</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-land"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">历史</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">空</div></div>
+          <div style="border:1px solid var(--line);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--fill);color:var(--ink2);display:grid;place-items:center"><svg class="ic"><use href="#i-globe"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2)">地理</div><div class="num" style="font-size:var(--s6);color:var(--ink3)">空</div></div>
+          <div style="border:1px solid var(--clayline);background:var(--claybg);border-radius:var(--rc);padding:var(--q3)">
+            <div style="width:32px;height:32px;border-radius:8px;background:#fff;color:var(--clay);display:grid;place-items:center"><svg class="ic"><use href="#i-atom"/></svg></div>
+            <div style="font-weight:500;margin-top:var(--q2);color:var(--clay)">物理</div><div class="num" style="font-size:var(--s6);color:var(--clay)">12 张</div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- C6 添加自定义端点 -->
+<div class="frame">
+  <div class="cap"><i>C6</i><b>添加自定义端点</b><em>models.json 的四个字段 · 无解释</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1"><svg class="ic sm" style="vertical-align:-3px;color:var(--ink3)"><use href="#i-chevL"/></svg> 模型管理</div>
+        <div class="l2"><div class="subj">自定义端点</div></div></div>
+      <div style="flex:1;overflow:hidden">
+        <div class="field">
+          <div class="fl">名称</div>
+          <div class="fi">火山方舟</div>
+        </div>
+        <div class="field">
+          <div class="fl">Base URL</div>
+          <div class="fi mono"><span style="font-size:var(--s5)">https://ark.cn-beijing.volces.com/api/v3</span></div>
+        </div>
+        <div class="field">
+          <div class="fl">API</div>
+          <div class="chips"><span class="chip on">openai-completions</span><span class="chip">openai-responses</span><span class="chip">anthropic-messages</span></div>
+        </div>
+        <div class="field">
+          <div class="fl">API Key</div>
+          <div class="fi mono"><span style="font-size:var(--s5)">••••••••••••4f2a</span></div>
+        </div>
+        <div class="field">
+          <div class="fl">模型</div>
+          <div class="mlist">
+            <div class="mitem"><span class="ck"></span><span class="id mono">deepseek-v4-pro</span><span class="ctx2 num">1M</span><span style="color:var(--ink3)"><svg class="ic sm"><use href="#i-x"/></svg></span></div>
+            <div class="mitem"><span class="ck"></span><span class="id mono">deepseek-v4-flash</span><span class="ctx2 num">1M</span><span style="color:var(--ink3)"><svg class="ic sm"><use href="#i-x"/></svg></span></div>
+            <div class="mitem" style="color:var(--ink3)"><svg class="ic sm"><use href="#i-plus"/></svg><span class="id" style="color:var(--ink3)">添加模型</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="btnbar full" style="border-top:1px solid var(--line)"><div class="btn g">取消</div><div class="btn p">保存</div></div>
+    </div>
+  </div></div>
+</div>
+
+</div>
+</body>
+</html>

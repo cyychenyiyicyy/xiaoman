@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>小满</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<div id="sprite-host" hidden></div>
+
+<div class="shell" id="shell">
+  <nav class="rail" aria-label="主导航">
+    <div class="logo" aria-hidden="true">满</div>
+    <div class="it on" aria-current="page">
+      <svg class="ic" aria-hidden="true"><use data-i="circle-dot"/></svg><span>对话</span>
+    </div>
+    <div class="it" aria-disabled="true">
+      <svg class="ic" aria-hidden="true"><use data-i="book-open-text"/></svg><span>错题</span>
+    </div>
+    <div class="it" aria-disabled="true">
+      <svg class="ic" aria-hidden="true"><use data-i="sparkles"/></svg><span>地图</span>
+    </div>
+    <div class="it" aria-disabled="true">
+      <svg class="ic" aria-hidden="true"><use data-i="clock"/></svg><span>记忆</span>
+    </div>
+    <div class="it" aria-disabled="true">
+      <svg class="ic" aria-hidden="true"><use data-i="zap"/></svg><span>本周</span>
+    </div>
+    <div class="sp"></div>
+    <div class="it" aria-disabled="true">
+      <svg class="ic" aria-hidden="true"><use data-i="settings"/></svg><span>设置</span>
+    </div>
+  </nav>
+
+  <main class="pane" id="pane">
+    <section class="view" id="view-chat">
+      <header class="top">
+        <div class="l1" id="top-brand">小满</div>
+        <div class="l2">
+          <div class="subj">
+            <svg class="ic" aria-hidden="true"><use data-i="circle-dot"/></svg>
+            <span id="top-subject">对话</span>
+          </div>
+          <div class="sp"></div>
+        </div>
+      </header>
+
+      <div class="stream" id="stream" aria-live="polite" aria-busy="true">
+        <div class="col">
+          <div class="skel">
+            <div class="row w60"></div>
+            <div class="row w80"></div>
+            <div class="row w40"></div>
+          </div>
+        </div>
+      </div>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <div class="col">
+          <div class="cbox" id="cbox">
+            <div class="thumbs" id="thumbs" hidden></div>
+            <div class="tools">
+              <button type="button" class="mpill hit44" id="model-pill" data-act="open-sheet" aria-haspopup="dialog">
+                <span class="pv" id="pill-provider">加载中</span>
+                <span class="md2" id="pill-model">—</span>
+                <svg class="ic sm car" aria-hidden="true"><use data-i="chevron-down"/></svg>
+              </button>
+              <div class="sp"></div>
+              <div class="think" role="group" aria-label="思考档位">
+                <button type="button" class="tpill hit44" data-act="set-think" data-think="off" aria-pressed="false">关</button>
+                <button type="button" class="tpill hit44" data-act="set-think" data-think="med" aria-pressed="false">
+                  <svg class="ic sm" aria-hidden="true"><use data-i="zap"/></svg><span>中</span>
+                </button>
+                <button type="button" class="tpill hit44" data-act="set-think" data-think="high" aria-pressed="false">
+                  <svg class="ic sm" aria-hidden="true"><use data-i="zap"/></svg><span>高</span>
+                </button>
+              </div>
+            </div>
+            <div class="crow">
+              <button type="button" class="ib" id="btn-attach" aria-label="添加图片">
+                <svg class="ic" aria-hidden="true"><use data-i="plus"/></svg>
+              </button>
+              <button type="button" class="ib" id="btn-camera" aria-label="拍照">
+                <svg class="ic" aria-hidden="true"><use data-i="camera"/></svg>
+              </button>
+              <textarea class="ta" id="ta" rows="1" placeholder="说点什么…" aria-label="输入内容"></textarea>
+              <button type="submit" class="send" id="btn-send" aria-label="发送" disabled>
+                <svg class="ic sm" aria-hidden="true"><use data-i="arrow-up"/></svg>
+              </button>
+            </div>
+            <input type="file" id="file-attach" accept="image/*" multiple hidden>
+            <input type="file" id="file-camera" accept="image/*" capture="environment" hidden>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="view" id="view-page" hidden></section>
+  </main>
+
+  <div class="overlay" id="overlay" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<noscript>小满需要 JavaScript。</noscript>
+<script src="app.js"></script>
+</body>
+</html>

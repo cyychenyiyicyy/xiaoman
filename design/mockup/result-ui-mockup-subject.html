@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学习伙伴 · 学科空间（不分会话，但按学科分）</title>
+<style>
+@font-face{font-family:"Lora";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/lora-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Lora";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/lora-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/inter-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/inter-latin-600-normal.woff2") format("woff2")}
+:root{
+  --paper:#FAF9F5; --surface:#FFFFFF; --alt:#F0EEE6; --alt2:#E9E6DC;
+  --ink:#191919; --ink2:#6B6862; --ink3:#9B988F;
+  --line:#E4E1D6; --line2:#D8D4C7;
+  --clay:#C96442; --claybg:#F7EAE3; --clayline:#EBCFC2;
+  --serif:"Lora","Sitka Text","Sitka","Songti SC","SimSun","Noto Serif CJK SC",Georgia,serif;
+  --sans:"Inter","Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  --fs-hero:32px; --lh-hero:1.28; --fs-h1:24px; --lh-h1:1.35; --fs-h2:20px; --lh-h2:1.45;
+  --fs-t:16px; --lh-t:1.5; --fs-b:14px; --lh-b:1.75; --fs-s:13px; --lh-s:1.65;
+  --fs-xs:12px; --lh-xs:1.55; --fs-lb:11px; --lh-lb:1.45;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#141413;color:#F0EEE6;font-family:var(--sans);font-size:14px;line-height:1.7;padding:40px 24px 80px}
+.pagehead{max-width:1560px;margin:0 auto 30px}
+.pagehead h1{font-family:var(--serif);font-size:30px;font-weight:500;margin:0 0 10px;letter-spacing:-.015em;font-synthesis-weight:none}
+.pagehead p{margin:0 0 7px;color:#A8A49A}
+.pagehead b{color:#F0EEE6}
+.pagehead code{background:#23221D;padding:2px 6px;border-radius:5px;font-size:12px;color:#D97757}
+.pill{display:inline-block;background:#23221D;color:#D97757;border-radius:6px;padding:2px 8px;font-size:12px;margin:0 6px 6px 0}
+.grid{max-width:1560px;margin:34px auto 0;display:flex;flex-wrap:wrap;gap:44px 40px;align-items:flex-start}
+.frame{width:360px}
+.cap{color:#A8A49A;margin:0 0 10px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:12.5px}
+.cap b{color:#F0EEE6;font-weight:600;font-size:13px}
+.cap i{font-style:normal;background:#23221D;color:#D97757;border-radius:4px;padding:1px 5px;font-size:11px}
+.cap em{font-style:normal;color:#7E7A70;font-size:11.5px}
+.phone{width:360px;height:780px;background:var(--paper);border-radius:30px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;color:var(--ink);box-shadow:0 18px 44px rgba(0,0,0,.42),0 0 0 1px #2E2C26}
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:var(--fs-lb);color:var(--ink2);font-weight:600;flex:none}
+.sb .d{display:flex;gap:3px;align-items:center}
+.sb .dot{width:4px;height:4px;border-radius:50%;background:var(--ink2)}
+.sb .bat{width:16px;height:8px;border:1px solid var(--ink2);border-radius:2px;position:relative}
+.sb .bat:after{content:"";position:absolute;inset:1px;right:5px;background:var(--ink2);border-radius:1px}
+
+.hd{height:56px;display:flex;align-items:center;gap:9px;padding:0 14px;border-bottom:1px solid var(--line);flex:none;position:relative;z-index:3;background:var(--paper)}
+.hd .av{width:32px;height:32px;border-radius:50%;background:var(--claybg);color:var(--clay);display:grid;place-items:center;
+  font-family:var(--serif);font-size:var(--fs-t);border:1px solid var(--clayline);flex:none;font-weight:500;font-synthesis-weight:none}
+.hd .nm{font-family:var(--serif);font-size:var(--fs-h2);font-weight:500;line-height:1.1;font-synthesis-weight:none}
+.hd .sp{flex:1}
+/* 学科胶囊 */
+.subj{display:flex;align-items:center;gap:5px;border:1px solid var(--line2);background:var(--surface);
+  border-radius:999px;padding:5px 9px 5px 11px;font-size:var(--fs-xs);font-weight:600;color:var(--ink)}
+.subj svg{color:var(--ink3)}
+.subj.open{border-color:var(--clayline);background:var(--claybg);color:var(--clay)}
+.subj.open svg{color:var(--clay)}
+.hd .x{width:26px;height:26px;display:grid;place-items:center;color:var(--ink2);flex:none}
+
+/* 下拉菜单 */
+.menu{position:absolute;left:14px;top:56px;right:14px;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;box-shadow:0 10px 30px rgba(25,25,25,.14);padding:6px;z-index:5}
+.menu .it{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;font-size:var(--fs-b)}
+.menu .it .lb2{font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.06em;padding:8px 10px 4px;font-weight:500}
+.menu .it.on{background:var(--claybg);color:var(--clay);font-weight:600}
+.menu .it .n{margin-left:auto;font-size:var(--fs-xs);color:var(--ink3)}
+.menu .it.on .n{color:var(--clay)}
+.menu .it .ck{width:14px;flex:none;color:var(--clay)}
+.scrim{position:absolute;inset:56px 0 0 0;background:rgba(25,25,25,.16);z-index:2}
+
+/* 内容 */
+.stream{flex:1;overflow:hidden;padding:12px 14px 0;position:relative}
+.day{text-align:center;font-size:var(--fs-xs);color:var(--ink3);margin:2px 0 14px;letter-spacing:.04em}
+.ag{margin:0 0 16px;font-size:var(--fs-b);line-height:var(--lh-b)}
+.ag p{margin:0 0 9px}
+.ag .lead{font-family:var(--serif);font-size:var(--fs-h2);line-height:var(--lh-h2);font-weight:500;margin:0 0 11px;font-synthesis-weight:none}
+.ag .muted{color:var(--ink2);font-size:var(--fs-s);line-height:var(--lh-s)}
+.hl{color:var(--clay);font-weight:600}
+.me{display:flex;justify-content:flex-end;margin:0 0 16px}
+.me span{background:var(--alt);padding:8px 13px;border-radius:16px 16px 4px 16px;font-size:var(--fs-b);line-height:var(--lh-t);max-width:76%}
+
+/* 科目摘要卡 */
+.subcard{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.subcard .nm2{font-family:var(--serif);font-size:var(--fs-t);font-weight:500;width:34px;flex:none;font-synthesis-weight:none}
+.subcard .info{flex:1;min-width:0;font-size:var(--fs-xs);color:var(--ink2);line-height:1.5}
+.subcard .info b{color:var(--ink);font-weight:600}
+.subcard .go{font-size:var(--fs-xs);color:var(--clay);font-weight:600;flex:none}
+.card{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 13px;margin:0 0 11px}
+.card .k{font-size:var(--fs-lb);line-height:var(--lh-lb);color:var(--ink3);letter-spacing:.08em;margin:0 0 7px;font-weight:500}
+.card .h{font-size:var(--fs-t);line-height:var(--lh-t);font-weight:600;margin:0 0 4px;display:flex;align-items:center;gap:5px}
+.card .s{font-size:var(--fs-s);line-height:var(--lh-s);color:var(--ink2);margin:0}
+.card .go2{color:var(--clay);font-weight:600}
+.btnrow{display:flex;gap:7px;margin-top:10px}
+.btn{flex:1;height:36px;border-radius:10px;display:grid;place-items:center;font-size:var(--fs-s);font-weight:600;
+  border:1px solid var(--line2);background:var(--surface);color:var(--ink)}
+.btn.p{background:var(--clay);border-color:var(--clay);color:#fff}
+.btn.g{background:transparent;border-color:transparent;color:var(--ink2)}
+.chain{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}
+.ch{display:flex;align-items:center;gap:8px;font-size:var(--fs-s)}
+.ch .nn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch .bars{display:flex;gap:2.5px;flex:none}
+.ch .b{width:6px;height:10px;border-radius:2px;background:var(--alt2)}
+.ch .b.on{background:var(--clay)}
+.ch .v{font-size:var(--fs-xs);color:var(--ink3);width:28px;text-align:right;flex:none}
+.subjtag{display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-lb);background:var(--alt);color:var(--ink2);
+  border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:1px}
+.composer{border-top:1px solid var(--line);padding:8px 10px 14px;flex:none}
+.cbar{display:flex;align-items:center;gap:3px;background:var(--surface);border:1px solid var(--line2);
+  border-radius:22px;padding:4px 5px 4px 9px;box-shadow:0 1px 2px rgba(25,25,25,.05)}
+.cbar .ic{width:31px;height:31px;display:grid;place-items:center;color:var(--ink2);flex:none}
+.cbar .ph{flex:1;font-size:var(--fs-b);color:var(--ink3);padding:0 3px}
+.cbar .send{width:31px;height:31px;border-radius:50%;background:var(--clay);color:#fff;display:grid;place-items:center;flex:none}
+.footer{max-width:1560px;margin:56px auto 0;color:#7E7A70;font-size:12.5px;line-height:1.9}
+.footer b{color:#A8A49A}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <h1>学科空间 · 不分会话，但按学科分</h1>
+  <p><b>关系轴单一，内容轴分科。</b>你只有一个她；但你有九个各自往下长的空间。</p>
+  <p><span class="pill">没有「新建对话」</span><span class="pill">没有会话列表</span><span class="pill">切换 = 换空间，不是换房间</span><span class="pill">记忆 / 复习队列 / 图谱全局共享</span></p>
+  <p style="margin-top:8px">和 07 的差别只有一处：<b>不做"合并渲染"</b>。一次只显示一个学科的消息，压掉另一科不会串进来。</p>
+</div>
+
+<div class="grid">
+
+<!-- S1 全部概览 -->
+<div class="frame">
+  <div class="cap"><i>S1</i><b>「全部」概览</b><em>默认落地页 · 长得像对话，不是仪表盘</em></div>
+  <div class="phone">
+    <div class="sb"><span>7:30</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="av">满</div><div class="nm">小满</div><div class="sp"></div>
+      <div class="subj">全部<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="stream">
+      <div class="day">今天</div>
+      <div class="ag"><p class="lead">早上好。今天四科有事：</p></div>
+      <div class="subcard"><div class="nm2">物理</div><div class="info"><b>12 张</b>待复习 · 受力分析占一半</div><div class="go">继续 ›</div></div>
+      <div class="subcard"><div class="nm2">数学</div><div class="info"><b>5 张</b> · 集合的包含关系只有 0.34</div><div class="go">继续 ›</div></div>
+      <div class="subcard"><div class="nm2">英语</div><div class="info"><b>3 个词</b>到期 · 上次错在拼写</div><div class="go">继续 ›</div></div>
+      <div class="subcard"><div class="nm2">化学</div><div class="info"><b>2 道</b> · 昨天错的是方程式配平</div><div class="go">继续 ›</div></div>
+      <div class="ag" style="margin-top:14px"><p>先从最多的开始，还是你有别的安排？</p>
+        <div class="btnrow"><div class="btn g">我自己安排</div><div class="btn p">从物理开始</div></div></div>
+      <div class="ag" style="margin-top:16px"><p class="muted">其它五科今天没有到期的东西。生物、政治、历史、地理都还空着 —— 想开始哪一科，直接说。</p></div>
+    </div>
+    <div class="composer"><div class="cbar">
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="ic" style="color:var(--clay)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 014.5 7h2.2l1.2-2h7.2l1.2 2h2.2A1.5 1.5 0 0120 8.5v9A1.5 1.5 0 0118.5 19h-13A1.5 1.5 0 014 17.5z"/><circle cx="11.5" cy="12.5" r="3.2"/></svg></div>
+      <div class="ph">说点什么…</div>
+      <div class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- S2 学科切换器展开 -->
+<div class="frame">
+  <div class="cap"><i>S2</i><b>学科切换器（展开）</b><em>顶栏唯一导航 · 十项</em></div>
+  <div class="phone">
+    <div class="sb"><span>7:31</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="av">满</div><div class="nm">小满</div><div class="sp"></div>
+      <div class="subj open">物理<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="menu">
+      <div class="lb2" style="font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.06em;padding:8px 10px 4px">概览</div>
+      <div class="it">全部<span class="n">4 科有事</span></div>
+      <div class="lb2">学科</div>
+      <div class="it">语文</div>
+      <div class="it">数学<span class="n">5</span></div>
+      <div class="it">英语<span class="n">3</span></div>
+      <div class="it on"><svg class="ck" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>物理<span class="n">12</span></div>
+      <div class="it">化学<span class="n">2</span></div>
+      <div class="it">生物</div>
+      <div class="it">政治</div>
+      <div class="it">历史</div>
+      <div class="it">地理</div>
+    </div>
+    <div class="scrim"></div>
+    <div class="stream">
+      <div class="day">今天</div>
+      <div class="ag"><p class="lead">物理这块，今天两件事：</p>
+        <ol><li>复习 <b>12 张</b>，受力分析占一半</li><li>昨天那道斜面的题重做一遍</li></ol></div>
+      <div class="card"><div class="k">今日复习</div><div class="h">开始 <span class="go2">12 张 ›</span></div><div class="s">预计 9 分钟</div></div>
+    </div>
+    <div class="composer"><div class="cbar">
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="ph">说点什么…</div>
+      <div class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- S3 数学空间 -->
+<div class="frame">
+  <div class="cap"><i>S3</i><b>数学空间（独立的一条长对话）</b><em>换科后只看这一科的历史</em></div>
+  <div class="phone">
+    <div class="sb"><span>22:10</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="av">满</div><div class="nm">小满</div><div class="sp"></div>
+      <div class="subj">数学<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="stream">
+      <div class="day">今天</div>
+      <div class="ag"><p class="lead">数学 5 张。都是集合这一章。</p>
+        <p class="muted">你在这条链上卡了两次，都是端点取不取的问题。</p></div>
+      <div class="me"><span>为什么 A ⊆ B 的时候 a ≤ 4 不行？</span></div>
+      <div class="ag">
+        <p>因为 <b>A</b> 是开区间 <span style="font-family:var(--serif)">(−1, 4)</span>，取不到 4。要盖住它，<b>B</b> 的上界只要 <span style="font-family:var(--serif)">≥ 4</span> 就行 —— <span style="font-family:var(--serif)">a = 4</span> 时 <span style="font-family:var(--serif)">B = (−∞, 4)</span>，刚好盖住开区间。</p>
+        <div class="card"><div class="k">这条链</div>
+          <div class="chain">
+            <div class="ch"><span class="nn">集合的概念与表示</span><span class="bars"><i class="b on"></i><i class="b on"></i><i class="b on"></i><i class="b on"></i><i class="b"></i></span><span class="v">0.72</span></div>
+            <div class="ch" style="padding-left:16px"><span class="nn">集合的包含关系</span><span class="bars"><i class="b on"></i><i class="b on"></i><i class="b"></i><i class="b"></i><i class="b"></i></span><span class="v">0.34</span></div>
+          </div></div>
+        <p class="muted">根因在第 1 层还是第 2 层？我觉得是端点，不是包含的定义。</p>
+      </div>
+      <div class="card"><div class="k">需要你确认</div><div class="h" style="font-weight:500">把「端点的开闭」记为一个子知识点？</div>
+        <div class="s">会挂到「集合的包含关系」下面，影响后续出题</div>
+        <div class="btnrow"><div class="btn">拒绝</div><div class="btn p">接受</div></div></div>
+    </div>
+    <div class="composer"><div class="cbar">
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="ic" style="color:var(--clay)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 014.5 7h2.2l1.2-2h7.2l1.2 2h2.2A1.5 1.5 0 0120 8.5v9A1.5 1.5 0 0118.5 19h-13A1.5 1.5 0 014 17.5z"/><circle cx="11.5" cy="12.5" r="3.2"/></svg></div>
+      <div class="ph">说点什么…</div>
+      <div class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+    </div></div>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  <b>为什么这不是会话列表</b>：你切的是<b>科目</b>，不是"开一个新对话"。没有一个空间会被"结束"，没有"删除"，历史永远在，她只有一个人。<br>
+  <b>技术上一句话</b>：消息表加 <code>subject</code>，查询只按 subject 过滤 —— <b>不做合并渲染</b>。Pi session 也是 1 学科 1 个，compaction 不串味。<br>
+  <b>主动消息</b>：跨科汇总只发在「全部」；单科开场只发在有任务的那科，一天最多 1 条 —— 你打开哪科才看到哪科，不会在一个屏幕上被九科堆满。
+</div>
+
+</body>
+</html>

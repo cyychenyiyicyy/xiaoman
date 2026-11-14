@@ -1,0 +1,133 @@
+# 21 · MVP 契约（主对话 + 模型配置）
+
+> **冻结时间**：2026-11-14。本文件是 MVP 前后端的唯一接口依据，改动必须同步改前端。
+> 范围由用户口述圈定：**只做主对话** —— 聊天、上下文、会话、模型添加与配置、模型选择、思考强度、拍照与图片上传。
+> **不做**：题目解析 / OCR / 错题 / 复习 / 知识地图 / 统计学 / 会话列表。
+
+---
+
+## 1. 三个已定决策
+
+| # | 决策 | 理由 |
+|---|---|---|
+| **M1** | **MVP 用 Web UI，直接复用 `design/mockup/theme.css` 与 v6 稿的对话屏**，平板浏览器打开即用；后续再套 WebView 壳出 APK | 用户要求「界面直接 copy 过来」；本机无 JDK/Android SDK，Web 是唯一能当天跑起来的形态；Ekko Pad 已验证过「WebView 壳 + Web UI」这条路 |
+| **M2** | **MVP 不接 Pi**，先用 OpenAI 兼容直连 | MVP 只需要「流式 + 多模态 + 会话」，Pi 的 catalog/compaction/工具在 M4 才付租金。留 `ChatEngine` 接缝，接 Pi 时替换实现即可 |
+| **M3** | **不用域名，直接用 IP**：`http://<服务器IP>:<port>` | 用户明确要求；与服务器现有 Caddy IP 反代方式一致 |
+
+> 环境偏差：本机实际跑 **PostgreSQL 16.15**（本机原装，服务被禁用，已在项目目录 `data/pgdata` 用 `pg_ctl` 单独起在 **5433**）。生产仍是 PG18 容器。16 与 18 在 MVP 用到的特性上无差异，记为已知偏差。
+
+---
+
+## 2. 进程与端口
+
+| 进程 | 地址 | 说明 |
+|---|---|---|
+| FastAPI | `127.0.0.1:8787` | 同时托管 `web/` 静态文件（`/` → `web/index.html`） |
+| PostgreSQL | `127.0.0.1:5433` | 库 `xiaoman_dev`，用户 `postgres`，trust 认证 |
+| 浏览器 | `http://127.0.0.1:8787` | 平板同网段用 `http://<本机IP>:8787` |
+
+---
+
+## 3. 数据表（MVP 6 张）
+
+```sql
+llm_provider(id pk, name, base_url, api_style, api_key, api_key_tail,
+             connected bool, kind, sort, created_at)
+llm_model(id pk, provider_id fk, model_key, display_name, context_len,
+          supports_images bool, supports_thinking bool, enabled bool, sort, created_at)
+conversation(id pk, subject, created_at, updated_at)        -- 单行，永不复用
+message(id pk, conversation_id fk, role, kind, content_md, reasoning_md,
+        images jsonb, provider_id, model_key, thinking, status, error, created_at)
+attachment(id pk, filename, mime, bytes, sha256, path, created_at)
+app_setting(key pk, value jsonb)                            -- 当前 model / thinking
+```
+
+- `api_style`：`openai`（默认）/ `anthropic`（预留）
+- `kind`：`custom`（用户添加）/ `mock`（内置，无需 key，用于验收）
+- **只追加**：`message` 不更新正文，流式结束才写 `status='done'`
+
+---
+
+## 4. API（前缀 `/api/v1`）
+
+### 4.1 会话
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/conversation` | `{id, subject, message_count, updated_at}`；不存在则创建 |
+| GET | `/messages?before=<id>&limit=50` | `{items:[Message], next_before}`，倒序取正序返 |
+
+`Message`：`{id, role:"user"|"assistant", kind:"text"|"image", content_md, reasoning_md, images:[{id,url,mime}], provider_id, model_key, thinking, status, created_at}`
+
+### 4.2 聊天（SSE）
+
+`POST /chat`，`Content-Type: application/json`
+
+```json
+{ "text": "…", "image_ids": ["att_…"], "thinking": "off|low|med|high" }
+```
+
+响应 `text/event-stream`，每行 `data: {json}`：
+
+| type | 载荷 |
+|---|---|
+| `meta` | `{user_message_id, assistant_message_id, provider_id, model_key, thinking}` |
+| `reasoning` | `{delta}` 思考链增量（可无） |
+| `text` | `{delta}` 正文增量 |
+| `done` | `{message_id, usage:{prompt_tokens, completion_tokens}}` |
+| `error` | `{code, message}`，随后流结束 |
+
+**规则**：模型与思考档位取自 `app_setting`，不在请求体里传；上下文 = 最近 20 条消息，超长按字符截断。
+
+### 4.3 Provider / Model / 设置
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/providers` | `[{id,name,base_url,api_style,api_key_tail,connected,kind,model_count}]` |
+| POST | `/providers` | `{name, base_url, api_key, api_style?}` → 新建 |
+| PATCH | `/providers/{id}` | 改名 / 改端点 / 换 key / 断开 |
+| DELETE | `/providers/{id}` | 级联删该 provider 的模型行 |
+| POST | `/providers/{id}/test` | 请求 `{base_url}/models`，返回 `{ok, models_count, latency_ms, error?}` |
+| POST | `/providers/{id}/sync-models` | 拉 `/models` 并 upsert，返回 `{added, total}` |
+| GET | `/models?provider_id=` | 组内模型 |
+| PATCH | `/models/{id}` | `enabled / display_name / context_len / supports_images / supports_thinking` |
+| GET | `/settings` | `{provider_id, model_id, thinking}` |
+| PATCH | `/settings` | 改当前模型 / 思考档 |
+
+### 4.4 附件
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/uploads` | multipart `file` → `{id, url, mime, bytes}` |
+| GET | `/attachments/{id}` | 原图字节（带 content-type） |
+
+### 4.5 健康
+
+`GET /health` → `{ok, db:"ok", schema_version, version}`
+
+---
+
+## 5. 内置 mock provider（验收用）
+
+无 API Key 时也要能验证全链路。首次启动 seed：
+
+- provider：`name="内置演示"`, `kind="mock"`, `base_url="mock://"`
+- model：`model_key="mock-fast"`, `context_len=128000`, `supports_images=true`, `supports_thinking=true`
+- `POST /chat` 命中 mock 时：读入文字 + 图片 id，按 200ms/块的节奏吐一段固定中文回复；若 `thinking != off`，先吐一段 `reasoning`。
+- 目的：**流式、消息落库、上下文、图片附件、思考档位**五条链路在没有真 key 时全部可验。
+
+---
+
+## 6. 前端（`web/`）
+
+| 文件 | 内容 |
+|---|---|
+| `theme.css` | 从 `design/mockup/theme.css` **整份复制**，只在末尾追加页面私有类 |
+| `sprite.svg` | 由 `design/mockup/icons/*.svg` 生成 `<symbol id="i-*">`，**描边强制 1.7** |
+| `fonts/` | 复制 `design/mockup/fonts/` 三个 Instrument Sans woff2 |
+| `index.html` | 结构照 `result-ui-v6.html` V1（rail + 顶栏 + 流 + composer） |
+| `app.js` | 无构建、原生 JS：SSE 读取、Markdown 渲染、模型弹层、模型管理、provider 表单、拍照/上传 |
+
+页面私有类（`.pgrp/.mrow/.au/.chk` 等）在 v6 稿 `<style>` 里，取过来放进 `theme.css` 末尾。
+
+**必须对上的视觉硬约束**：无 emoji 图标 · 图标 14/18/22 且描边 1.7 · 字号只用 s1–s6 · 间距只用 q1–q6 · 一屏最多一个 filled · 返回/关闭用 `ink2` 且 44×44 · 不写解释性副标题 · 数字 tabular-nums。

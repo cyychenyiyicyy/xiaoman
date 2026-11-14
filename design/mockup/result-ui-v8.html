@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="theme.css">
+<title>小满 · v8 深色模式 + 拍题摄像头</title>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v16"/><path d="M16 13h2"/><path d="M16 9h2"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/><path d="M6 13h2"/><path d="M6 9h2"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-atom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></symbol>
+<symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></symbol>
+<symbol id="i-cam" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-flip" viewBox="0 0 24 24"><path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h7"/><path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-7"/><path d="M12 2v20"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-chevR" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+<symbol id="i-pal" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+</defs></svg>
+
+<div class="head">
+  <h1 class="d1">v8 · 深色模式 + 拍题摄像头</h1>
+  <p><b>深色</b>是纯 token 换值——<code>theme.css</code> 里一段 <code>@media (prefers-color-scheme: dark)</code> 加一个 <code>.dark</code> 类，18 屏全部跟着变，组件一行没改。顺手修了两处会掉对比度的地方。</p>
+  <p><b>拍题</b>改成平板自己拍：前摄 + 顶部镜面 → 俯视桌面。所以加了「选择摄像头」，默认前摄。<b>手机上传那条路径去掉了。</b></p>
+  <div style="margin-top:var(--q3)">
+    <span class="tag hi">深色对比度：ink/paper 15.8:1 · ink2/card 7.4:1 · ink3/card 4.8:1</span>
+    <span class="tag hi">赤陶上的文字改用 --on-clay（深色下变深字，4.6:1）</span>
+    <span class="tag">摄像头默认前摄 · 三项可选 · 无描述文本</span>
+  </div>
+</div>
+
+<div class="grid">
+
+<!-- D1 拍摄（浅色） -->
+<div class="frame">
+  <div class="cap"><i>D1</i><b>拍题 · 取景</b><em>前摄俯视桌面 · 右上可选摄像头</em></div>
+  <div class="wrap"><div class="tab" style="background:#2A2724">
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:var(--q2);padding:var(--q3) var(--q4);color:#EFEBE3">
+        <div style="width:26px;height:26px;display:grid;place-items:center;color:#EFEBE3"><svg class="ic sm"><use href="#i-chevL"/></svg></div>
+        <div style="font-weight:500">拍题</div>
+        <div style="flex:1"></div>
+        <div class="chip" style="background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.18);color:#EFEBE3">
+          <svg class="ic sm" style="vertical-align:-3px"><use href="#i-flip"/></svg> 前摄</div>
+      </div>
+      <div style="flex:1;position:relative;margin:0 var(--q4);border-radius:12px;overflow:hidden;
+                  background:linear-gradient(180deg,#3A3630,#2E2A26);border:1px solid rgba(255,255,255,.08)">
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-1.5deg);
+                    width:420px;height:300px;background:#F6F3EC;border-radius:3px;box-shadow:0 18px 40px rgba(0,0,0,.45)">
+          <div style="padding:22px 24px;color:#3A352C;font-size:var(--s6);line-height:1.7">
+            <div style="font-weight:600;margin-bottom:10px">4. 质量 m = 2 kg 的物块置于倾角 30° 的斜面…</div>
+            <div style="height:6px;width:88%;background:#DCD5C6;border-radius:3px;margin-bottom:7px"></div>
+            <div style="height:6px;width:76%;background:#DCD5C6;border-radius:3px;margin-bottom:7px"></div>
+            <div style="height:6px;width:92%;background:#DCD5C6;border-radius:3px;margin-bottom:18px"></div>
+            <div style="font-weight:600;margin-bottom:10px">5. 关于超重与失重，下列说法正确的是</div>
+            <div style="height:6px;width:70%;background:#DCD5C6;border-radius:3px;margin-bottom:7px"></div>
+            <div style="height:6px;width:84%;background:#DCD5C6;border-radius:3px"></div>
+          </div>
+        </div>
+        <div class="thumb" style="position:absolute;left:120px;top:120px;width:430px;height:120px;background:transparent;border:0">
+        </div>
+        <div style="position:absolute;left:150px;top:118px;width:392px;height:104px;border:1.5px solid var(--clay);border-radius:6px;background:rgba(201,122,94,.10)"></div>
+        <div style="position:absolute;left:150px;top:238px;width:392px;height:86px;border:1.5px solid var(--clay);border-radius:6px;background:rgba(201,122,94,.10)"></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--q4) var(--q5) var(--q5)">
+        <div style="width:52px;height:52px;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center;color:#EFEBE3">
+          <svg class="ic"><use href="#i-image"/></svg></div>
+        <div style="width:72px;height:72px;border-radius:50%;border:3px solid #EFEBE3;display:grid;place-items:center">
+          <div style="width:58px;height:58px;border-radius:50%;background:var(--clay)"></div></div>
+        <div style="width:52px"></div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- D2 选择摄像头（浅色弹层） -->
+<div class="frame">
+  <div class="cap"><i>D2</i><b>选择摄像头</b><em>三项 · 当前打勾 · 无说明</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1">拍题</div><div class="l2"><div class="subj">取景</div></div></div>
+      <div class="stream"><div class="ag"><p class="lead">把卷子放在桌面。</p><p>框会自动跟。</p></div></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet" style="left:72px">
+      <div class="grab"></div>
+      <div class="inner">
+        <div class="d3" style="margin-bottom:var(--q3)">选择摄像头</div>
+        <div class="scard">
+          <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cam"/></svg></div>
+            <div class="md"><div class="n1">前摄</div></div>
+            <div class="trail"><svg class="ic sm" style="color:var(--clay)"><use href="#i-check"/></svg></div></div>
+          <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cam"/></svg></div>
+            <div class="md"><div class="n1">后摄</div></div>
+            <div class="trail"></div></div>
+          <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cpu"/></svg></div>
+            <div class="md"><div class="n1">USB</div></div>
+            <div class="trail"></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- D3 对话（深色） -->
+<div class="frame">
+  <div class="cap"><i>D3</i><b>对话 · 深色</b><em>同一份 theme.css · 组件零改动</em></div>
+  <div class="wrap dark"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneL">
+      <div class="top"><div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="sp"></div><div class="more"><svg class="ic sm"><use href="#i-more"/></svg></div></div></div>
+      <div class="stream">
+        <div class="day"><svg class="ic"><use href="#i-moon"/></svg>今天 · 22:14</div>
+        <div class="ag"><p class="lead">物理这块，今天两件事。</p>
+          <p>复习 <b class="num">12</b> 张 —— 受力分析占一半；再把昨天那道斜面题重做一遍。</p></div>
+        <div class="c-out"><div class="h">开始 12 张 →</div></div>
+        <div class="me"><span>牛顿第二定律到底怎么用？</span></div>
+        <div class="ag"><p>它是「合外力 → 加速度」的桥。但你的问题不在这一步。</p>
+          <div class="c-out" style="padding:0">
+            <div class="kv" style="padding:10px 14px"><span class="k">受力分析</span><b style="color:var(--clay)">0.31</b></div>
+            <div class="kv" style="padding:10px 14px"><span class="k" style="padding-left:14px">牛顿第二定律</span><b>0.58</b></div>
+          </div>
+          <p>10-21 那道斜面题，你漏的是摩擦力。</p></div>
+      </div>
+      <div class="composer"><div class="cbox">
+        <div class="tools"><div class="mpill"><span class="pv">千帆</span><span class="md2">deepseek-v4-flash</span><svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="tpill on"><svg class="ic"><use href="#i-zap"/></svg>中</div><div class="ctx num">8.2k</div></div>
+        <div class="crow"><div class="ib"><svg class="ic"><use href="#i-plus"/></svg></div>
+          <div class="ib act"><svg class="ic"><use href="#i-cam"/></svg></div>
+          <div class="ph">说点什么…</div><div class="send"><svg class="ic sm"><use href="#i-up"/></svg></div></div>
+      </div></div>
+    </div>
+    <div class="paneR">
+      <div style="padding:var(--q4) var(--q4) var(--q3);border-bottom:1px solid var(--line);display:flex;align-items:center">
+        <div style="font-size:var(--s3);font-weight:500">今日</div><div style="flex:1"></div>
+        <div style="font-size:var(--s5);color:var(--ink3)" class="num">22 张</div></div>
+      <div style="flex:1;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--claybg);display:grid;place-items:center;color:var(--clay);flex:none"><svg class="ic"><use href="#i-atom"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">物理</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">12 张</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500;color:var(--clay)">0.31</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-sigma"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">数学</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">5 张</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.34</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-lang"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">英语</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">3 个词</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.62</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- D4 复习（深色） -->
+<div class="frame">
+  <div class="cap"><i>D4</i><b>复习 · 深色</b><em>filled 换成深色 clay · 文字改深色</em></div>
+  <div class="wrap dark"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="dhead"><div class="x"><svg class="ic sm"><use href="#i-x"/></svg></div>
+        <div style="font-weight:500">复习</div><div class="sp"></div>
+        <div class="num" style="font-size:var(--s5);color:var(--ink3)">3 / 15</div></div>
+      <div style="height:2px;background:var(--fill2);flex:none"><div style="height:2px;width:20%;background:var(--clay)"></div></div>
+      <div style="flex:1;display:flex;min-height:0">
+        <div style="flex:1.12;padding:var(--q5) 40px;display:flex;flex-direction:column;border-right:1px solid var(--line)">
+          <div class="d3" style="line-height:1.62">斜面上的物块，除了重力，还要画哪几个力？各自方向朝哪？</div>
+          <div class="chips" style="margin-top:var(--q4)"><span class="chip">受力分析</span><span class="chip on">漏了摩擦力</span></div>
+          <div style="flex:1"></div>
+          <div class="chips"><span class="chip">提示</span><span class="chip">跳过</span></div>
+        </div>
+        <div style="flex:1;padding:var(--q5) 40px;display:flex;flex-direction:column;background:var(--card)">
+          <div class="lbl">作答</div>
+          <div style="flex:1;display:grid;place-items:center;border:1px dashed var(--line2);border-radius:var(--rc);
+               background:var(--fill);color:var(--ink3);font-size:var(--s5);margin-top:var(--q3)">写在这里</div>
+          <div class="chips" style="justify-content:flex-end;margin-top:var(--q3)"><span class="chip">参考答案</span><span class="chip">对比</span></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--q2);padding:var(--q4) var(--q5) var(--q2);flex:none">
+        <div class="btn" style="flex:1;flex-direction:column;height:52px;gap:0"><span>忘记</span><span class="num" style="font-size:var(--s6);color:var(--ink3)">1 分</span></div>
+        <div class="btn" style="flex:1;flex-direction:column;height:52px;gap:0"><span>吃力</span><span class="num" style="font-size:var(--s6);color:var(--ink3)">1 天</span></div>
+        <div class="btn" style="flex:1;flex-direction:column;height:52px;gap:0;background:var(--clay);border-color:var(--clay);color:var(--on-clay)"><span>记得</span><span class="num" style="font-size:var(--s6);opacity:.7">4 天</span></div>
+        <div class="btn" style="flex:1;flex-direction:column;height:52px;gap:0"><span>太简单</span><span class="num" style="font-size:var(--s6);color:var(--ink3)">9 天</span></div>
+      </div>
+      <div style="text-align:center;font-size:var(--s6);color:var(--ink3);padding-bottom:var(--q4)" class="num">目标保留率 0.90</div>
+    </div>
+  </div></div>
+</div>
+
+<!-- D5 错题（深色） -->
+<div class="frame">
+  <div class="cap"><i>D5</i><b>错题 · 深色</b><em>卡片描边减弱 · 题干仍读得清</em></div>
+  <div class="wrap dark"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it on"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div style="width:200px;flex:none;border-right:1px solid var(--line);padding:var(--q4) var(--q3)">
+      <div class="lbl" style="margin-bottom:6px">学科</div>
+      <div class="spec" style="border:0;padding:6px var(--q2);border-radius:7px;background:var(--fill);color:var(--ink);font-weight:500">全部<span style="margin-left:auto" class="num">56</span></div>
+      <div class="spec" style="border:0;padding:6px var(--q2)">物理<span style="margin-left:auto" class="num">18</span></div>
+      <div class="spec" style="border:0;padding:6px var(--q2)">数学<span style="margin-left:auto" class="num">24</span></div>
+      <div class="spec" style="border:0;padding:6px var(--q2)">英语<span style="margin-left:auto" class="num">9</span></div>
+      <div class="lbl" style="margin:var(--q4) 0 6px">状态</div>
+      <div class="spec" style="border:0;padding:6px var(--q2);border-radius:7px;background:var(--fill);color:var(--ink);font-weight:500">未解决<span style="margin-left:auto" class="num">12</span></div>
+      <div class="spec" style="border:0;padding:6px var(--q2)">已解决<span style="margin-left:auto" class="num">47</span></div>
+    </div>
+    <div class="paneM">
+      <div class="dhead" style="height:56px">
+        <div style="display:flex;gap:var(--q4);font-size:var(--s5);font-weight:500">
+          <span style="color:var(--ink);padding-bottom:5px;border-bottom:1.5px solid var(--ink)">全部错题</span>
+          <span style="color:var(--ink3);padding-bottom:5px">知识分类</span></div>
+        <div class="sp"></div>
+        <div class="chips"><span class="chip on">数学</span><span class="chip">年级</span></div></div>
+      <div class="gridw">
+        <div class="dh">09 / 02</div>
+        <div class="cols">
+          <div class="col">
+            <div class="qc on"><div class="st">已知集合 A = {x | −1 &lt; x &lt; 4}，B = {x | x &lt; a}，若 A ⊆ B，则实数 a 满足</div>
+              <div class="mt"><span class="kp">集合的包含关系</span><span class="num">错 1</span></div></div>
+            <div class="qc"><div class="st">设集合 M = {1, x, y}，N = {x, x², xy}，且 M = N，求 x²⁰²⁵ + y²⁰²⁶</div>
+              <div class="mt"><span class="kp">集合的相等</span><span class="num">错 2</span></div></div>
+          </div>
+          <div class="col">
+            <div class="qc"><div class="st">二次函数 y = ax² + bx − 2 过 A(1,t)、B(2,t)，最大值 1 − 3a²/4</div>
+              <div class="mt"><span class="kp">二次函数最值</span><span class="num">错 3</span></div></div>
+            <div class="qc"><div class="st">分式方程 (2x + a)/(x + 1) = 1 的解为负数，求 a 范围</div>
+              <div class="mt"><span class="kp">分式方程</span><span class="num">错 1</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- D6 设置（深色）含摄像头 -->
+<div class="frame">
+  <div class="cap"><i>D6</i><b>设置 · 深色</b><em>新增「拍题摄像头」一行</em></div>
+  <div class="wrap dark"><div class="tab">
+    <div class="rail"><div class="logo">满</div>
+      <div class="it"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div><div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div></div>
+    <div class="paneM">
+      <div class="top"><div class="l1">小满 · 0.1.0</div><div class="l2"><div class="subj">设置</div></div></div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="lbl">拍题</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cam"/></svg></div>
+              <div class="md"><div class="n1">拍题摄像头</div></div>
+              <div class="trail"><span class="val">前摄</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-image"/></svg></div>
+              <div class="md"><div class="n1">存原图</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="lbl">外观</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-pal"/></svg></div>
+              <div class="md"><div class="n1">外观</div></div>
+              <div class="trail"><span class="val">跟随系统</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="lbl">复习</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-clock"/></svg></div>
+              <div class="md"><div class="n1">每日上限</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">20</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-zap"/></svg></div>
+              <div class="md"><div class="n1">目标保留率</div></div>
+              <div class="trail"><div class="slider"><div class="track"><i style="width:62%"></i><b></b></div><span class="n">0.90</span></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="lbl">通知</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-bell"/></svg></div>
+              <div class="md"><div class="n1">每日开场</div></div>
+              <div class="trail"><span class="val">07:30</span><div class="sw on"></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup flat">
+          <div class="lbl">模型与数据</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cpu"/></svg></div>
+              <div class="md"><div class="n1">模型管理</div></div>
+              <div class="trail"><span class="val">2 / 5</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学习伙伴 · 错题模块改版（借鉴豆包爱学的信息结构）</title>
+<style>
+@font-face{font-family:"Lora";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/lora-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Lora";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/lora-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/inter-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/inter-latin-600-normal.woff2") format("woff2")}
+
+:root{
+  --paper:#FAF9F5; --surface:#FFFFFF; --alt:#F0EEE6; --alt2:#E9E6DC;
+  --ink:#191919; --ink2:#6B6862; --ink3:#9B988F;
+  --line:#E4E1D6; --line2:#D8D4C7;
+  --clay:#C96442; --claybg:#F7EAE3; --clayline:#EBCFC2;
+  --serif:"Lora","Sitka Text","Sitka","Songti SC","SimSun","Noto Serif CJK SC",Georgia,serif;
+  --sans:"Inter","Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  --fs-hero:32px; --lh-hero:1.28;
+  --fs-h1:24px;   --lh-h1:1.35;
+  --fs-h2:20px;   --lh-h2:1.45;
+  --fs-t:16px;    --lh-t:1.5;
+  --fs-b:14px;    --lh-b:1.75;
+  --fs-s:13px;    --lh-s:1.65;
+  --fs-xs:12px;   --lh-xs:1.55;
+  --fs-lb:11px;   --lh-lb:1.45;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#141413;color:#F0EEE6;font-family:var(--sans);font-size:14px;line-height:1.7;padding:40px 24px 80px}
+.pagehead{max-width:1560px;margin:0 auto 14px}
+.pagehead h1{font-family:var(--serif);font-size:30px;font-weight:500;margin:0 0 10px;letter-spacing:-.015em;font-synthesis-weight:none}
+.pagehead p{margin:0 0 8px;color:#A8A49A}
+.pagehead b{color:#F0EEE6}
+.pagehead code{background:#23221D;padding:2px 6px;border-radius:5px;font-size:12px;color:#D97757}
+.pill{display:inline-block;background:#23221D;color:#D97757;border-radius:6px;padding:2px 8px;font-size:12px;margin:0 6px 6px 0}
+.grid{max-width:1560px;margin:34px auto 0;display:flex;flex-wrap:wrap;gap:46px 40px;align-items:flex-start}
+.frame{width:360px}
+.frame.wide{width:845px}
+.cap{color:#A8A49A;margin:0 0 10px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:12.5px}
+.cap b{color:#F0EEE6;font-weight:600;font-size:13px}
+.cap i{font-style:normal;background:#23221D;color:#D97757;border-radius:4px;padding:1px 5px;font-size:11px}
+.cap em{font-style:normal;color:#7E7A70;font-size:11.5px}
+.phone{width:360px;height:780px;background:var(--paper);border-radius:30px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;color:var(--ink);box-shadow:0 18px 44px rgba(0,0,0,.42),0 0 0 1px #2E2C26}
+.wrap{width:845px;height:528px;overflow:hidden;border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.45),0 0 0 1px #2E2C26}
+.tab{width:1280px;height:800px;transform:scale(.66);transform-origin:top left;background:var(--paper);color:var(--ink);display:flex;overflow:hidden}
+
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:var(--fs-lb);color:var(--ink2);font-weight:600;flex:none}
+.sb .d{display:flex;gap:3px;align-items:center}
+.sb .dot{width:4px;height:4px;border-radius:50%;background:var(--ink2)}
+.sb .bat{width:16px;height:8px;border:1px solid var(--ink2);border-radius:2px;position:relative}
+.sb .bat:after{content:"";position:absolute;inset:1px;right:5px;background:var(--ink2);border-radius:1px}
+
+/* 顶栏 */
+.hd{height:52px;display:flex;align-items:center;gap:12px;padding:0 14px;flex:none}
+.hd .x{width:26px;height:26px;display:grid;place-items:center;color:var(--ink);flex:none}
+.hd .sp{flex:1}
+/* 顶部双泳道 */
+.seg{display:flex;gap:20px;padding:0 14px 10px;flex:none}
+.seg span{font-size:var(--fs-t);font-weight:600;color:var(--ink3);padding-bottom:7px;border-bottom:2px solid transparent}
+.seg span.on{color:var(--ink);border-bottom-color:var(--ink)}
+/* 筛选条 */
+.filters{display:flex;gap:7px;padding:0 14px 12px;overflow:hidden;flex:none}
+.fchip{font-size:var(--fs-xs);border:1px solid var(--line2);border-radius:999px;padding:5px 11px;color:var(--ink2);background:var(--surface);white-space:nowrap;display:flex;align-items:center;gap:4px}
+.fchip.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600}
+.fchip .car{opacity:.55}
+
+/* 卡片网格 */
+.gridwrap{flex:1;overflow:hidden;padding:0 14px}
+.dhead{font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.08em;font-weight:500;margin:6px 0 9px}
+.cols{display:flex;gap:10px;align-items:flex-start}
+.col{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.qcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px;display:flex;flex-direction:column;min-height:0}
+.qcard .stem{font-size:var(--fs-s);line-height:1.68;color:var(--ink);overflow:hidden}
+.qcard .stem .f{font-family:var(--serif);font-size:var(--fs-s);font-synthesis-weight:none}
+.qcard .fade{height:22px;margin-top:-16px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 82%);position:relative}
+.qcard .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.qcard .tag{font-size:var(--fs-lb);line-height:1.4;background:var(--alt);border-radius:6px;padding:3px 7px;color:var(--ink2);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.qcard .tag.plus{color:var(--clay);background:var(--claybg)}
+.qcard .cnt{font-size:var(--fs-lb);color:var(--ink3);margin-top:8px}
+.qcard .rowtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.qcard .badge{font-size:var(--fs-lb);font-weight:600;color:#5C6B4C;background:#EDF0E8;border-radius:999px;padding:2px 7px}
+
+/* 知识分类卡 */
+.kpc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;position:relative}
+.kpc .top{display:flex;align-items:flex-start;gap:10px}
+.kpc .l{flex:1;min-width:0}
+.kpc .nm{font-family:var(--serif);font-size:var(--fs-h2);font-weight:500;letter-spacing:-.005em;font-synthesis-weight:none}
+.kpc .sub{font-size:var(--fs-s);color:var(--ink3);margin-top:5px}
+.kpc .new{position:absolute;right:12px;top:12px;background:#5C6B4C;color:#fff;border-radius:999px;padding:2px 8px;font-size:var(--fs-lb);font-weight:600}
+.kpc .sum{font-size:var(--fs-xs);line-height:1.65;color:var(--ink2);background:var(--alt);border-radius:8px;padding:9px 11px;margin-top:11px;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.kpc .mb{display:flex;align-items:center;gap:7px;margin-top:11px}
+.kpc .mbar{flex:1;height:5px;border-radius:3px;background:var(--alt2);overflow:hidden}
+.kpc .mbar i{display:block;height:100%;background:var(--clay);border-radius:3px}
+.kpc .mv{font-size:var(--fs-lb);color:var(--clay);font-weight:600;flex:none}
+
+/* 详情 */
+.pager{display:flex;align-items:center;gap:10px;justify-content:center}
+.pager .b{width:28px;height:28px;border-radius:50%;background:var(--alt);display:grid;place-items:center;color:var(--ink2)}
+.pager .n{font-size:var(--fs-s);font-weight:600;min-width:48px;text-align:center}
+.dbody{flex:1;overflow:hidden;padding:0 14px}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:14px 0 9px}
+.sec .t1{font-size:var(--fs-t);font-weight:600}
+.sec .lk{font-size:var(--fs-xs);color:var(--ink2)}
+.stem2{font-size:var(--fs-t);line-height:1.85}
+.stem2 .f{font-family:var(--serif);font-synthesis-weight:none}
+.opts{margin-top:10px;font-size:var(--fs-t);line-height:1.9;color:var(--ink)}
+.opts div{display:flex;gap:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.chip{font-size:var(--fs-xs);border:1px solid var(--line2);border-radius:999px;padding:5px 10px;color:var(--ink2);background:var(--surface)}
+.chip.on{background:var(--claybg);border-color:var(--clayline);color:var(--clay);font-weight:600}
+.chip.add{color:var(--ink3);border-style:dashed;padding:5px 9px}
+.tabs{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-top:16px}
+.tabs span{font-size:var(--fs-t);font-weight:600;color:var(--ink3);padding-bottom:9px;border-bottom:2px solid transparent}
+.tabs span.on{color:var(--ink);border-bottom-color:var(--ink)}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 0}
+.empty .a{font-size:var(--fs-t);font-weight:600;color:var(--ink)}
+.empty .b2{font-size:var(--fs-s);color:var(--ink3)}
+/* 底部动作胶囊 */
+.pillbar{margin:0 12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:999px;
+  box-shadow:0 2px 10px rgba(25,25,25,.06);display:flex;align-items:center;padding:6px;flex:none}
+.pillbar .a{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:44px;font-size:var(--fs-s);font-weight:600;color:var(--ink)}
+.pillbar .a.clay{color:var(--clay)}
+.pillbar .sep{width:1px;height:24px;background:var(--line)}
+.pillbar .a svg{flex:none}
+/* 平板三栏 */
+.rail{width:76px;border-right:1px solid var(--line);background:var(--alt);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:4px;flex:none}
+.rail .logo{width:34px;height:34px;border-radius:10px;background:var(--clay);color:#fff;display:grid;place-items:center;
+  font-family:var(--serif);font-size:var(--fs-t);margin-bottom:14px;flex:none;font-weight:500;font-synthesis-weight:none}
+.rail .it{width:56px;height:52px;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;color:var(--ink2);font-size:var(--fs-lb);line-height:1;letter-spacing:0}
+.rail .it.on{background:var(--claybg);color:var(--clay);font-weight:600}
+.rail .sp{flex:1}
+.filt{width:224px;flex:none;border-right:1px solid var(--line);background:var(--paper);padding:16px 14px;display:flex;flex-direction:column;gap:14px}
+.filt .g{font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.08em;font-weight:500;margin-bottom:7px}
+.filt .o{font-size:var(--fs-s);padding:7px 9px;border-radius:8px;color:var(--ink2);display:flex;justify-content:space-between}
+.filt .o.on{background:var(--claybg);color:var(--clay);font-weight:600}
+.filt .o span{font-size:var(--fs-xs);color:var(--ink3)}
+.mid{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0}
+.midh{height:56px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);flex:none}
+.det{width:520px;flex:none;display:flex;flex-direction:column;background:var(--surface)}
+.footer{max-width:1560px;margin:56px auto 0;color:#7E7A70;font-size:12.5px;line-height:1.9}
+.footer b{color:#A8A49A}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <h1>错题模块改版 · 借鉴豆包爱学的信息结构（不抄风格）</h1>
+  <p><b>从你那三张图里我拿走 6 个结构性做法</b>，其中两个是我原稿明显做错的：</p>
+  <p><span class="pill">① 两栏卡片 + 题干原文（不是一行摘要）</span><span class="pill">② 时间透镜 / 知识透镜 双视图</span><span class="pill">③ 知识点聚合卡（题数 + 定义 + 新增角标）</span><span class="pill">④ 详情左右翻页 2/24</span><span class="pill">⑤ 我的笔记 / 答案解析 分家</span><span class="pill">⑥ 底部三动作胶囊</span></p>
+  <p style="margin-top:10px">风格仍是 Anthropic 那一套（赤陶单色、衬线 500、1px 描边、8 级字号）。<b>不采纳</b>它的：多色卡片底色、独立「1对1讲解」页、AI 生成免责声明。</p>
+</div>
+
+<div class="grid">
+
+<!-- M1 全部错题 -->
+<div class="frame">
+  <div class="cap"><i>M1</i><b>全部错题</b><em>双栏卡片 · 按录入时间分组</em></div>
+  <div class="phone">
+    <div class="sb"><span>5:38</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div><div class="sp"></div>
+      <div class="x"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="seg"><span class="on">全部错题</span><span>知识分类</span></div>
+    <div class="filters">
+      <span class="fchip on">未解决 12</span><span class="fchip">年级 <b class="car">▾</b></span><span class="fchip">知识点 <b class="car">▾</b></span><span class="fchip">错因 <b class="car">▾</b></span>
+    </div>
+    <div class="gridwrap">
+      <div class="dhead">09/02</div>
+      <div class="cols">
+        <div class="col">
+          <div class="qcard">
+            <div class="stem">设集合 <span class="f">M = {1, x, y}</span>，<span class="f">N = {x, x², xy}</span>，且 <span class="f">M = N</span>，则 <span class="f">x²⁰²⁵ + y²⁰²⁶</span> = ___
+              <div class="fade"></div></div>
+            <div class="tags"><span class="tag">集合的相等</span></div>
+          </div>
+          <div class="qcard">
+            <div class="stem">在平面直角坐标系中，二次函数 <span class="f">y = ax² + bx − 2</span> 的图象过点 <span class="f">A(1, t)</span>、<span class="f">B(2, t)</span>，且最大值为 <span class="f">1 − 3a²/4</span>。（1）求解析式…
+              <div class="fade"></div></div>
+            <div class="tags"><span class="tag">二次函数图象</span><span class="tag">最值</span></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="qcard">
+            <div class="rowtop"><span class="badge">新</span></div>
+            <div class="stem">已知集合 <span class="f">A = {x | −1 &lt; x &lt; 4}</span>，<span class="f">B = {x | x &lt; a}</span>，若 <span class="f">A ⊆ B</span>，则实数 <span class="f">a</span> 满足（　）
+              <div class="fade"></div></div>
+            <div class="tags"><span class="tag">集合的包含关系</span></div>
+          </div>
+          <div class="qcard">
+            <div class="stem">关于 <span class="f">x</span> 的分式方程 <span class="f">(2x + a)/(x + 1) = 1</span> 的解为负数，则 <span class="f">a</span> 的取值范围是 ___
+              <div class="fade"></div></div>
+            <div class="tags"><span class="tag">分式方程</span><span class="tag">根的讨论</span></div>
+          </div>
+          <div class="qcard">
+            <div class="stem">计算 <span class="f">(a²)³ · a⁻² ÷ a⁴</span>，并说明每一步用的运算律…
+              <div class="fade"></div></div>
+            <div class="tags"><span class="tag">幂的运算</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pillbar">
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>录入</div>
+      <div class="sep"></div>
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5M7 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></svg>打印</div>
+      <div class="sep"></div>
+      <div class="a clay"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9l3 3v11H4z"/><path d="M9 12h5M9 15h3"/><path d="M19 5l1 1"/></svg>复习</div>
+    </div>
+  </div>
+</div>
+
+<!-- M2 知识分类 -->
+<div class="frame">
+  <div class="cap"><i>M2</i><b>知识分类</b><em>知识点聚合卡 · 题数 / 定义 / 掌握度 / 新增</em></div>
+  <div class="phone">
+    <div class="sb"><span>5:38</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div><div class="sp"></div>
+      <div class="x"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="seg"><span>全部错题</span><span class="on">知识分类</span></div>
+    <div class="filters"><span class="fchip">年级 <b class="car">▾</b></span><span class="fchip">只看薄弱</span><span class="fchip">按先修排序</span></div>
+    <div class="gridwrap">
+      <div class="dhead">最近新增的知识点</div>
+      <div class="kpc">
+        <span class="new">+2</span>
+        <div class="top"><div class="l">
+          <div class="nm">集合的包含关系</div>
+          <div class="sub">3 道错题 · 必修一 第一章</div>
+        </div></div>
+        <div class="sum">若 A ⊆ B，则 A 中每个元素都在 B 中；注意端点取不取得到（等号）。求参数范围时，先画数轴再定端点。</div>
+        <div class="mb"><span class="xs" style="color:var(--ink3)">掌握度</span><div class="mbar"><i style="width:34%"></i></div><span class="mv">0.34</span></div>
+      </div>
+      <div class="kpc">
+        <div class="top"><div class="l">
+          <div class="nm">集合的相等</div>
+          <div class="sub">1 道错题 · 必修一 第一章</div>
+        </div></div>
+        <div class="sum">两集合相等 ⇔ 元素完全相同。常用手段：分类讨论 + 检验元素互异性（同一集合内元素不能重复）。</div>
+        <div class="mb"><span class="xs" style="color:var(--ink3)">掌握度</span><div class="mbar"><i style="width:52%"></i></div><span class="mv">0.52</span></div>
+      </div>
+      <div class="kpc">
+        <span class="new">+1</span>
+        <div class="top"><div class="l">
+          <div class="nm">二次函数图象与最值</div>
+          <div class="sub">4 道错题 · 必修一 第二章</div>
+        </div></div>
+        <div class="sum">y = ax² + bx + c 的顶点式与对称轴；给定区间上的最值要看对称轴落在区间内还是外。</div>
+        <div class="mb"><span class="xs" style="color:var(--ink3)">掌握度</span><div class="mbar"><i style="width:61%"></i></div><span class="mv">0.61</span></div>
+      </div>
+      <div class="kpc">
+        <div class="top"><div class="l">
+          <div class="nm">分式方程与根的讨论</div>
+          <div class="sub">2 道错题 · 必修一 第二章</div>
+        </div></div>
+        <div class="sum">去分母前先定 x ≠ 0 的限制；解出含参根后，用「根为负」加上「分母不为零」一起筛。</div>
+        <div class="mb"><span class="xs" style="color:var(--ink3)">掌握度</span><div class="mbar"><i style="width:45%"></i></div><span class="mv">0.45</span></div>
+      </div>
+    </div>
+    <div class="pillbar">
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>录入</div>
+      <div class="sep"></div>
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V4h10v5M7 18H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></svg>打印</div>
+      <div class="sep"></div>
+      <div class="a clay"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9l3 3v11H4z"/><path d="M9 12h5M9 15h3"/><path d="M19 5l1 1"/></svg>复习这条链</div>
+    </div>
+  </div>
+</div>
+
+<!-- M3 题目详情 -->
+<div class="frame">
+  <div class="cap"><i>M3</i><b>题目详情</b><em>左右翻页 · 笔记与解析分家</em></div>
+  <div class="phone">
+    <div class="sb"><span>5:39</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="sp"></div>
+      <div class="pager"><div class="b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+        <div class="n">2 / 24</div>
+        <div class="b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></div></div>
+      <div class="sp"></div>
+      <div class="x"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4z"/></svg></div></div>
+    <div class="dbody">
+      <div class="sec"><span class="t1">题目</span><span class="lk">查看原图 ›</span></div>
+      <div class="stem2">已知集合 <span class="f">A = {x | −1 &lt; x &lt; 4}</span>，<span class="f">B = {x | x &lt; a}</span>，若 <span class="f">A ⊆ B</span>，则实数 <span class="f">a</span> 满足（　）</div>
+      <div class="opts">
+        <div><span>A.</span><span><span class="f">a &lt; 4</span></span></div>
+        <div><span>B.</span><span><span class="f">a ≤ 4</span></span></div>
+        <div><span>C.</span><span><span class="f">a &gt; 4</span></span></div>
+        <div><span>D.</span><span><span class="f">a ≥ 4</span></span></div>
+      </div>
+      <div class="chips">
+        <span class="chip add">＋</span>
+        <span class="chip on">集合的包含关系</span>
+        <span class="chip">数学 / 必修一</span>
+      </div>
+      <div class="tabs"><span class="on">我的笔记</span><span>答案解析</span></div>
+      <div class="empty">
+        <div class="a">点一下，记下你当时为什么错</div>
+        <div class="b2">空白也没关系，她会在你复习时问起</div>
+      </div>
+    </div>
+    <div class="pillbar">
+      <div class="a clay"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></svg>问她</div>
+      <div class="sep"></div>
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M7 9h6M7 13h4"/><path d="M17 9h4v10a2 2 0 01-2 2h-8"/></svg>相似题</div>
+      <div class="sep"></div>
+      <div class="a"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"/></svg>写笔记</div>
+    </div>
+  </div>
+</div>
+
+<!-- M4 平板三栏 -->
+<div class="frame wide">
+  <div class="cap"><i>M4</i><b>错题本 · 平板三栏</b><em>筛选 224 → 网格（自适应列数）→ 详情 520</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></svg>对话</div>
+      <div class="it on"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 4h11l3 3v13H5z"/><path d="M9 9h6M9 13h6"/></svg>错题</div>
+      <div class="it"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="8" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M9 8l6 0M8.5 9.3l2 5.5M15.5 10.3l-2 4.6"/></svg>地图</div>
+      <div class="it"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2"/></svg>记忆</div>
+      <div class="it"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 18V9M9 18V5M14 18v-6M19 18v-9"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h9"/></svg>设置</div>
+    </div>
+    <div class="filt">
+      <div>
+        <div class="g">状态</div>
+        <div class="o on">未解决 <span>12</span></div>
+        <div class="o">已解决 <span>47</span></div>
+        <div class="o">已标记 <span>5</span></div>
+      </div>
+      <div>
+        <div class="g">视图</div>
+        <div class="o on">全部错题</div>
+        <div class="o">知识分类</div>
+      </div>
+      <div>
+        <div class="g">知识点</div>
+        <div class="o on">全部</div>
+        <div class="o">集合的包含关系</div>
+        <div class="o">二次函数图象</div>
+        <div class="o">分式方程</div>
+        <div class="o">幂的运算</div>
+      </div>
+      <div>
+        <div class="g">错因</div>
+        <div class="o">概念不清</div>
+        <div class="o">计算错</div>
+        <div class="o">读题错</div>
+        <div class="o">粗心</div>
+      </div>
+    </div>
+    <div class="mid">
+      <div class="midh"><div class="segt"><div class="seg" style="padding:0;gap:18px"><span class="on">全部错题</span><span>知识分类</span></div></div>
+        <div class="sp" style="flex:1"></div><span class="fchip">年级 ▾</span><span class="fchip">录入时间 ▾</span></div>
+      <div style="flex:1;overflow:hidden;padding:14px 18px">
+        <div class="dhead">09/02</div>
+        <div class="cols" style="gap:12px">
+          <div class="col" style="gap:12px">
+            <div class="qcard" style="border-color:var(--clayline);box-shadow:0 0 0 1px var(--clayline)">
+              <div class="stem" style="font-size:var(--fs-b)">已知集合 <span class="f">A = {x | −1 &lt; x &lt; 4}</span>，<span class="f">B = {x | x &lt; a}</span>，若 <span class="f">A ⊆ B</span>，则实数 <span class="f">a</span> 满足（　）</div>
+              <div class="tags"><span class="tag">集合的包含关系</span></div>
+            </div>
+            <div class="qcard">
+              <div class="stem" style="font-size:var(--fs-b)">设集合 <span class="f">M = {1, x, y}</span>，<span class="f">N = {x, x², xy}</span>，且 <span class="f">M = N</span>，则 <span class="f">x²⁰²⁵ + y²⁰²⁶</span> = ___</div>
+              <div class="tags"><span class="tag">集合的相等</span></div>
+            </div>
+          </div>
+          <div class="col" style="gap:12px">
+            <div class="qcard">
+              <div class="stem" style="font-size:var(--fs-b)">二次函数 <span class="f">y = ax² + bx − 2</span> 过 <span class="f">A(1,t)</span>、<span class="f">B(2,t)</span>，最大值 <span class="f">1 − 3a²/4</span>，求解析式。</div>
+              <div class="tags"><span class="tag">二次函数图象</span><span class="tag">最值</span></div>
+            </div>
+            <div class="qcard">
+              <div class="stem" style="font-size:var(--fs-b)">分式方程 <span class="f">(2x + a)/(x + 1) = 1</span> 的解为负数，求 <span class="f">a</span> 的取值范围。</div>
+              <div class="tags"><span class="tag">分式方程</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="det">
+      <div style="height:56px;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid var(--line);flex:none">
+        <div class="pager"><div class="b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+          <div class="n">2 / 24</div>
+          <div class="b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></div></div>
+        <div style="flex:1"></div>
+        <span class="lk" style="font-size:var(--fs-xs);color:var(--ink2)">查看原图 ›</span>
+        <span style="font-size:var(--fs-s);color:var(--clay);font-weight:600">重做</span>
+      </div>
+      <div style="flex:1;padding:22px 26px;overflow:hidden">
+        <div class="stem2" style="font-size:var(--fs-h2);line-height:1.6;font-family:var(--serif);font-weight:500;font-synthesis-weight:none">已知集合 A = {x | −1 &lt; x &lt; 4}，B = {x | x &lt; a}，若 A ⊆ B，则实数 a 满足（　）</div>
+        <div class="opts" style="margin-top:14px">
+          <div><span>A.</span><span><span class="f">a &lt; 4</span></span></div>
+          <div><span>B.</span><span><span class="f">a ≤ 4</span></span></div>
+          <div><span>C.</span><span><span class="f">a &gt; 4</span></span></div>
+          <div><span>D.</span><span><span class="f">a ≥ 4</span></span></div>
+        </div>
+        <div class="chips"><span class="chip add">＋</span><span class="chip on">集合的包含关系</span><span class="chip">数学 / 必修一</span></div>
+        <div class="tabs"><span class="on">我的笔记</span><span>答案解析</span><span>历次作答</span></div>
+        <div style="padding:16px 0;font-size:var(--fs-s);color:var(--ink3)">还没有笔记。点一下写下当时为什么错 —— 这句话比答案解析对你更有用。</div>
+      </div>
+      <div style="border-top:1px solid var(--line);padding:12px 22px;display:flex;gap:9px;flex:none">
+        <div class="chip on" style="flex:1;text-align:center;padding:9px">问她</div>
+        <div class="chip" style="flex:1;text-align:center;padding:9px">相似题</div>
+        <div class="chip" style="flex:1;text-align:center;padding:9px">写笔记</div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</div>
+
+<div class="footer">
+  <b>为什么两栏卡片比一行摘要清晰</b>：错题是「认出来」的动作，不是「读下去」的动作。你要找的是<b>那道长什么样的题</b>，所以卡片上必须出现<b>题干原文</b>；我原来写的「导体棒在磁场中运动 · 方向判反」是<b>我替你总结的</b>，你反而认不出来。<br>
+  <b>工程代价（重要）</b>：卡片里不能跑 WebView 渲染 LaTeX（一屏十几张必卡死）。所以**列表卡片用服务端预渲染的题干缩略图**，详情页才用原生/WebView 渲染完整公式。见 `10-错题模块设计.md`。
+</div>
+
+</body>
+</html>

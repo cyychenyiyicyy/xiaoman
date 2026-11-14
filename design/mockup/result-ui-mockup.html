@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学习伙伴 · 手机界面稿 v2（compact 降级）</title>
+<style>
+@font-face{font-family:"Lora";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/lora-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Lora";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/lora-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/inter-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/inter-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/inter-latin-600-normal.woff2") format("woff2")}
+
+:root{
+  --paper:#FAF9F5; --surface:#FFFFFF; --alt:#F0EEE6; --alt2:#E9E6DC;
+  --ink:#191919; --ink2:#6B6862; --ink3:#9B988F;
+  --line:#E4E1D6; --line2:#D8D4C7;
+  --clay:#C96442; --claybg:#F7EAE3; --clayline:#EBCFC2;
+  --serif:"Lora","Sitka Text","Sitka","Songti SC","SimSun","Noto Serif CJK SC",Georgia,serif;
+  --sans:"Inter","Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  --fs-hero:32px; --lh-hero:1.28;
+  --fs-h1:24px;   --lh-h1:1.35;
+  --fs-h2:20px;   --lh-h2:1.45;
+  --fs-t:16px;    --lh-t:1.5;
+  --fs-b:14px;    --lh-b:1.75;
+  --fs-s:13px;    --lh-s:1.65;
+  --fs-xs:12px;   --lh-xs:1.55;
+  --fs-lb:11px;   --lh-lb:1.45;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#141413;color:#F0EEE6;font-family:var(--sans);font-size:14px;line-height:1.7;padding:40px 24px 80px}
+.pagehead{max-width:1600px;margin:0 auto 32px}
+.pagehead h1{font-family:var(--serif);font-size:30px;font-weight:500;margin:0 0 10px;letter-spacing:-.015em;font-synthesis-weight:none}
+.pagehead p{margin:0;color:#A8A49A}
+.pagehead code{background:#23221D;padding:2px 6px;border-radius:5px;font-size:12px;color:#D97757}
+.pagehead b{color:#F0EEE6}
+
+/* 字号：8 级，与平板稿完全一致 */
+.hero{font-family:var(--serif);font-size:var(--fs-hero);line-height:var(--lh-hero);font-weight:500;letter-spacing:-.015em;font-synthesis-weight:none}
+.h1{font-family:var(--serif);font-size:var(--fs-h1);line-height:var(--lh-h1);font-weight:500;letter-spacing:-.01em;font-synthesis-weight:none}
+.h2{font-family:var(--serif);font-size:var(--fs-h2);line-height:var(--lh-h2);font-weight:500;letter-spacing:-.005em;font-synthesis-weight:none}
+.t{font-size:var(--fs-t);line-height:var(--lh-t);font-weight:600}
+.b{font-size:var(--fs-b);line-height:var(--lh-b)}
+.s{font-size:var(--fs-s);line-height:var(--lh-s)}
+.xs{font-size:var(--fs-xs);line-height:var(--lh-xs)}
+.lb{font-size:var(--fs-lb);line-height:var(--lh-lb);font-weight:500;letter-spacing:.08em}
+
+.grid{max-width:1600px;margin:0 auto;display:flex;flex-wrap:wrap;gap:44px 40px;align-items:flex-start}
+.frame{width:360px}
+.cap{font-size:12.5px;color:#A8A49A;margin:0 0 10px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.cap b{color:#F0EEE6;font-weight:600;font-size:13px}
+.cap i{font-style:normal;background:#23221D;color:#D97757;border-radius:4px;padding:1px 5px;font-size:11px}
+.cap em{font-style:normal;color:#7E7A70;font-size:11.5px}
+.phone{width:360px;height:780px;background:var(--paper);border-radius:30px;overflow:hidden;position:relative;
+  display:flex;flex-direction:column;color:var(--ink);box-shadow:0 18px 44px rgba(0,0,0,.42),0 0 0 1px #2E2C26}
+.sb{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:var(--fs-lb);color:var(--ink2);font-weight:600;flex:none}
+.sb .d{display:flex;gap:3px;align-items:center}
+.sb .dot{width:4px;height:4px;border-radius:50%;background:var(--ink2)}
+.sb .bat{width:16px;height:8px;border:1px solid var(--ink2);border-radius:2px;position:relative}
+.sb .bat:after{content:"";position:absolute;inset:1px;right:5px;background:var(--ink2);border-radius:1px}
+.hd{height:56px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line);flex:none}
+.hd .av{width:32px;height:32px;border-radius:50%;background:var(--claybg);color:var(--clay);display:grid;place-items:center;
+  font-family:var(--serif);font-size:var(--fs-t);border:1px solid var(--clayline);flex:none;font-weight:500;font-synthesis-weight:none}
+.hd .ttl{font-family:var(--serif);font-size:var(--fs-h2);font-weight:500;line-height:1.1;font-synthesis-weight:none}
+.hd .ttl small{display:block;font-family:var(--sans);font-size:var(--fs-xs);color:var(--ink3);font-weight:400;margin-top:3px}
+.hd .sp{flex:1}
+.hd .x{width:26px;height:26px;display:grid;place-items:center;color:var(--ink2);flex:none}
+.hd .act{font-size:var(--fs-s);color:var(--clay);font-weight:600}
+.stream{flex:1;overflow:hidden;padding:12px 14px 0}
+.day{text-align:center;font-size:var(--fs-xs);color:var(--ink3);margin:2px 0 14px;letter-spacing:.04em}
+.ag{margin:0 0 16px;font-size:var(--fs-b);line-height:var(--lh-b)}
+.ag p{margin:0 0 9px}
+.ag .lead{font-family:var(--serif);font-size:var(--fs-h2);line-height:var(--lh-h2);font-weight:500;margin:0 0 10px;font-synthesis-weight:none}
+.ag ol{margin:0 0 10px;padding-left:18px}
+.ag li{margin:0 0 4px}
+.ag .muted{color:var(--ink2);font-size:var(--fs-s);line-height:var(--lh-s)}
+.hl{color:var(--clay);font-weight:600}
+.me{display:flex;justify-content:flex-end;margin:0 0 16px}
+.me span{background:var(--alt);padding:8px 13px;border-radius:16px 16px 4px 16px;font-size:var(--fs-b);line-height:var(--lh-t);max-width:76%}
+.card{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 13px;margin:0 0 11px}
+.card .k{font-size:var(--fs-lb);line-height:var(--lh-lb);color:var(--ink3);letter-spacing:.08em;margin:0 0 7px;font-weight:500}
+.card .h{font-size:var(--fs-t);line-height:var(--lh-t);font-weight:600;margin:0 0 4px;display:flex;align-items:center;gap:5px}
+.card .s{font-size:var(--fs-s);line-height:var(--lh-s);color:var(--ink2);margin:0}
+.card .go{color:var(--clay);font-weight:600}
+.btnrow{display:flex;gap:7px;margin-top:10px}
+.btn{flex:1;height:36px;border-radius:10px;display:grid;place-items:center;font-size:var(--fs-s);font-weight:600;
+  border:1px solid var(--line2);background:var(--surface);color:var(--ink)}
+.btn.p{background:var(--clay);border-color:var(--clay);color:#fff}
+.btn.g{background:transparent;border-color:transparent;color:var(--ink2)}
+.composer{border-top:1px solid var(--line);padding:8px 10px 14px;flex:none}
+.cbar{display:flex;align-items:center;gap:3px;background:var(--surface);border:1px solid var(--line2);
+  border-radius:22px;padding:4px 5px 4px 9px;box-shadow:0 1px 2px rgba(25,25,25,.05)}
+.cbar .ic{width:31px;height:31px;display:grid;place-items:center;color:var(--ink2);flex:none}
+.cbar .ph{flex:1;font-size:var(--fs-b);color:var(--ink3);padding:0 3px}
+.cbar .send{width:31px;height:31px;border-radius:50%;background:var(--clay);color:#fff;display:grid;place-items:center;flex:none}
+.chain{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}
+.ch{display:flex;align-items:center;gap:8px;font-size:var(--fs-s)}
+.ch .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch .bars{display:flex;gap:2.5px;flex:none}
+.ch .b{width:6px;height:10px;border-radius:2px;background:var(--alt2)}
+.ch .b.on{background:var(--clay)}
+.ch .v{font-size:var(--fs-xs);color:var(--ink3);width:28px;text-align:right;flex:none}
+.ind{width:14px;flex:none}
+.body{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:var(--fs-xs);line-height:1.4;border:1px solid var(--line2);border-radius:999px;padding:4px 9px;color:var(--ink2);background:var(--surface)}
+.chip.on{background:var(--claybg);border-color:var(--clayline);color:var(--clay);font-weight:600}
+.row{display:flex;gap:11px;padding:11px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+.row .main{flex:1;min-width:0}
+.row .t1{font-size:var(--fs-t);line-height:var(--lh-t);font-weight:600;margin:0 0 3px}
+.row .t2{font-size:var(--fs-s);line-height:var(--lh-s);color:var(--ink2);margin:0}
+.row .meta{font-size:var(--fs-xs);color:var(--ink3);flex:none;text-align:right}
+.sechead{padding:14px 14px 6px;font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.08em;font-weight:500}
+.thumb{border-radius:10px;background:var(--alt);border:1px solid var(--line);display:grid;place-items:center;position:relative;overflow:hidden}
+.thumb .lab{font-size:var(--fs-xs);color:var(--ink3)}
+.box{position:absolute;border:1.5px solid var(--clay);border-radius:5px;background:rgba(201,100,66,.06)}
+.box span{position:absolute;top:-9px;left:-1px;background:var(--clay);color:#fff;font-size:var(--fs-lb);padding:1px 4px;border-radius:3px;font-weight:600}
+.conf{display:inline-flex;font-size:var(--fs-lb);color:#8A6A1F;background:#FBF1DA;border:1px solid #EEDDB4;
+  border-radius:999px;padding:2px 6px;margin-left:5px;font-weight:600}
+.pbar{height:3px;background:var(--alt2);border-radius:2px;overflow:hidden;flex:none}
+.pbar i{display:block;height:100%;background:var(--clay);border-radius:2px}
+.grade{display:flex;gap:6px;margin:12px 0 7px}
+.gr{flex:1;height:40px;border-radius:10px;display:grid;place-items:center;font-size:var(--fs-xs);font-weight:600;
+  border:1px solid var(--line2);background:var(--surface)}
+.gr.a{background:#FBF1DA;border-color:#EEDDB4;color:#8A6A1F}
+.gr.b{background:var(--alt);border-color:var(--line2)}
+.gr.c{background:#EDF0E8;border-color:#DCE1D3;color:#5C6B4C}
+.gr.d{background:var(--claybg);border-color:var(--clayline);color:var(--clay)}
+.onb{padding:30px 20px;display:flex;flex-direction:column;height:100%}
+.onb .eyebrow{font-size:var(--fs-lb);color:var(--clay);letter-spacing:.1em;margin-bottom:9px;font-weight:500}
+.onb h2{margin:0 0 8px}
+.onb p.sub{margin:0 0 22px;font-size:var(--fs-s);line-height:var(--lh-s);color:var(--ink2)}
+.field{margin-bottom:15px}
+.field label{display:block;font-size:var(--fs-lb);color:var(--ink3);letter-spacing:.05em;margin-bottom:6px;font-weight:500}
+.field .inp{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:var(--fs-b);background:var(--surface);color:var(--ink3)}
+.field .inp.f{color:var(--ink);border-color:var(--clayline);background:var(--claybg)}
+.onb .sp{flex:1}
+.onb .btn.p{height:42px;border-radius:12px;flex:none}
+.fn{text-align:center;font-size:var(--fs-xs);color:var(--ink3);margin-top:12px}
+.mem{display:flex;gap:9px;padding:10px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+.mem .dot2{width:5px;height:5px;border-radius:50%;background:var(--clay);margin-top:7px;flex:none}
+.mem .tx{flex:1;font-size:var(--fs-s);line-height:var(--lh-s)}
+.mem .tx small{display:block;color:var(--ink3);font-size:var(--fs-xs);margin-top:3px}
+.mem .x{color:var(--ink3);flex:none}
+.footer{max-width:1600px;margin:56px auto 0;color:#7E7A70;font-size:12.5px;line-height:1.9}
+.footer b{color:#A8A49A}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <h1>学习伙伴 · 手机界面稿 v2</h1>
+  <p class="b">这是 <b>compact（&lt;600dp）降级形态</b>：卡片整页替换，导航收进左滑抽屉。字体与字号和平板稿<b>完全同一套</b>（Lora + Inter，8 级字号）。内容换成<b>高一物理</b>。</p>
+  <p class="b" style="margin-top:8px">手机上只保留这几屏就够了——按 09 的结论，<b>手机是采集器，精细活儿都在平板上做</b>。</p>
+</div>
+
+<div class="grid">
+
+<!-- P0 对话 -->
+<div class="frame">
+  <div class="cap"><i>P0</i><b>对话（首页）</b><em>compact · 无 Tab 栏</em></div>
+  <div class="phone">
+    <div class="sb"><span>7:30</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="av">满</div><div class="ttl">小满<small>今天陪你学物理</small></div><div class="sp"></div>
+      <div class="x"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div></div>
+    <div class="stream">
+      <div class="day">今天</div>
+      <div class="ag">
+        <p class="lead">早上好。今天三件事：</p>
+        <ol><li>复习 <b>12 张</b>，受力分析占一半</li><li>昨天错的 <b>3 道</b>重做</li><li>「受力分析」已经 <span class="hl">9 天</span>没碰了</li></ol>
+      </div>
+      <div class="card"><div class="k">今日复习</div><div class="h">开始今天的复习 <span class="go">12 张 ›</span></div><div class="s">预计 9 分钟 · 3 张是重犯错题</div></div>
+      <div class="me"><span>牛顿第二定律到底怎么用？</span></div>
+      <div class="ag">
+        <p>它是「合外力 → 加速度」的桥。但你的问题不在这一步。</p>
+        <div class="card"><div class="k">先修链</div>
+          <div class="chain">
+            <div class="ch"><span class="nm">受力分析</span><span class="bars"><i class="b on"></i><i class="b on"></i><i class="b"></i><i class="b"></i><i class="b"></i></span><span class="v">0.31</span></div>
+            <div class="ch"><span class="ind"></span><span class="nm">牛顿第二定律</span><span class="bars"><i class="b on"></i><i class="b on"></i><i class="b on"></i><i class="b"></i><i class="b"></i></span><span class="v">0.58</span></div>
+          </div></div>
+        <p class="muted">10-21 那道斜面题，你漏的是摩擦力。</p>
+      </div>
+      <div class="card"><div class="k">需要你确认</div><div class="h w5" style="font-weight:500">把「受力分析」加进复习队列？</div><div class="s">会生成 2 张新卡，明天开始出现</div>
+        <div class="btnrow"><div class="btn">拒绝</div><div class="btn p">接受</div></div></div>
+    </div>
+    <div class="composer"><div class="cbar">
+      <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="ic" style="color:var(--clay)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 014.5 7h2.2l1.2-2h7.2l1.2 2h2.2A1.5 1.5 0 0120 8.5v9A1.5 1.5 0 0118.5 19h-13A1.5 1.5 0 014 17.5z"/><circle cx="11.5" cy="12.5" r="3.2"/></svg></div>
+      <div class="ph">说点什么…</div>
+      <div class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- P1 复习 -->
+<div class="frame">
+  <div class="cap"><i>P1</i><b>复习会话</b><em>一卡一屏 · 可离线</em></div>
+  <div class="phone">
+    <div class="sb"><span>22:14</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+      <div class="ttl">复习<small>受力分析 · 第 3 张</small></div><div class="sp"></div><div class="xs" style="color:var(--ink3)">3 / 15</div></div>
+    <div class="pbar" style="margin:0 14px"><i style="width:20%"></i></div>
+    <div class="body" style="padding:0 14px">
+      <div style="padding:22px 0 0">
+        <div class="h2" style="line-height:1.6">斜面上的物块，除了重力，还要画哪几个力？各自方向朝哪？</div>
+        <div class="s" style="margin-top:14px;color:var(--ink3)">来自 10-21 的错题 · 上次错因 <b style="color:var(--clay)">漏了摩擦力</b></div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="grade"><div class="gr a">忘记</div><div class="gr b">吃力</div><div class="gr c">记得</div><div class="gr d">太简单</div></div>
+      <div class="xs" style="color:var(--ink3);text-align:center;padding-bottom:14px">「记得」→ 下次 4 天后</div>
+    </div>
+  </div>
+</div>
+
+<!-- P2 采集校对 -->
+<div class="frame">
+  <div class="cap"><i>P2</i><b>采集校对</b><em>上下布局 · 手机上体验一般，主力在平板</em></div>
+  <div class="phone">
+    <div class="sb"><span>7:31</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="ttl">识别结果<small>3 道题 · 1 道待确认</small></div><div class="sp"></div><div class="act">完成</div></div>
+    <div class="body">
+      <div class="thumb" style="height:110px;margin:12px 14px">
+        <span class="lab">原图</span>
+        <div class="box" style="left:24px;top:18px;width:250px;height:30px"><span>1</span></div>
+        <div class="box" style="left:24px;top:56px;width:250px;height:28px"><span>2</span></div>
+      </div>
+      <div style="padding:0">
+        <div class="row"><div class="main"><p class="t1">第 1 题 <span class="conf">96%</span></p><p class="t2">斜面 μ 计算 · 牛顿第二定律</p>
+          <div class="chips" style="margin-top:7px"><span class="chip on">牛顿第二定律</span><span class="chip">受力分析</span></div></div><div class="meta">8 分</div></div>
+        <div class="row" style="background:#FDFBF3"><div class="main"><p class="t1">第 2 题 <span class="conf">需确认 62%</span></p><p class="t2">公式可能漏了 cosθ，请核对</p>
+          <div class="chips" style="margin-top:7px"><span class="chip on">受力分析</span><span class="chip">＋</span></div></div><div class="meta">6 分</div></div>
+        <div class="row"><div class="main"><p class="t1">第 3 题 <span class="conf">91%</span></p><p class="t2">电梯加速 · 超重判断</p>
+          <div class="chips" style="margin-top:7px"><span class="chip on">超重与失重</span></div></div><div class="meta">5 分</div></div>
+      </div>
+    </div>
+    <div class="composer" style="display:flex;gap:7px"><div class="btn g" style="height:42px;flex:.8">全部存为待补</div><div class="btn p" style="height:42px;flex:1.2">确认入库（3）</div></div>
+  </div>
+</div>
+
+<!-- P3 错题本 -->
+<div class="frame">
+  <div class="cap"><i>P3</i><b>错题本</b><em>抽屉 · 长周期视图</em></div>
+  <div class="phone">
+    <div class="sb"><span>22:30</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="ttl">错题本<small>未解决 12 · 已解决 47</small></div></div>
+    <div class="chips" style="padding:11px 14px"><span class="chip on">未解决</span><span class="chip">按知识点</span><span class="chip">按错因</span></div>
+    <div class="body">
+      <div class="row"><div class="main"><p class="t1">斜面 μ 计算 · 漏了摩擦力</p><p class="t2">受力分析 · 错 2 次 · 10-21</p></div><div class="meta">概念</div></div>
+      <div class="row"><div class="main"><p class="t1">传送带上物块 · 摩擦力方向判错</p><p class="t2">受力分析 · 错 3 次 · 10-15</p></div><div class="meta">概念</div></div>
+      <div class="row"><div class="main"><p class="t1">连接体 · 整体法隔离法用混</p><p class="t2">连接体问题 · 错 1 次 · 11-02</p></div><div class="meta">思路</div></div>
+      <div class="row"><div class="main"><p class="t1">超重失重 · 看成速度方向</p><p class="t2">超重与失重 · 错 1 次 · 11-09</p></div><div class="meta">概念</div></div>
+      <div class="row"><div class="main"><p class="t1">匀变速追及 · 忘判是否已停</p><p class="t2">匀变速 · 错 2 次 · 10-28</p></div><div class="meta">读题</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- P4 设置（九科） -->
+<div class="frame">
+  <div class="cap"><i>P4</i><b>设置 · 我的科目</b><em>高一 · 九科全开</em></div>
+  <div class="phone">
+    <div class="sb"><span>22:36</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="ttl">设置</div></div>
+    <div class="body">
+      <div class="sechead">我在学</div>
+      <div style="padding:0 14px 12px" class="chips">
+        <span class="chip on">语文</span><span class="chip on">数学</span><span class="chip on">英语</span>
+        <span class="chip on">物理</span><span class="chip on">化学</span><span class="chip on">生物</span>
+        <span class="chip on">政治</span><span class="chip on">历史</span><span class="chip on">地理</span>
+      </div>
+      <div class="xs" style="padding:0 14px 14px;color:var(--ink3)">高一 · 九科全开。可以先只喂物理，其它科目用到再说。</div>
+      <div class="sechead">她</div>
+      <div class="row" style="padding:11px 14px"><div class="main"><p class="t1">名字</p><p class="t2">小满</p></div><div class="meta">›</div></div>
+      <div class="row" style="padding:11px 14px"><div class="main"><p class="t1">说话方式</p><p class="t2">简短 · 先提示后详解</p></div><div class="meta">›</div></div>
+      <div class="sechead">复习</div>
+      <div class="row" style="padding:11px 14px"><div class="main"><p class="t1">每日上限</p><p class="t2">20 张</p></div><div class="meta">›</div></div>
+      <div class="row" style="padding:11px 14px"><div class="main"><p class="t1">目标记忆保留率</p><p class="t2">0.90</p></div><div class="meta">›</div></div>
+      <div class="sechead">通知</div>
+      <div class="row" style="padding:11px 14px"><div class="main"><p class="t1">每日开场</p><p class="t2">07:30 · 已开启</p></div><div class="meta">›</div></div>
+      <div class="row" style="padding:11px 14px;border:0"><div class="main"><p class="t1">一天最多打扰</p><p class="t2">2 条</p></div><div class="meta">›</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- P5 引导 -->
+<div class="frame">
+  <div class="cap"><i>P5</i><b>引导</b><em>首次启动 · 只问三个问题</em></div>
+  <div class="phone">
+    <div class="sb"><span>9:41</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="onb">
+      <div class="eyebrow">第 1 步 / 共 3 步</div>
+      <h2 class="hero">先认识一下你。</h2>
+      <p class="sub">三个问题就够。剩下的我会在往后的日子里慢慢记住。</p>
+      <div class="field"><label>你在学什么</label><div class="inp f">高一 · 九科</div></div>
+      <div class="field"><label>什么时候用得上</label><div class="inp">2028 年 6 月 · 高考</div></div>
+      <div class="field"><label>每天大概能给几分钟</label><div class="inp">15 分钟</div></div>
+      <div class="sp"></div>
+      <div class="btn p">开始</div>
+      <div class="fn">数据只存在你自己的服务器上</div>
+    </div>
+  </div>
+</div>
+
+<!-- P6 记忆 -->
+<div class="frame">
+  <div class="cap"><i>P6</i><b>她记得的</b><em>可见可删 · 信任地基</em></div>
+  <div class="phone">
+    <div class="sb"><span>22:34</span><div class="d"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="bat"></span></div></div>
+    <div class="hd"><div class="x"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="ttl">她记得的<small>只记稳定的事实和偏好</small></div></div>
+    <div class="body">
+      <div class="sechead">学习事实</div>
+      <div class="mem"><span class="dot2"></span><div class="tx">受力分析薄弱，是物理错题的共同根因<small>11-14 · 来自一次提问</small></div><span class="x">⋯</span></div>
+      <div class="mem"><span class="dot2"></span><div class="tx">做斜面题时习惯只写 mg sinθ，容易漏摩擦力<small>11-09 · 来自错题重做</small></div><span class="x">⋯</span></div>
+      <div class="mem"><span class="dot2"></span><div class="tx">每周三晚有竞赛课，不安排复习<small>11-06 · 来自使用规律</small></div><span class="x">⋯</span></div>
+      <div class="sechead">偏好</div>
+      <div class="mem"><span class="dot2"></span><div class="tx">先给提示，不要一上来给完整答案<small>10-30 · 你亲口说过</small></div><span class="x">⋯</span></div>
+      <div class="mem"><span class="dot2"></span><div class="tx">每天能给的复习时间大约 15 分钟<small>10-28 · 首次设置</small></div><span class="x">⋯</span></div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  <b>与平板稿的关系</b>：同一套 token、同一套 8 级字号、同一套字体。差别只有两处：① 卡片整页替换（平板是右栏）；② 导航收进左滑抽屉（平板是 rail）。<br>
+  <b>手机定位</b>：采集器 + 随手看。校对、复习、图谱、统计这些留在平板。
+</div>
+
+</body>
+</html>

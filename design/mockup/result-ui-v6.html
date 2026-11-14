@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小满 · 界面 v6（provider 分组模型 · 无描述文本 · 全面规范化）</title>
+<style>
+@font-face{font-family:"ISans";font-weight:400;font-display:swap;src:url("fonts/instrument-sans-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"ISans";font-weight:500;font-display:swap;src:url("fonts/instrument-sans-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"ISans";font-weight:600;font-display:swap;src:url("fonts/instrument-sans-latin-600-normal.woff2") format("woff2")}
+:root{
+  --paper:#FBFAF7; --card:#FFFFFF; --fill:#F4F1EA; --fill2:#EDE9E0;
+  --ink:#1A1917; --ink2:#6E6A62; --ink3:#A09B90;
+  --line:#E8E4DA; --line2:#DCD7CA;
+  --clay:#B0563A; --claybg:#F8EDE8; --clayline:#EAD5CB;
+  --sage:#5F7355;
+  --sans:"ISans","Inter","Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+  --s1:34px;--l1:1.24; --s2:24px;--l2:1.30; --s3:19px;--l3:1.50;
+  --s4:15px;--l4:1.72; --s5:13px;--l5:1.60; --s6:11px;--l6:1.45;
+  --q1:4px;--q2:8px;--q3:12px;--q4:20px;--q5:32px;--q6:52px;
+  --i-sm:14px; --i-md:18px; --i-lg:22px; --stroke:1.7px;
+  --rc:10px;--rb:8px;--rp:999px;
+}
+*{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#111110;color:#EDEAE3;font-family:var(--sans);font-size:var(--s4);line-height:var(--l4);padding:40px 24px 80px}
+.d1{font-size:var(--s1);line-height:var(--l1);font-weight:500;letter-spacing:-.02em}
+.d2{font-size:var(--s2);line-height:var(--l2);font-weight:500;letter-spacing:-.015em}
+.d3{font-size:var(--s3);line-height:var(--l3);font-weight:500;letter-spacing:-.005em}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.mono{font-family:ui-monospace,"SF Mono",Consolas,monospace}
+.ic{width:var(--i-md);height:var(--i-md);stroke:currentColor;fill:none;stroke-width:var(--stroke);stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.sm{width:var(--i-sm);height:var(--i-sm)}
+.ic.lg{width:var(--i-lg);height:var(--i-lg)}
+
+.head{max-width:1600px;margin:0 auto 12px}
+.head h1{margin:0 0 var(--q3)}
+.head p{margin:0 0 var(--q2);color:#8E8A80;font-size:var(--s5);line-height:1.85;max-width:940px}
+.head b{color:#EDEAE3;font-weight:500}
+.head code{background:#232220;padding:2px 6px;border-radius:4px;font-size:var(--s6);color:#C98B6E}
+.tag{display:inline-block;border:1px solid #2E2C28;color:#B8B2A6;border-radius:var(--rp);padding:3px 10px;font-size:var(--s6);margin:0 6px 6px 0}
+.tag.hi{border-color:#4A3A32;color:#C98B6E}
+
+.grid{max-width:1600px;margin:var(--q5) auto 0;display:flex;flex-wrap:wrap;gap:52px 44px;align-items:flex-start}
+.frame{width:845px}
+.cap{color:#8E8A80;margin:0 0 var(--q3);display:flex;gap:var(--q2);align-items:baseline;flex-wrap:wrap;font-size:var(--s5)}
+.cap b{color:#EDEAE3;font-weight:500;font-size:var(--s5)}
+.cap i{font-style:normal;border:1px solid #2E2C28;color:#C98B6E;border-radius:4px;padding:0 5px;font-size:var(--s6)}
+.cap em{font-style:normal;color:#6B6760;font-size:var(--s6)}
+.wrap{width:845px;height:528px;overflow:hidden;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 0 1px #26241F}
+.tab{width:1280px;height:800px;transform:scale(.66);transform-origin:top left;background:var(--paper);
+  color:var(--ink);display:flex;overflow:hidden;font-family:var(--sans);position:relative}
+
+.rail{width:72px;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;
+  padding:var(--q4) 0;gap:2px;flex:none}
+.rail .logo{width:30px;height:30px;border-radius:9px;background:var(--clay);color:#fff;display:grid;place-items:center;
+  font-size:var(--s4);margin-bottom:var(--q4);flex:none;font-weight:500}
+.rail .it{width:54px;padding:9px 0 7px;border-radius:var(--rc);display:flex;flex-direction:column;align-items:center;
+  gap:var(--q1);color:var(--ink3);font-size:var(--s6);line-height:1;letter-spacing:.01em}
+.rail .it.on{color:var(--clay);background:var(--claybg);font-weight:500}
+.rail .sp{flex:1}
+
+.paneL{width:452px;flex:none;display:flex;flex-direction:column;border-right:1px solid var(--line)}
+.paneR{flex:1;display:flex;flex-direction:column;background:var(--card);min-width:0}
+.paneM{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--card)}
+
+.top{padding:var(--q3) var(--q4);border-bottom:1px solid var(--line);flex:none}
+.top .l1{display:flex;align-items:center;gap:6px;color:var(--ink3);font-size:var(--s6);letter-spacing:.09em;margin-bottom:3px}
+.top .l2{display:flex;align-items:center;gap:var(--q2)}
+.top .subj{display:flex;align-items:center;gap:7px;font-size:var(--s2);line-height:1.2;font-weight:500;letter-spacing:-.015em}
+.top .subj .ic{width:20px;height:20px;color:var(--clay)}
+.top .subj .car{width:13px;height:13px;color:var(--ink3);stroke-width:var(--stroke)}
+.top .sp{flex:1}
+.top .more{color:var(--ink3);display:grid;place-items:center;width:26px;height:26px;border-radius:var(--rb)}
+
+.stream{flex:1;overflow:hidden;padding:var(--q4) var(--q4) 0}
+.day{display:flex;align-items:center;gap:var(--q2);color:var(--ink3);font-size:var(--s6);letter-spacing:.1em;margin:0 0 var(--q4)}
+.day .ic{width:13px;height:13px;stroke-width:var(--stroke)}
+.ag{margin:0 0 var(--q4)}
+.ag p{margin:0 0 var(--q3);font-size:var(--s4);line-height:var(--l4)}
+.ag .lead{font-size:var(--s3);line-height:var(--l3);font-weight:500;margin:0 0 var(--q3)}
+.me{display:flex;justify-content:flex-end;margin:0 0 var(--q4)}
+.me span{background:var(--fill);padding:9px var(--q3);border-radius:14px 14px 3px 14px;font-size:var(--s4);line-height:1.6;max-width:80%}
+.c-out{border:1px solid var(--line);background:var(--card);border-radius:var(--rc);padding:var(--q3) 14px;margin:0 0 var(--q3)}
+.c-out .h{font-size:var(--s4);line-height:var(--l5);font-weight:500;margin:0 0 var(--q1);display:flex;align-items:center;gap:6px}
+.kv{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);font-size:var(--s5)}
+.kv b{font-weight:500;font-variant-numeric:tabular-nums}
+
+/* 输入框 */
+.composer{padding:0 var(--q4) var(--q4);flex:none}
+.cbox{border:1px solid var(--line2);background:var(--card);border-radius:16px;overflow:hidden}
+.cbox .tools{display:flex;align-items:center;gap:var(--q2);padding:var(--q2) var(--q2) 0 var(--q3)}
+.mpill{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:var(--rp);
+  border:1px solid var(--line2);background:var(--card);font-size:var(--s6);color:var(--ink2);max-width:220px;overflow:hidden}
+.mpill .pv{color:var(--ink3);font-size:var(--s6);white-space:nowrap}
+.mpill .md2{color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpill .car{width:11px;height:11px;color:var(--ink3);stroke-width:var(--stroke);flex:none}
+.tpill{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border-radius:var(--rp);
+  background:var(--fill);font-size:var(--s6);color:var(--ink2);white-space:nowrap}
+.tpill .ic{width:12px;height:12px;stroke-width:var(--stroke)}
+.ctx{margin-left:auto;font-size:var(--s6);color:var(--ink3);padding-right:4px}
+.crow{display:flex;align-items:center;gap:2px;padding:var(--q2) 6px var(--q2) var(--q3)}
+.crow .ib{width:30px;height:30px;display:grid;place-items:center;color:var(--ink3);flex:none;border-radius:50%}
+.crow .ib.act{color:var(--clay)}
+.crow .ph{flex:1;font-size:var(--s4);color:var(--ink3);padding:0 var(--q1)}
+.crow .send{width:30px;height:30px;border-radius:50%;background:var(--clay);color:#fff;display:grid;place-items:center;flex:none;margin-right:2px}
+
+/* sheet 通用 */
+.scrim{position:absolute;inset:0;background:rgba(25,25,25,.28);z-index:4}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:18px 18px 0 0;
+  box-shadow:0 -12px 40px rgba(25,25,25,.16);z-index:5;max-height:88%;display:flex;flex-direction:column}
+.sheet .grab{width:34px;height:3px;border-radius:2px;background:var(--line2);margin:var(--q3) auto;flex:none}
+.sheet .inner{padding:0 var(--q5) var(--q5);overflow:hidden}
+.lbl{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500}
+
+/* provider 分组（模型弹层） */
+.pgrp{margin-bottom:var(--q4)}
+.pgrp .ph{display:flex;align-items:center;gap:var(--q2);padding:0 var(--q2) var(--q2)}
+.pgrp .pn{font-size:var(--s6);color:var(--ink2);font-weight:500}
+.pgrp .au{margin-left:auto;font-size:var(--s6);color:var(--ink3)}
+.pgrp .au.ok{color:var(--sage)}
+.mrow{display:flex;align-items:center;gap:var(--q3);min-height:48px;padding:0 var(--q2);border-radius:var(--rb)}
+.mrow.on{background:var(--claybg)}
+.mrow .nm{flex:1;font-size:var(--s4);color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow.on .nm{color:var(--clay);font-weight:500}
+.mrow .chk{color:var(--clay);flex:none;width:18px;display:grid;place-items:center}
+.mrow.link .nm{color:var(--ink2)}
+.mrow.link .chev{width:14px;height:14px;color:var(--ink3);stroke-width:var(--stroke);flex:none}
+
+/* 设置（规范化） */
+.settings{flex:1;overflow:hidden;padding:0 var(--q5) var(--q5)}
+.sgroup{margin-bottom:var(--q5)}
+.sgroup .slabel{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500;padding:0 var(--q1) var(--q2)}
+.scard{border:1px solid var(--line);border-radius:var(--rc);background:var(--card);overflow:hidden}
+.srow{display:flex;align-items:center;gap:var(--q3);min-height:56px;padding:0 14px;position:relative}
+.srow + .srow::before{content:"";position:absolute;top:0;left:14px;right:0;height:1px;background:var(--line)}
+.srow .lead{width:24px;display:grid;place-items:center;color:var(--ink2);flex:none}
+.srow .md{flex:1;min-width:0}
+.srow .n1{font-size:var(--s4);line-height:1.4}
+.srow .trail{display:flex;align-items:center;gap:var(--q2);flex:none;color:var(--ink3)}
+.srow .val{font-size:var(--s5);color:var(--ink2);font-variant-numeric:tabular-nums}
+.srow.danger .n1{color:var(--clay)}
+.srow .chev{width:14px;height:14px;stroke-width:var(--stroke);color:var(--ink3)}
+.sw{width:42px;height:25px;border-radius:var(--rp);background:var(--fill2);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(25,25,25,.2)}
+.sw.on{background:var(--clay)}
+.sw.on::after{left:20px}
+.stepper{display:flex;align-items:center;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.stepper .b{width:28px;height:28px;display:grid;place-items:center;color:var(--ink2);background:var(--card)}
+.stepper .v{min-width:38px;text-align:center;font-size:var(--s5);font-weight:500;font-variant-numeric:tabular-nums;
+  border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:28px}
+.slider{display:flex;align-items:center;gap:var(--q2);width:180px}
+.slider .track{flex:1;height:4px;border-radius:2px;background:var(--fill2);position:relative}
+.slider .track i{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:var(--clay)}
+.slider .track b{position:absolute;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid var(--clay);left:62%}
+.slider .n{font-size:var(--s6);color:var(--ink2);font-variant-numeric:tabular-nums;width:30px;text-align:right}
+
+/* provider 详情 */
+.det{flex:1;overflow:hidden;padding:0 var(--q5) var(--q5)}
+.kvrow{display:flex;align-items:center;min-height:48px;padding:0 14px;border-bottom:1px solid var(--line);font-size:var(--s5);color:var(--ink2)}
+.kvrow:last-child{border-bottom:0}
+.kvrow .k{flex:1}
+.kvrow .v{color:var(--ink);font-size:var(--s5);display:flex;align-items:center;gap:var(--q2);font-variant-numeric:tabular-nums}
+.mlist{border:1px solid var(--line);border-radius:var(--rc);background:var(--card);overflow:hidden}
+.mitem{display:flex;align-items:center;gap:var(--q2);min-height:44px;padding:0 14px;position:relative;font-size:var(--s5)}
+.mitem + .mitem::before{content:"";position:absolute;top:0;left:14px;right:0;height:1px;background:var(--line)}
+.mitem .ck{width:16px;display:grid;place-items:center;color:var(--clay);flex:none}
+.mitem .id{flex:1;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mitem .ctx2{font-size:var(--s6);color:var(--ink3);font-variant-numeric:tabular-nums}
+.btnbar{display:flex;gap:var(--q2);padding:var(--q4) 0 0}
+.btn{height:40px;padding:0 var(--q4);border-radius:var(--rb);display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  font-size:var(--s5);font-weight:500;border:1px solid var(--line2);background:var(--card);color:var(--ink)}
+.btn.p{background:var(--clay);border-color:var(--clay);color:#fff}
+.btn.d{color:var(--clay);border-color:var(--clayline)}
+.btn .ic{width:15px;height:15px}
+
+.footer{max-width:1600px;margin:var(--q6) auto 0;color:#6B6760;font-size:var(--s5);line-height:1.9}
+.footer b{color:#8E8A80}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-atom" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M20.2 20.2c2.04-2.03.02-7.36-4.5-11.9-4.54-4.52-9.87-6.54-11.9-4.5-2.04 2.03-.02 7.36 4.5 11.9 4.54 4.52 9.87 6.54 11.9 4.5Z"/><path d="M15.7 15.7c4.52-4.54 6.54-9.87 4.5-11.9-2.03-2.04-7.36-.02-11.9 4.5-4.52 4.54-6.54 9.87-4.5 11.9 2.03 2.04 7.36.02 11.9-4.5Z"/></symbol>
+<symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-chevR" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-cam" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+<symbol id="i-pal" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h2a8 8 0 018 8z"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v16"/><path d="M16 13h2"/><path d="M16 9h2"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/><path d="M6 13h2"/><path d="M6 9h2"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-.5-8.98A6 6 0 1 0 6 15.5"/><path d="M12 12v9"/><path d="m8 17 4-4 4 4"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+</defs></svg>
+
+<div class="head">
+  <h1 class="d1">界面 v6</h1>
+  <p>按 Pi 的 provider 模型重做，并清掉所有解释性文本：<b>① 模型按 provider 分组</b>（同一个 DeepSeek 可以同时挂在千帆和火山下面，显示为 <code>provider/model</code>）；<b>② 删掉价格与所有描述性文案</b>；<b>③ 新增模型管理</b>（provider 列表 → 认证 → 模型 → 更新目录，目录来自 models.dev）。</p>
+  <div style="margin-top:var(--q3)">
+    <span class="tag hi">模型 = provider + model 二元组</span>
+    <span class="tag hi">只显示已认证 provider 的模型（Pi 的做法）</span>
+    <span class="tag hi">无价格 · 无描述 · 无解释副标题</span>
+    <span class="tag">设置行 56dp · 图标 14/18/22 · 描边 1.7</span>
+  </div>
+</div>
+
+<div class="grid">
+
+<!-- V1 对话 -->
+<div class="frame">
+  <div class="cap"><i>V1</i><b>对话</b><em>胶囊显示 provider / model</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneL">
+      <div class="top">
+        <div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="sp"></div><div class="more"><svg class="ic sm"><use href="#i-more"/></svg></div></div>
+      </div>
+      <div class="stream">
+        <div class="day"><svg class="ic"><use href="#i-sun"/></svg>今天 · 11 月 14 日 周五</div>
+        <div class="ag"><p class="lead">物理这块，今天两件事。</p>
+          <p>复习 <b class="num">12</b> 张 —— 受力分析占一半；再把昨天那道斜面题重做一遍。</p></div>
+        <div class="c-out"><div class="h">开始 12 张 →</div></div>
+        <div class="me"><span>牛顿第二定律到底怎么用？</span></div>
+        <div class="ag"><p>它是「合外力 → 加速度」的桥。但你的问题不在这一步。</p>
+          <div class="c-out" style="padding:0">
+            <div class="kv" style="border-top:0;padding:10px 14px"><span>受力分析</span><b style="color:var(--clay)">0.31</b></div>
+            <div class="kv" style="padding:10px 14px"><span style="padding-left:14px">牛顿第二定律</span><b>0.58</b></div>
+          </div>
+          <p>10-21 那道斜面题，你漏的是摩擦力。</p></div>
+      </div>
+      <div class="composer">
+        <div class="cbox">
+          <div class="tools">
+            <div class="mpill"><span class="pv">千帆</span><span class="md2">deepseek-v4-flash</span><svg class="ic car"><use href="#i-chev"/></svg></div>
+            <div class="tpill"><svg class="ic"><use href="#i-zap"/></svg>中</div>
+            <div class="ctx num">8.2k</div>
+          </div>
+          <div class="crow">
+            <div class="ib"><svg class="ic"><use href="#i-plus"/></svg></div>
+            <div class="ib act"><svg class="ic"><use href="#i-cam"/></svg></div>
+            <div class="ib"><svg class="ic sm"><use href="#i-mic"/></svg></div>
+            <div class="ph">说点什么…</div>
+            <div class="send"><svg class="ic sm"><use href="#i-up"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="paneR">
+      <div style="padding:var(--q4) var(--q4) var(--q3);border-bottom:1px solid var(--line);display:flex;align-items:center">
+        <div style="font-size:var(--s3);font-weight:500">今日</div><div style="flex:1"></div>
+        <div style="font-size:var(--s5);color:var(--ink3)" class="num">22 张</div>
+      </div>
+      <div style="flex:1;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--claybg);display:grid;place-items:center;color:var(--clay);flex:none"><svg class="ic"><use href="#i-atom"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">物理</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">12 张</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500;color:var(--clay)">0.31</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-sigma"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">数学</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">5 张</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.34</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4);border-bottom:1px solid var(--line)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-lang"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">英语</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">3 个词</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.62</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+        <div style="display:flex;align-items:center;gap:var(--q3);padding:var(--q3) var(--q4)">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none"><svg class="ic"><use href="#i-flask"/></svg></div>
+          <div style="flex:1"><div style="font-size:var(--s4);font-weight:500">化学</div><div style="font-size:var(--s5);color:var(--ink2)" class="num">2 道</div></div>
+          <div class="num" style="font-size:var(--s2);font-weight:500">0.55</div>
+          <svg class="ic sm" style="color:var(--ink3)"><use href="#i-chevR"/></svg></div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V2 模型弹层：按 provider 分组 -->
+<div class="frame">
+  <div class="cap"><i>V2</i><b>模型弹层 · 按 provider 分组</b><em>同模型不同 provider 各算一条 · 无价格无描述</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneL">
+      <div class="top"><div class="l1">小满 · 陪你学 · 第 47 天</div>
+        <div class="l2"><div class="subj"><svg class="ic"><use href="#i-atom"/></svg>物理<svg class="ic car"><use href="#i-chev"/></svg></div>
+          <div class="sp"></div><div class="more"><svg class="ic sm"><use href="#i-more"/></svg></div></div></div>
+      <div class="stream"><div class="ag"><p class="lead">物理这块，今天两件事。</p>
+        <p>复习 <b class="num">12</b> 张 —— 受力分析占一半。</p></div></div>
+      <div class="composer">
+        <div class="cbox" style="border-color:var(--clayline)">
+          <div class="tools">
+            <div class="mpill" style="border-color:var(--clayline);background:var(--claybg)">
+              <span class="pv" style="color:var(--clay)">千帆</span><span class="md2" style="color:var(--clay)">deepseek-v4-flash</span>
+              <svg class="ic car" style="color:var(--clay)"><use href="#i-chev"/></svg></div>
+            <div class="ctx num">8.2k</div>
+          </div>
+          <div class="crow"><div class="ph">说点什么…</div><div class="send"><svg class="ic sm"><use href="#i-up"/></svg></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="paneR" style="background:var(--paper)"></div>
+    <div class="scrim"></div>
+    <div class="sheet" style="left:72px">
+      <div class="grab"></div>
+      <div class="inner">
+        <div class="pgrp">
+          <div class="ph"><span class="pn">千帆 Token Plan</span><span class="au ok">已连接</span></div>
+          <div class="mrow"><span class="nm">deepseek-v4-pro</span><span class="chk"></span></div>
+          <div class="mrow on"><span class="nm">deepseek-v4-flash</span><span class="chk"><svg class="ic sm"><use href="#i-check"/></svg></span></div>
+          <div class="mrow"><span class="nm">ernie-5.0</span><span class="chk"></span></div>
+        </div>
+        <div class="pgrp">
+          <div class="ph"><span class="pn">火山方舟</span><span class="au ok">已连接</span></div>
+          <div class="mrow"><span class="nm">deepseek-v4-pro</span><span class="chk"></span></div>
+          <div class="mrow"><span class="nm">deepseek-v4-flash</span><span class="chk"></span></div>
+        </div>
+        <div class="pgrp">
+          <div class="ph"><span class="pn">Anthropic</span><span class="au">未连接</span></div>
+          <div class="mrow link"><span class="nm">去连接</span><svg class="ic chev"><use href="#i-chevR"/></svg></div>
+        </div>
+        <div class="pgrp" style="margin-bottom:var(--q3)">
+          <div class="ph"><span class="pn">思考档位</span></div>
+          <div class="mrow" style="gap:var(--q2)">
+            <div class="tpill">关</div>
+            <div class="tpill" style="background:var(--claybg);color:var(--clay);font-weight:500"><svg class="ic"><use href="#i-zap"/></svg>中</div>
+            <div class="tpill">高</div>
+          </div>
+        </div>
+        <div class="mrow link" style="border-top:1px solid var(--line);border-radius:0;min-height:52px;padding:0 var(--q2)">
+          <span class="nm">模型管理</span><svg class="ic chev"><use href="#i-chevR"/></svg>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V3 设置（去掉所有解释副标题） -->
+<div class="frame">
+  <div class="cap"><i>V3</i><b>设置</b><em>删掉全部解释性副标题 · 只留状态值</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneM">
+      <div class="top"><div class="l1">小满 · 0.1.0</div><div class="l2"><div class="subj">设置</div></div></div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="slabel">她</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-user"/></svg></div>
+              <div class="md"><div class="n1">名字</div></div>
+              <div class="trail"><span class="val">小满</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-msg"/></svg></div>
+              <div class="md"><div class="n1">说话方式</div></div>
+              <div class="trail"><span class="val">先提示</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">复习</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-clock"/></svg></div>
+              <div class="md"><div class="n1">每日上限</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">20</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-zap"/></svg></div>
+              <div class="md"><div class="n1">目标保留率</div></div>
+              <div class="trail"><div class="slider"><div class="track"><i style="width:62%"></i><b></b></div><span class="n">0.90</span></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-spark"/></svg></div>
+              <div class="md"><div class="n1">先修闸门</div></div>
+              <div class="trail"><div class="sw on"></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">通知</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-bell"/></svg></div>
+              <div class="md"><div class="n1">每日开场</div></div>
+              <div class="trail"><span class="val">07:30</span><div class="sw on"></div></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-bell"/></svg></div>
+              <div class="md"><div class="n1">每天最多</div></div>
+              <div class="trail"><div class="stepper"><div class="b"><svg class="ic sm"><use href="#i-minus"/></svg></div><div class="v">2</div><div class="b"><svg class="ic sm"><use href="#i-plus"/></svg></div></div></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">模型与数据</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cpu"/></svg></div>
+              <div class="md"><div class="n1">模型管理</div></div>
+              <div class="trail"><span class="val">2 / 5</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-db"/></svg></div>
+              <div class="md"><div class="n1">数据与导出</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-pal"/></svg></div>
+              <div class="md"><div class="n1">外观</div></div>
+              <div class="trail"><span class="val">跟随系统</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup" style="margin-bottom:0">
+          <div class="slabel">危险操作</div>
+          <div class="scard">
+            <div class="srow danger"><div class="lead"><svg class="ic"><use href="#i-x"/></svg></div>
+              <div class="md"><div class="n1">清空复习记录</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V4 模型管理 -->
+<div class="frame">
+  <div class="cap"><i>V4</i><b>模型管理</b><em>已连接 / 未连接 / 自定义 / 目录</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneM">
+      <div class="top">
+        <div class="l1"><svg class="ic" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-chevL"/></svg> 设置</div>
+        <div class="l2"><div class="subj">模型管理</div></div>
+      </div>
+      <div class="settings">
+        <div class="sgroup">
+          <div class="slabel">已连接</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-plug"/></svg></div>
+              <div class="md"><div class="n1">千帆 Token Plan</div></div>
+              <div class="trail"><span class="val">11 个模型</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-plug"/></svg></div>
+              <div class="md"><div class="n1">火山方舟</div></div>
+              <div class="trail"><span class="val">5 个模型</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">未连接</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-key"/></svg></div>
+              <div class="md"><div class="n1">Anthropic</div></div>
+              <div class="trail"><span class="val">连接</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-key"/></svg></div>
+              <div class="md"><div class="n1">OpenAI</div></div>
+              <div class="trail"><span class="val">连接</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-key"/></svg></div>
+              <div class="md"><div class="n1">OpenRouter</div></div>
+              <div class="trail"><span class="val">连接</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">自定义</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-plus"/></svg></div>
+              <div class="md"><div class="n1">添加 OpenAI 兼容端点</div></div>
+              <div class="trail"><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+        <div class="sgroup" style="margin-bottom:0">
+          <div class="slabel">目录</div>
+          <div class="scard">
+            <div class="srow"><div class="lead"><svg class="ic"><use href="#i-cloud"/></svg></div>
+              <div class="md"><div class="n1">更新模型目录</div></div>
+              <div class="trail"><span class="val">models.dev</span><svg class="ic chev"><use href="#i-chevR"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- V5 provider 详情 -->
+<div class="frame">
+  <div class="cap"><i>V5</i><b>Provider 详情</b><em>认证 · 端点 · 模型 · 更新目录</em></div>
+  <div class="wrap"><div class="tab">
+    <div class="rail">
+      <div class="logo">满</div>
+      <div class="it on"><svg class="ic"><use href="#i-dot"/></svg>对话</div>
+      <div class="it"><svg class="ic"><use href="#i-book"/></svg>错题</div>
+      <div class="it"><svg class="ic"><use href="#i-spark"/></svg>地图</div>
+      <div class="it"><svg class="ic"><use href="#i-clock"/></svg>记忆</div>
+      <div class="it"><svg class="ic"><use href="#i-zap"/></svg>本周</div>
+      <div class="sp"></div>
+      <div class="it on" style="background:var(--claybg);color:var(--clay)"><svg class="ic"><use href="#i-set"/></svg>设置</div>
+    </div>
+    <div class="paneM">
+      <div class="top">
+        <div class="l1"><svg class="ic" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-chevL"/></svg> 模型管理</div>
+        <div class="l2"><div class="subj">千帆 Token Plan</div></div>
+      </div>
+      <div class="det">
+        <div class="sgroup">
+          <div class="slabel">认证</div>
+          <div class="scard">
+            <div class="kvrow"><span class="k">状态</span><span class="v" style="color:var(--sage)">已连接</span></div>
+            <div class="kvrow"><span class="k">API Key</span><span class="v mono">••••••••4f2a</span></div>
+            <div class="kvrow"><span class="k">端点</span><span class="v mono">qianfan.baidubce.com/v2/tokenplan/personal</span></div>
+          </div>
+        </div>
+        <div class="sgroup">
+          <div class="slabel">模型 · 11</div>
+          <div class="mlist">
+            <div class="mitem"><span class="ck"><svg class="ic sm"><use href="#i-check"/></svg></span><span class="id mono">deepseek-v4-flash</span><span class="ctx2 num">1M</span></div>
+            <div class="mitem"><span class="ck"></span><span class="id mono">deepseek-v4-pro</span><span class="ctx2 num">1M</span></div>
+            <div class="mitem"><span class="ck"></span><span class="id mono">deepseek-v3.2</span><span class="ctx2 num">128K</span></div>
+            <div class="mitem"><span class="ck"></span><span class="id mono">ernie-5.0</span><span class="ctx2 num">256K</span></div>
+            <div class="mitem"><span class="ck"></span><span class="id mono">glm-5.3</span><span class="ctx2 num">128K</span></div>
+          </div>
+        </div>
+        <div class="btnbar">
+          <div class="btn"><svg class="ic"><use href="#i-refresh"/></svg>更新目录</div>
+          <div class="btn d"><svg class="ic"><use href="#i-x"/></svg>断开</div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</div>
+
+<div class="footer">
+  <b>模型为什么按 provider 分组</b>：同一个 <code>deepseek-v4-pro</code> 可能同时在千帆和火山上架，价格、限流、可用性都不一样。所以模型的身份是 <b><code>provider/model</code> 二元组</b>（Pi 就是这么引用的：<code>azure/deepseek-v4-pro</code>）。只显示<b>已认证 provider</b> 的模型——这是 Pi <code>/model</code> 的行为，避免选到一个用不了的。<br>
+  <b>为什么删价格</b>：自定义端点的价格我们无从得知，写死反而误导。要比较就去 provider 详情看上下文长度。<br>
+  <b>为什么删描述文本</b>：<code>每日上限 = 20</code> 不需要解释"超出顺延"；<code>先修闸门</code> 开关不需要解释原理。<b>副标题只在承载状态/值时才出现</b>，不承载解释。
+</div>
+
+</body>
+</html>
