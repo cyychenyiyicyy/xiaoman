@@ -516,14 +516,41 @@
 
   function caretHtml() { return '<span class="caret" aria-hidden="true"></span>'; }
 
+  var THINK_PEEK_CHARS = 96;
+
+  function nowMs() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+
+  function tailText(s, n) {
+    var t = String(s || "").replace(/\s+/g, " ").trim();
+    return t.length > n ? "…" + t.slice(-n) : t;
+  }
+
+  function thinkSecs(m) {
+    if (m._thinkMs != null) return Math.max(1, Math.round(m._thinkMs / 1000));
+    if (m.thinking_ms) return Math.max(1, Math.round(m.thinking_ms / 1000));
+    if (m._thinkStart) return Math.max(1, Math.round((nowMs() - m._thinkStart) / 1000));
+    return 0;
+  }
+
+  function thinkLabel(m) {
+    var secs = thinkSecs(m);
+    if (m.status === "streaming" && !m.content_md) return secs ? "思考中 · " + secs + " 秒" : "思考中";
+    return secs ? "思考 " + secs + " 秒" : "思考";
+  }
+
+  // 折叠态就给出「最新思考尾巴」：不用展开也能看到实时（参考 CopilotKit / DeepSeek-Reasonix）
   function reasoningHtml(m) {
-    var live = m.status === 'streaming' && !m.content_md;
-    var open = m._open !== undefined ? m._open : live;
-    var label = m.status === 'streaming' ? '思考中' : '思考';
+    var thinking = m.status === "streaming" && !m.content_md;
+    var open = m._open === true;
     m._renderOpen = open;
-    return '<details class="rbox" data-key="' + esc(m._key) + '"' + (open ? ' open' : '') + '>' +
-      '<summary class="rsum">' + ic('zap', 'sm') + '<span>' + label + '</span>' + ic('chevron-down', 'sm rcar') +
-      '</summary><div class="rbody">' + renderMarkdown(m.reasoning_md) + '</div></details>';
+    var peek = thinking && m.reasoning_md
+      ? '<span class="rpeek">' + escText(tailText(m.reasoning_md, THINK_PEEK_CHARS)) + "</span>"
+      : "";
+    return '<details class="rbox" data-key="' + esc(m._key) + '"' + (open ? " open" : "") + ">" +
+      '<summary class="rsum">' + ic("zap", "sm") +
+      '<span class="rlabel">' + esc(thinkLabel(m)) + "</span>" + peek +
+      ic("chevron-down", "sm rcar") + "</summary>" +
+      '<div class="rbody">' + renderMarkdown(m.reasoning_md) + "</div></details>";
   }
 
   function msgErrorHtml(m) {
@@ -746,19 +773,38 @@ function typesetMath(el) {
     renderStream(true);
   }
 
+  // 思考计时：思考中每 0.5 秒刷新一次标签（不用等下一个 delta）
+  setInterval(function () {
+    for (var ti = 0; ti < state.messages.length; ti++) {
+      var tm = state.messages[ti];
+      if (tm.status === "streaming" && !tm.content_md && tm._thinkStart) paintReasoning(tm);
+    }
+  }, 500);
+
   function paintReasoning(m) {
     var root = msgRoot(m);
     if (!root) return;
-    var det = root.querySelector('details.rbox');
+    var det = root.querySelector("details.rbox");
     if (!det) {
-      root.insertAdjacentHTML('afterbegin', reasoningHtml(m));
+      root.insertAdjacentHTML("afterbegin", reasoningHtml(m));
       return;
     }
-    det.setAttribute('open', '');
-    var body = det.querySelector('.rbody');
-    if (body) body.innerHTML = renderMarkdown(m.reasoning_md);
-    var label = det.querySelector('.rsum span');
-    if (label) label.textContent = m.status === 'streaming' ? '思考中' : '思考';
+    var lab = det.querySelector(".rlabel");
+    if (lab) lab.textContent = thinkLabel(m);
+    var thinking = m.status === "streaming" && !m.content_md;
+    var peek = det.querySelector(".rpeek");
+    if (peek) {
+      if (thinking && m.reasoning_md) {
+        peek.textContent = tailText(m.reasoning_md, THINK_PEEK_CHARS);
+        peek.hidden = false;
+      } else {
+        peek.hidden = true;
+      }
+    }
+    if (det.hasAttribute("open")) {
+      var body = det.querySelector(".rbody");
+      if (body) body.innerHTML = renderMarkdown(m.reasoning_md);
+    }
   }
 
   /* ── 渲染：模型弹层 ───────────────────────────────── */
@@ -1485,9 +1531,11 @@ function typesetMath(el) {
           if (ev.thinking) asst.thinking = ev.thinking;
           // 只回填 id：DOM 靠 _key 跟踪，不重刷（重刷会打断渐显）
         } else if (ev.type === 'reasoning') {
+          if (!asst._thinkStart) asst._thinkStart = nowMs();
           asst.reasoning_md += ev.delta || '';
           paintReasoning(asst);
         } else if (ev.type === 'text') {
+          if (asst._thinkStart && asst._thinkMs == null) asst._thinkMs = nowMs() - asst._thinkStart;
           asst.content_md += ev.delta || '';
           if (!asst._st) startLive(asst);
           if (asst._st) {
@@ -1498,6 +1546,7 @@ function typesetMath(el) {
           sawDone = true;
           asst.status = 'done';
           asst.usage = ev.usage || null;
+          if (ev.thinking_ms) { asst.thinking_ms = ev.thinking_ms; asst._thinkMs = ev.thinking_ms; }
           if (ev.message_id != null) asst.id = ev.message_id;
           if (asst._st) {
             asst._st.final = true;
@@ -1855,6 +1904,8 @@ function typesetMath(el) {
 
   boot();
 })();
+
+
 
 
 

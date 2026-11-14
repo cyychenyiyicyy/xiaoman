@@ -262,3 +262,25 @@ cd server
 **② 数学公式必须渲染，不能当普通文本吐。** 接 KaTeX（`web/vendor/katex/`，离线，270KB JS + 60 个字体 + 22.8KB CSS），走 `auto-render`，只对 `.stable`（已提交段落）做，正在流的 `.live` 加 `no-math` 跳过，避免半截公式变红字。display 公式（`$$…$$`）闭合即提交渲染，缩短裸 TeX 窗口。
 
 **③ 客户端断开不能记成 done。** 之前断流时半截回复被标 `done`，历史里会留一条残句。现在 `CancelledError` → `status=error / 连接中断`。
+### 9.5 思考过程：折叠态实时尾巴 + 秒数（2026-11-14 晚）
+
+用户要求：**「思考要显示思考几秒；思考过程中无需展开就能看到实时」**。参照的开源实现：
+
+| 来源 | 做法 |
+|---|---|
+| [CopilotKit reasoning card](https://github.com/copilotkit/copilotkit/blob/0573996d8d4270521c9d357168321b6948742d38/showcase/shell-docs/src/content/snippets/shared/guides/custom-look-and-feel/reasoning-messages.mdx) | 思考中「Thinking…」+ 脉冲；结束切「Thought for X seconds」 |
+| [smoothui AI Reasoning](https://github.com/educlopez/smoothui/blob/e4b0b44a5c640ec217800eb664db18879822cd6c/apps/docs/content/docs/components/ai-reasoning.mdx) | 自己计时；结束先停一拍再收起，不硬切 |
+| [DeepSeek-Reasonix #7966](https://github.com/esengine/DeepSeek-Reasonix/pull/7966) | 折叠态保留**最新流式尾巴**做预览（原实现要么全裸露、要么无预览） |
+| [eliza orchestrator-reasoning](https://github.com/elizaOS/eliza/blob/524089add665fb75fdb7cc47979d419bdd31714e/plugins/plugin-task-coordinator/src/orchestrator-reasoning.tsx) | 思考中「Thinking…」，结束「Thought for {duration}」 |
+
+**实现**
+
+| 项 | 规则 |
+|---|---|
+| 折叠 | **默认折叠**。折叠态常驻一行：`思考中 · N 秒` + 最新思考尾巴（单行、右端渐隐 mask） |
+| 计时 | 客户端 `performance.now()` 从首个 reasoning 增量起算，首个正文增量或结束时封口；**服务端同步测量**并写入 `message.thinking_ms`，重载后仍显示秒数 |
+| 结束 | 标签变 `思考 N 秒`，预览隐藏，箭头回到最右 |
+| 展开 | 用户点了才展开，展开时正文随流更新（`rbody` 只更新已展开的那个） |
+| 文案 | 只写值：`思考 12 秒` / `思考中 · 3 秒`，不写解释 |
+
+已验证（jsdom）：标签序列 `思考中 · 1 秒 → 思考 1 秒`；预览长度 9→17→24 字；**思考中自动展开次数 = 0**；DB `thinking_ms = 266`。

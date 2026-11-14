@@ -91,6 +91,7 @@ class MessageOut(BaseModel):
     provider_id: str | None = None
     model_key: str | None = None
     thinking: str
+    thinking_ms: int = 0
     status: str
     error: str
     created_at: datetime
@@ -99,3 +100,5 @@ class MessageOut(BaseModel):
 class ChatIn(BaseModel):
     text: str = ""
     image_ids: list[str] = Field(default_factory=list)
+
+

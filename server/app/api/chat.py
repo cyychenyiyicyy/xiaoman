@@ -1,5 +1,6 @@
 """会话 / 消息 / 聊天流（SSE）。"""
 import asyncio
+import time
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -34,6 +35,7 @@ def _msg_out(m: Message) -> dict:
         "provider_id": m.provider_id,
         "model_key": m.model_key,
         "thinking": m.thinking,
+        "thinking_ms": m.thinking_ms or 0,
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -174,6 +176,9 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         usage = {"prompt_tokens": 0, "completion_tokens": 0}
         error: dict | None = None
         cancelled = False
+        t_think_start: float | None = None
+        t_think_end: float | None = None
+        think_ms = 0
 
         yield _sse(
             {
@@ -197,9 +202,13 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             ):
                 kind = ev.get("type")
                 if kind == "text":
+                    if t_think_start is not None and t_think_end is None:
+                        t_think_end = time.monotonic()
                     text_parts.append(ev["delta"])
                     yield _sse({"type": "text", "delta": ev["delta"]})
                 elif kind == "reasoning":
+                    if t_think_start is None:
+                        t_think_start = time.monotonic()
                     reason_parts.append(ev["delta"])
                     yield _sse({"type": "reasoning", "delta": ev["delta"]})
                 elif kind == "usage":
@@ -230,6 +239,9 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                         row.status, row.error = "error", "连接中断（客户端断开）"
                     else:
                         row.status = "done" if text_parts else "empty"
+                    if t_think_start is not None:
+                        think_ms = int(((t_think_end or time.monotonic()) - t_think_start) * 1000)
+                        row.thinking_ms = think_ms
                     row.prompt_tokens = usage["prompt_tokens"]
                     row.completion_tokens = usage["completion_tokens"]
                     current = s.get(Conversation, conv_id)
@@ -238,7 +250,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                     s.commit()
 
         if error is None:
-            yield _sse({"type": "done", "message_id": assistant_id, "usage": usage})
+            yield _sse({"type": "done", "message_id": assistant_id, "usage": usage, "thinking_ms": think_ms})
 
     return StreamingResponse(
         event_stream(),

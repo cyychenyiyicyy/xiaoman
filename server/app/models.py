@@ -86,6 +86,7 @@ class Message(Base):
     thinking: Mapped[str] = mapped_column(String(8), nullable=False, default="off")
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="done")
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    thinking_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

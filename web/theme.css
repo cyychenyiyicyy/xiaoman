@@ -637,3 +637,11 @@ button.mitem:focus-visible{outline:2px solid var(--clay);outline-offset:-2px}
 .agbody .katex-display>.katex{max-width:100%}
 /* 消息流底部留白：让最后一行不贴着输入框边被切 */
 .stream{padding-bottom:var(--q5)}
+
+/* 思考折叠条：标签 + 最新尾巴预览（折叠态就能看到实时，参考 CopilotKit / smoothui / DeepSeek-Reasonix） */
+.rsum .rlabel{color:var(--ink2);font-size:var(--s5);white-space:nowrap;flex:none;font-variant-numeric:tabular-nums}
+.rsum .rpeek{flex:1;min-width:0;color:var(--ink3);font-size:var(--s6);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;-webkit-mask-image:linear-gradient(to right,#000 72%,transparent 100%);
+  mask-image:linear-gradient(to right,#000 72%,transparent 100%)}
+.rsum .rpeek[hidden]{display:none}
+.rsum .rcar{margin-left:auto}
