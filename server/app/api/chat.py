@@ -20,7 +20,9 @@ from ..db import SessionLocal, get_db
 from ..models import Attachment, Conversation, Message, Memory
 from ..schemas import ChatIn
 from ..seed import get_current, get_memory_cfg, get_search_cfg
+from ..services import compact as compact_service
 from ..services import memory as memory_service
+from ..services import spaces
 from ..services import search as search_service
 from ..services.llm import (
     MEMORY_ADD_TOOL,
@@ -65,13 +67,26 @@ def _msg_out(m: Message) -> dict:
 
 
 def _conversation(db: Session) -> Conversation:
-    conv = db.scalar(select(Conversation).limit(1))
-    if conv is None:
-        conv = Conversation(subject="全部")
-        db.add(conv)
-        db.commit()
-        db.refresh(conv)
-    return conv
+    return spaces.current_conversation(db)
+
+
+@router.get("/subjects")
+def subjects(db: Session = Depends(get_db)):
+    return spaces.overview(db)
+
+
+@router.patch("/subject")
+def switch_subject(payload: dict, db: Session = Depends(get_db)):
+    name = (payload or {}).get("subject") or ""
+    try:
+        cur = spaces.switch(db, name)
+    except ValueError as exc:
+        raise HTTPException(400, "未知学科") from exc
+    conv = spaces.conversation_for(db, cur)
+    count = db.scalar(
+        select(func.count()).select_from(Message).where(Message.conversation_id == conv.id)
+    )
+    return {"current": cur, "conversation_id": conv.id, "message_count": int(count or 0)}
 
 
 @router.get("/conversation")
@@ -124,12 +139,12 @@ def list_messages(before: str | None = None, limit: int = 50, db: Session = Depe
     stmt = (
         select(Message)
         .where(Message.conversation_id == conv.id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
+        .order_by(Message.seq.desc())
     )
     if before:
         anchor = db.get(Message, before)
         if anchor is not None:
-            stmt = stmt.where(Message.created_at < anchor.created_at)
+            stmt = stmt.where(Message.seq < anchor.seq)
     rows = list(db.scalars(stmt.limit(limit + 1)).all())
     has_more = len(rows) > limit
     rows = rows[:limit]
@@ -202,30 +217,9 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             # 不再预检索：改成模型自己调 web_search 工具（见 stream_with_tools）
             pass
 
-    # 历史必须 append-only：每轮只是「上轮请求 + 新内容」，
-    # 否则滑动窗口一丢最旧消息，整条前缀就变了，DeepSeek 的前缀缓存直接归零。
-    # 只有累计超过 token 预算时才从最旧开始丢（丢一次之后长期稳定）。
-    budget = int(getattr(settings, "history_token_budget", 60000))
-    rows = list(
-        db.scalars(
-            select(Message)
-            .where(
-                Message.conversation_id == conv.id,
-                Message.status == "done",
-                Message.role.in_(("user", "assistant")),
-            )
-            .order_by(Message.created_at.desc())
-        ).all()
-    )
-    picked: list[Message] = []
-    used = 0
-    for m in rows:
-        cost = _est_tokens(m.content_md)
-        if used + cost > budget:
-            break
-        used += cost
-        picked.append(m)
-    history = list(reversed(picked))
+    # 历史：append-only；超过预算时由 compact 把最旧一段压成摘要，只保留最近的原文
+    summary_block, hist_rows = compact_service.history(db, conv)
+    history = hist_rows
 
     user_msg = Message(
         conversation_id=conv.id,
@@ -369,9 +363,10 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 stream = stream_chat(
                     provider_snap, model_snap, hist, text, atts, thinking,
                     memory_block="", web_block=web_hint, native_search=False,
+                    summary_block=summary_block,
                 )
             else:
-                base_msgs = build_openai_messages(hist, text, atts, "", web_hint)
+                base_msgs = build_openai_messages(hist, text, atts, "", web_hint, summary_block=summary_block)
                 stream = stream_with_tools(
                 provider_snap,
                 model_snap,
@@ -518,6 +513,18 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                             row.remembered = saved
                             s.commit()
                     yield _sse({"type": "memory", "items": saved})
+
+            # 上下文压缩：超过预算才跑，失败不影响对话
+            try:
+                with SessionLocal() as s3:
+                    conv_row = s3.get(Conversation, conv_id)
+                    info = await compact_service.maybe_compact(
+                        s3, conv_row, provider_snap, model_snap
+                    ) if conv_row is not None else None
+                if info:
+                    yield _sse({"type": "compacted", **info})
+            except Exception:  # noqa: BLE001
+                pass
 
     return StreamingResponse(
         event_stream(),

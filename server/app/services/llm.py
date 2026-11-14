@@ -54,11 +54,14 @@ def build_openai_messages(
     memory_block: str = "",
     web_block: str = "",
     dynamic_prefix: str = "",
+    summary_block: str = "",
 ) -> list[dict]:
     """把历史 + 本轮拼成 OpenAI messages。历史只取文本，图片仅本轮带。"""
     # 关键：system 必须完全静态，否则每轮前缀都不同，DeepSeek 的自动前缀缓存永远命中不了
     # 静态前缀 + 很少变的记忆块（Open WebUI #20317 的做法）：记忆留 system，网页走工具
     msgs: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT + today_line() + (memory_block or "")}]
+    if (summary_block or "").strip():
+        msgs.append({"role": "system", "content": "【更早对话的摘要（已压缩）】\n" + summary_block.strip()})
     cap = settings.message_char_cap
     for m in history[-settings.history_limit :]:
         body = (m.content_md or "")[:cap]
@@ -116,6 +119,7 @@ async def stream_chat(
     memory_block: str = "",
     web_block: str = "",
     native_search: bool = False,
+    summary_block: str = "",
 ) -> AsyncIterator[dict]:
     """统一入口。provider.kind == 'mock' 走内置回显。"""
     if provider.kind == "mock" or provider.base_url.startswith("mock://"):
@@ -127,7 +131,7 @@ async def stream_chat(
     url = f"{base}/chat/completions"
     payload: dict = {
         "model": model.model_key,
-        "messages": build_openai_messages(history, user_text, attachments, memory_block, web_block),
+        "messages": build_openai_messages(history, user_text, attachments, memory_block, web_block, summary_block=summary_block),
         "stream": True,
         "stream_options": {"include_usage": True},
     }

@@ -745,3 +745,12 @@ button.it:active{background:var(--fill)}
 .seg .tpill.on{border-color:var(--clayline);background:var(--claybg);color:var(--clay)}
 .fta{height:auto;min-height:88px;padding:var(--q2) var(--q3);line-height:var(--l4);resize:vertical}
 .btn.danger{color:var(--clay);border:1px solid var(--clayline);background:transparent}
+
+
+/* ── 学科胶囊与列表 ───────────────────────────────── */
+.top .subj{cursor:pointer;border:1px solid transparent;background:transparent;border-radius:var(--rb);
+  padding:2px var(--q1);font-family:inherit;color:inherit}
+.top .subj:active{background:var(--fill)}
+.top .subj .car{color:var(--ink3)}
+.mrow .cnt{color:var(--ink3);font-size:var(--s6);margin-left:auto;padding-left:var(--q2);font-variant-numeric:tabular-nums}
+.mrow .chk{width:18px;display:grid;place-items:center;color:var(--clay);flex:none}

@@ -9,6 +9,8 @@
   var THINK = ['off', 'med', 'high'];
 
   var state = {
+    subjects: null,          // GET /subjects: {current, items}
+    subjectScroll: {},       // 每个学科记住滚动位置（docs/11 §3.1）
     view: 'chat',            // chat | page
     page: null,              // {kind:'models'} | {kind:'provider',providerId} | {kind:'form',providerId}
     overlay: null,           // {kind:'models'} | {kind:'confirm',pid,name}
@@ -338,6 +340,17 @@
     })[0] || null;
   }
 
+  async function loadSubjects() {
+    try {
+      state.subjects = await api('/subjects');
+      var cur = state.subjects && state.subjects.current;
+      var el = q('#top-subject');
+      if (el && cur) el.textContent = cur;
+    } catch (e) {
+      state.subjects = { current: '全部', items: [] };
+    }
+  }
+
   async function loadCatalog() {
     state.catalogState = 'loading';
     try {
@@ -443,7 +456,7 @@
 
   async function openSettings() {
     openPage({ kind: 'settings' });
-    await Promise.all([loadSearchSettings(), loadMemorySettings(), loadMemoryStats()]);
+    await Promise.all([loadSearchSettings(), loadMemorySettings(), loadMemoryStats(), loadSubjects()]);
     if (state.page && state.page.kind === 'settings') render();
   }
 
@@ -454,7 +467,7 @@
     state.catalog = null;
     state.catalogState = 'loading';
     state.msgState = 'loading';
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects()]);
     render();
     if (state.settings && state.settings.provider_id != null) {
       await loadModelsFor(state.settings.provider_id);
@@ -1247,6 +1260,47 @@ function typesetMath(el) {
       '</div></div></div>';
   }
 
+  function subjectsSheetHtml(o) {
+    var cur = (state.subjects && state.subjects.current) || '全部';
+    var items = (state.subjects && state.subjects.items) || [];
+    var rows = items.map(function (it) {
+      var on = it.subject === cur;
+      return '<button type="button" class="mrow' + (on ? ' on' : '') + '" data-act="switch-subject" data-subject="' +
+        esc(it.subject) + '"><span class="nm">' + esc(it.subject) + '</span>' +
+        (it.count ? '<span class="cnt">' + numWrap(it.count) + '</span>' : '') +
+        (on ? '<span class="chk">' + ic('check', 'sm') + '</span>' : '<span class="chk"></span>') +
+        '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="subj-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="subj-ttl">学科</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="pgrp">' + rows + '</div></div>' +
+      '</div></div>';
+  }
+
+  async function switchSubject(name) {
+    var old = (state.subjects && state.subjects.current) || '全部';
+    if (name === old) { state.overlay = null; render(); return; }
+    var st = q('#stream');
+    if (st) state.subjectScroll[old] = st.scrollTop;
+    try {
+      await api('/subject', { method: 'PATCH', json: { subject: name } });
+    } catch (e) {
+      toast('切换失败：' + e.message);
+      return;
+    }
+    state.overlay = null;
+    state.messages = [];
+    state.liveMsg = null;
+    state.msgState = 'loading';
+    await Promise.all([loadSubjects(), loadMessages()]);
+    render();
+    var s2 = q('#stream');
+    if (s2) s2.scrollTop = state.subjectScroll[name] || s2.scrollHeight;
+  }
+
   function sourcesSheetHtml(o) {
     var m = findMessageByKey(o.key);
     var mem = m ? (m.sources || []).filter(function (s) { return s && s.type === 'memory'; }) : [];
@@ -1387,6 +1441,7 @@ function typesetMath(el) {
       : kind === 'model' ? modelDetailSheetHtml(state.overlay)
         : kind === 'sources' ? sourcesSheetHtml(state.overlay)
       : kind === 'memory' ? memoryEditSheetHtml(state.overlay)
+      : kind === 'subjects' ? subjectsSheetHtml(state.overlay)
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -2591,6 +2646,8 @@ function typesetMath(el) {
     'save-memory': function (el) { saveMemory(el.getAttribute('data-id')); },
     'pick-memory-kind': function (el) { pickMemoryKind(el); },
     'to-bottom': function () { scrollToBottom(true); },
+    'open-subjects': function () { setOverlay({ kind: 'subjects' }); },
+    'switch-subject': function (el) { switchSubject(el.getAttribute('data-subject')); },
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
     'reload-memories': function () { loadMemories().then(function () { render(); }); },
@@ -2697,7 +2754,7 @@ function typesetMath(el) {
     autosize();
     render();
 
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects()]);
     render();
 
     if (state.settings && state.settings.provider_id != null) {

@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Identity, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -65,6 +65,9 @@ class Conversation(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
     subject: Mapped[str] = mapped_column(String(20), nullable=False, default="全部")
+    summary_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    summary_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    summary_until_seq: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -73,6 +76,8 @@ class Message(Base):
     __tablename__ = "message"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    # 单调递增序号：created_at 会撞（同一批插入），排序与压缩游标都靠它
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(), nullable=False, unique=True, index=True)
     conversation_id: Mapped[str] = mapped_column(
         ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False, index=True
     )
