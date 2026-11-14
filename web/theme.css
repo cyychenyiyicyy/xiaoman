@@ -754,3 +754,20 @@ button.it:active{background:var(--fill)}
 .top .subj .car{color:var(--ink3)}
 .mrow .cnt{color:var(--ink3);font-size:var(--s6);margin-left:auto;padding-left:var(--q2);font-variant-numeric:tabular-nums}
 .mrow .chk{width:18px;display:grid;place-items:center;color:var(--clay);flex:none}
+
+
+/* ── 学习空间名单（Grok Bot / 微信好友列表式左侧栏）──────── */
+.spaces{width:204px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column;
+  gap:2px;padding:var(--q3) var(--q2);overflow-y:auto;background:var(--paper)}
+.spaces .stitle{font-size:var(--s6);letter-spacing:.1em;color:var(--ink3);font-weight:500;
+  padding:0 var(--q2) var(--q2);flex:none}
+.space{display:flex;align-items:center;gap:var(--q2);width:100%;min-height:40px;padding:0 var(--q2);
+  border:0;background:transparent;border-radius:var(--rb);color:var(--ink2);
+  font-family:inherit;font-size:var(--s5);text-align:left;cursor:pointer;flex:none}
+.space .ic{display:block;color:var(--ink3);flex:none}
+.space .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.space .c{color:var(--ink3);font-size:var(--s6);font-variant-numeric:tabular-nums;flex:none}
+.space.on{background:var(--claybg);color:var(--clay)}
+.space.on .ic,.space.on .c{color:var(--clay)}
+.space:active{background:var(--fill)}
+@media (max-width: 900px){ .spaces{display:none} }

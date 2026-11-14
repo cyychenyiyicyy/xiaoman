@@ -340,12 +340,30 @@
     })[0] || null;
   }
 
+  function renderSpaces() {
+    var host = q('#spaces');
+    if (!host) return;
+    var su = state.subjects || { current: '全部', items: [] };
+    var cur = su.current || '全部';
+    var label = q('#top-subject');
+    if (label) label.textContent = cur;
+    var items = su.items && su.items.length ? su.items : [{ subject: cur, count: 0 }];
+    host.innerHTML = '<div class="stitle">学习空间</div>' +
+      items.map(function (it) {
+        var on = it.subject === cur;
+        return '<button type="button" class="space' + (on ? ' on' : '') + '" data-act="switch-subject" data-subject="' +
+          esc(it.subject) + '"' + (on ? ' aria-current="true"' : '') + '>' +
+          ic(SUBJECT_ICON[it.subject] || 'circle-dot', 'sm') +
+          '<span class="n">' + esc(it.subject) + '</span>' +
+          (it.count ? '<span class="c">' + numWrap(it.count) + '</span>' : '') +
+          '</button>';
+      }).join('');
+  }
+
   async function loadSubjects() {
     try {
       state.subjects = await api('/subjects');
-      var cur = state.subjects && state.subjects.current;
-      var el = q('#top-subject');
-      if (el && cur) el.textContent = cur;
+      renderSpaces();
     } catch (e) {
       state.subjects = { current: '全部', items: [] };
     }
@@ -478,6 +496,7 @@
 
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
+    renderSpaces();
     renderTop();
     renderRail();
     var isChat = state.view === 'chat';
@@ -497,7 +516,10 @@
 
   function renderTop() {
     var el = q('#top-subject');
-    if (state.conversation && state.conversation.subject) el.textContent = state.conversation.subject;
+    if (!el) return;
+    var cur = (state.subjects && state.subjects.current)
+      || (state.conversation && state.conversation.subject);
+    if (cur) el.textContent = cur;
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
@@ -998,6 +1020,12 @@ function typesetMath(el) {
     liveEls(m);
   }
 
+  var SUBJECT_ICON = {
+    '全部': 'circle-dot', '语文': 'book-open-text', '数学': 'sigma', '英语': 'languages',
+    '物理': 'atom', '化学': 'flask-conical', '生物': 'leaf', '政治': 'landmark',
+    '历史': 'book', '地理': 'globe'
+  };
+
   var CJK_CH = /[\u4e00-\u9fff\u3400-\u4dbf]/;
   var CJK_PUNCT = /[\u3000-\u303f\uff01-\uff20\uff3b-\uff40\uff5b-\uff65]/;
 
@@ -1285,13 +1313,19 @@ function typesetMath(el) {
     if (name === old) { state.overlay = null; render(); return; }
     var st = q('#stream');
     if (st) state.subjectScroll[old] = st.scrollTop;
+    var r;
     try {
-      await api('/subject', { method: 'PATCH', json: { subject: name } });
+      r = await api('/subject', { method: 'PATCH', json: { subject: name } });
     } catch (e) {
       toast('切换失败：' + e.message);
       return;
     }
     state.overlay = null;
+    if (r) {
+      state.conversation = {
+        id: r.conversation_id, subject: name, message_count: r.message_count
+      };
+    }
     state.messages = [];
     state.liveMsg = null;
     state.msgState = 'loading';
