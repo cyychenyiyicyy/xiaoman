@@ -202,11 +202,41 @@ def check_api(run: Run) -> None:
     run.results[-1].ms = run.results[-1].ms or int((time.perf_counter() - started) * 1000)
 
 
+def check_catalog(run: Run) -> None:
+    """models.dev 目录：内置平台清单 / 元数据命中 / 未收录必须 404。"""
+    from app.services import catalog
+
+    started = time.perf_counter()
+    try:
+        src = catalog.sources({})
+        run.add(
+            "catalog.presets",
+            "PASS" if len(src) >= 10 and all(s.get("base_url") for s in src) else "FAIL",
+            f"{len(src)} 个内置平台",
+        )
+        meta = catalog.lookup("deepseek", "deepseek-v4-flash")
+        ok = bool(meta) and meta["context"] > 0 and meta["tools"] and meta["images"]
+        run.add(
+            "catalog.lookup",
+            "PASS" if ok else "FAIL",
+            json.dumps(meta, ensure_ascii=False)[:160] if meta else "查不到",
+        )
+        miss = catalog.lookup("deepseek", "__verify_not_exist__")
+        run.add(
+            "catalog.miss",
+            "PASS" if miss is None else "FAIL",
+            "未收录应返回 None",
+        )
+    except Exception as exc:  # noqa: BLE001
+        run.add("catalog", "FAIL", f"{type(exc).__name__}: {exc}"[:300])
+    run.results[-1].ms = int((time.perf_counter() - started) * 1000)
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", default="schema,migration,api")
+    parser.add_argument("--only", default="schema,migration,api,catalog")
     parser.add_argument("--selftest", action="store_true", help="注入一个假失败，验证脚本会 exit 1")
     parser.add_argument("--destructive", action="store_true")
     args = parser.parse_args()
@@ -225,6 +255,8 @@ def main() -> int:
         check_migration(run, args.destructive)
     if "api" in selected:
         check_api(run)
+    if "catalog" in selected:
+        check_catalog(run)
     for name in ("fsrs", "export"):
         if name in selected:
             run.add(name, "SKIP", "MVP 未实现（M2 / M3 末）")

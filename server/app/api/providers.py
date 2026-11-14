@@ -9,6 +9,7 @@ from ..db import get_db
 from ..models import LLMModel, LLMProvider
 from ..schemas import ModelOut, ModelPatch, ProviderIn, ProviderOut, ProviderPatch
 from ..seed import get_current, set_current
+from ..services import catalog
 from ..services.llm import fetch_models
 
 router = APIRouter(tags=["providers"])
@@ -27,6 +28,7 @@ def _out(db: Session, p: LLMProvider) -> ProviderOut:
         api_key_tail=p.api_key_tail,
         connected=p.connected,
         kind=p.kind,
+        catalog_id=p.catalog_id,
         model_count=int(count or 0),
     )
 
@@ -41,17 +43,20 @@ def list_providers(db: Session = Depends(get_db)):
 
 @router.post("/providers", response_model=ProviderOut, status_code=201)
 def create_provider(payload: ProviderIn, db: Session = Depends(get_db)):
-    base = payload.base_url.strip().rstrip("/")
+    preset = catalog.PRESET_BY_ID.get(payload.catalog_id or "")
+    base = payload.base_url.strip().rstrip("/") or (preset["base_url"] if preset else "")
+    name = payload.name.strip() or (preset["name"] if preset else "")
     if payload.api_style == "openai" and not base.startswith(("http://", "https://", "mock://")):
         raise HTTPException(400, "base_url 必须以 http(s):// 开头")
     provider = LLMProvider(
-        name=payload.name.strip(),
+        name=name,
         base_url=base,
         api_style=payload.api_style,
         api_key=payload.api_key.strip(),
         api_key_tail=payload.api_key.strip()[-4:] if len(payload.api_key.strip()) >= 8 else "",
         connected=False,
         kind="custom",
+        catalog_id=(preset["catalog_id"] if preset else ""),
         sort=0,
     )
     db.add(provider)
@@ -150,33 +155,60 @@ async def sync_models(pid: str, db: Session = Depends(get_db)):
         for m in db.scalars(select(LLMModel).where(LLMModel.provider_id == provider.id)).all()
     }
     added = 0
+    enriched = 0
     for idx, item in enumerate(items):
         key = item["id"]
         row = existing.get(key)
+        meta = catalog.lookup(provider.catalog_id, key)  # 没有 catalog_id 也会跨平台兜底
         guess_vision = any(h in key.lower() for h in VISION_HINTS)
         guess_think = any(h in key.lower() for h in THINK_HINTS)
         if row is None:
-            db.add(
-                LLMModel(
+            if meta:
+                row = LLMModel(
+                    provider_id=provider.id,
+                    model_key=key,
+                    display_name=meta["name"] or key,
+                    context_len=meta["context"],
+                    output_len=meta["output"],
+                    supports_images=meta["images"],
+                    supports_thinking=meta["reasoning"],
+                    supports_tools=meta["tools"],
+                    meta_source="catalog",
+                    enabled=True,
+                    sort=idx,
+                )
+                enriched += 1
+            else:
+                row = LLMModel(
                     provider_id=provider.id,
                     model_key=key,
                     display_name=key,
                     context_len=int(item.get("context_length") or 0),
                     supports_images=bool(item.get("images") or guess_vision),
                     supports_thinking=bool(item.get("thinking") or guess_think),
+                    meta_source="guess",
                     enabled=True,
                     sort=idx,
                 )
-            )
+            db.add(row)
             added += 1
-        else:
-            if item.get("context_length") and not row.context_len:
+            continue
+        # 已有行：用户手改过的永不覆盖
+        if row.meta_source != "manual":
+            if meta:
+                row.context_len = meta["context"] or row.context_len
+                row.output_len = meta["output"] or row.output_len
+                row.supports_images = meta["images"]
+                row.supports_tools = meta["tools"]
+                row.supports_thinking = meta["reasoning"]
+                row.meta_source = "catalog"
+            elif item.get("context_length") and not row.context_len:
                 row.context_len = int(item["context_length"])
-            row.sort = idx
+        row.sort = idx
     db.commit()
     total = db.scalar(select(func.count()).select_from(LLMModel).where(LLMModel.provider_id == provider.id))
     _repair_current(db)
-    return {"added": added, "total": int(total or 0)}
+    return {"added": added, "total": int(total or 0), "enriched": enriched}
 
 
 @router.get("/models", response_model=list[ModelOut])
@@ -187,13 +219,26 @@ def list_models(provider_id: str | None = None, db: Session = Depends(get_db)):
     return db.scalars(stmt).all()
 
 
+META_FIELDS = {
+    "display_name",
+    "context_len",
+    "output_len",
+    "supports_images",
+    "supports_thinking",
+    "supports_tools",
+}
+
+
 @router.patch("/models/{mid}", response_model=ModelOut)
 def patch_model(mid: str, payload: ModelPatch, db: Session = Depends(get_db)):
     row = db.get(LLMModel, mid)
     if row is None:
         raise HTTPException(404, "模型不存在")
-    for field, value in payload.model_dump(exclude_none=True).items():
+    data = payload.model_dump(exclude_none=True)
+    for field, value in data.items():
         setattr(row, field, value)
+    if META_FIELDS & set(data):
+        row.meta_source = "manual"  # 用户手改过，之后 sync 不再覆盖
     db.commit()
     db.refresh(row)
     return row

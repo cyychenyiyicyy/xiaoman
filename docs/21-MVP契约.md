@@ -174,3 +174,83 @@ cd server
 首次启动会 seed 一个**内置演示模型**（不需要 API Key），用来验证流式、图片、上下文。
 接真模型：点输入框左上角胶囊 → 模型管理 → 添加 OpenAI 兼容端点（`baseUrl` + `API Key`）。
 `baseUrl` 要带版本段，例如 DeepSeek 填 `https://api.deepseek.com/v1`。
+---
+
+## 9. 扩展 v2（2026-11-14 晚：流式渐显 + 模型目录）
+
+### 9.1 新增/变更字段
+
+| 表.列 | 类型 | 说明 |
+|---|---|---|
+| `llm_provider.catalog_id` | TEXT default `''` | 对应 models.dev 的 provider id（`deepseek` / `alibaba-cn` …），空 = 自定义 |
+| `llm_model.supports_tools` | BOOL default false | 是否支持**工具调用** |
+| `llm_model.meta_source` | TEXT default `''` | `catalog`（models.dev 自动填）/ `guess`（按名字猜）/ `manual`（用户改过） |
+
+### 9.2 目录接口
+
+**`GET /api/v1/catalog`** → 内置平台清单（含连接状态）
+```json
+{"sources":[
+  {"catalog_id":"deepseek","name":"DeepSeek","group":"国内",
+   "base_url":"https://api.deepseek.com/v1","api_style":"openai",
+   "doc":"https://api-docs.deepseek.com/quick_start/pricing",
+   "model_count":4,"connected":true,"provider_id":"…"}
+]}
+```
+`group` 只有两值：`国内` / `海外`。
+
+**`GET /api/v1/catalog/models?catalog_id=deepseek`** → 该平台的模型清单（来自 models.dev）
+```json
+{"models":[{"key":"deepseek-v4-flash","name":"DeepSeek V4.1 Flash",
+  "context":1048576,"output":393216,
+  "images":true,"tools":true,"reasoning":true}]}
+```
+
+**`GET /api/v1/catalog/lookup?catalog_id=deepseek&model_key=deepseek-v4-flash`**
+→ `{context, output, images, tools, reasoning, name}`；查不到返回 **404**（前端据此要求手填）。
+
+**`POST /api/v1/providers`** 新增可选字段 `catalog_id`。
+**`POST /api/v1/providers/{id}/sync-models`** 返回值新增 `enriched`（本次由目录自动填充的模型数）。
+
+**`PATCH /api/v1/models/{id}`** 新增可改字段 `supports_tools`；任何 PATCH 都把 `meta_source` 置为 `manual`。
+**`GET /api/v1/models`** 每项新增 `supports_tools`、`meta_source`、`output_len`。
+
+### 9.3 界面规格（按 skill 规范）
+
+**A. 流式渐显**
+
+| 项 | 规则 |
+|---|---|
+| 节奏 | 用 `requestAnimationFrame` 队列匀速揭示，**不是**收到多少就画多少。基准 ~55 字/秒；积压每多 40 字，速率 +25%，保证不落后于真实流 |
+| 渐显 | 新揭示的**词**包进 `<span class="sw">`，`animation: swfade .28s ease-out both`；`from{opacity:0;transform:translateY(1px)}` `to{opacity:1;transform:none}` |
+| 结构 | 已完成的段落渲染成 Markdown 放进 `.stable`；正在流的尾段放 `.live`（纯文本 + 词 span），段末（`\n\n`）时提交进 `.stable` |
+| 收尾 | `done` 时一次渲染完整 Markdown，移除 streaming 标记 |
+| 光标 | 流式期间尾段后跟一个 `.caret`（2×18px，`--clay`，`steps(2)` 闪烁），结束后移除 |
+
+**B. 模型管理页**
+
+三段结构，沿用 `sgroup / scard / srow`：
+
+```
+已连接        → 每个 provider 一行（模型数 + chevron）
+内置平台      → 两小分节「国内」「海外」，每行 = 平台名 + 「连接 ›」
+自定义        → 添加 OpenAI 兼容端点
+```
+- 未连接平台**不列模型**（AGENTS §3.4）；
+- 已内置的平台点「连接」→ 表单只要求 **API Key**（名称/端点已预填，可改）。
+
+**C. provider 详情 / 模型行**
+
+模型行改为可点：右侧显示 `context`（`1M` / `128K`，tabular），点开 **模型设置 sheet**：
+- 显示名（input）
+- 上下文长度（input，数字，单位 K）
+- 多模态 / 工具调用 / 思考 三个 **switch**
+- 底部一行说明来源：`models.dev` 或 `手填`
+- 目录未收录时，四个字段为空并给一行 `未收录，请手动填写`（`ink3`，不是解释性副标题，是状态）
+
+**D. 新增端点表单（含元数据）**
+
+字段：名称 / 端点 / API Key / 显示名 / 上下文长度 / 多模态 / 工具调用 / 思考。
+- 前四项必填校验；后四项可选，**留空则等 sync 后由目录补**；
+- 保存后自动 `sync-models`，若 `enriched > 0` 给 toast `已从 models.dev 填充 N 个模型`；
+- 保存是唯一 filled 按钮，取消为 outlined。

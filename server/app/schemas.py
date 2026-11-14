@@ -9,6 +9,7 @@ class ProviderIn(BaseModel):
     base_url: str = ""
     api_key: str = ""
     api_style: str = "openai"
+    catalog_id: str = ""
 
 
 class ProviderPatch(BaseModel):
@@ -29,6 +30,7 @@ class ProviderOut(BaseModel):
     api_key_tail: str
     connected: bool
     kind: str
+    catalog_id: str = ""
     model_count: int = 0
 
 
@@ -40,16 +42,21 @@ class ModelOut(BaseModel):
     model_key: str
     display_name: str
     context_len: int
+    output_len: int = 0
     supports_images: bool
     supports_thinking: bool
+    supports_tools: bool = False
+    meta_source: str = ""
     enabled: bool
 
 
 class ModelPatch(BaseModel):
     display_name: str | None = None
     context_len: int | None = None
+    output_len: int | None = None
     supports_images: bool | None = None
     supports_thinking: bool | None = None
+    supports_tools: bool | None = None
     enabled: bool | None = None
 
 
