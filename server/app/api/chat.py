@@ -132,6 +132,41 @@ def cache_stats(limit: int = 20, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/overview/today")
+def overview_today(db: Session = Depends(get_db)):
+    """「今天」空间：各科最近聊到哪 + 消息数（不是聊天，是首页概览）。"""
+    items = []
+    total = 0
+    for name in spaces.SUBJECTS:
+        if name == "全部":
+            continue
+        conv = db.scalar(select(Conversation).where(Conversation.subject == name).limit(1))
+        if conv is None:
+            continue
+        count = db.scalar(
+            select(func.count()).select_from(Message).where(Message.conversation_id == conv.id)
+        ) or 0
+        total += int(count)
+        last = db.scalar(
+            select(Message)
+            .where(Message.conversation_id == conv.id)
+            .order_by(Message.seq.desc())
+            .limit(1)
+        )
+        text = (last.content_md if last else "") or ""
+        items.append(
+            {
+                "subject": name,
+                "count": int(count),
+                "last_text": " ".join(text.split())[:80],
+                "last_at": last.created_at.isoformat() if last and last.created_at else None,
+                "last_role": last.role if last else None,
+            }
+        )
+    items.sort(key=lambda x: (x["last_at"] is None, x["last_at"] or ""), reverse=True)
+    return {"total": total, "items": items}
+
+
 @router.get("/messages")
 def list_messages(before: str | None = None, limit: int = 50, db: Session = Depends(get_db)):
     conv = _conversation(db)

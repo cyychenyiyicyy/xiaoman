@@ -340,13 +340,49 @@
     })[0] || null;
   }
 
+  function isToday() {
+    return ((state.subjects && state.subjects.current) || '全部') === '全部';
+  }
+
+  function todayLabel(name) { return name === '全部' ? '今天' : name; }
+
+  async function loadToday() {
+    try { state.today = await api('/overview/today'); }
+    catch (e) { state.today = { total: 0, items: [] }; }
+  }
+
+  function todayHtml() {
+    var t = state.today || { total: 0, items: [] };
+    var d = new Date();
+    var date = (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+    var active = (t.items || []).filter(function (x) { return x.count > 0; });
+    var lead = active.length
+      ? '今天 ' + date + '。你在 ' + active.length + ' 个科目里聊了 ' + t.total + ' 条。'
+      : '今天 ' + date + '。还没开始，从哪一科都行。';
+    var cards = active.map(function (it) {
+      return '<button type="button" class="tcard" data-act="switch-subject" data-subject="' + esc(it.subject) + '">' +
+        '<span class="ti">' + ic(SUBJECT_ICON[it.subject] || 'circle-dot', 'md') + '</span>' +
+        '<span class="tb"><span class="tn">' + esc(it.subject) + '</span>' +
+        '<span class="tt">' + esc(it.last_text || '') + '</span></span>' +
+        '<span class="tr"><span class="tc">' + numWrap(it.count) + '</span>' +
+        ic('chevron-right', 'sm chev') + '</span></button>';
+    }).join('');
+    var empty = active.length ? '' :
+      '<div class="empty">' + ic('sun') + '<div class="t">今天还没开始</div>' +
+      '<button type="button" class="btn" data-act="switch-subject" data-subject="物理">从物理开始</button></div>';
+    return '<div class="col"><div class="today">' +
+      '<div class="theader"><div class="tgreet">' + esc(lead) + '</div></div>' +
+      (cards ? '<div class="tlist">' + cards + '</div>' : empty) +
+      '</div></div>';
+  }
+
   function renderSpaces() {
     var host = q('#spaces');
     if (!host) return;
     var su = state.subjects || { current: '全部', items: [] };
     var cur = su.current || '全部';
     var label = q('#top-subject');
-    if (label) label.textContent = cur;
+    if (label) label.textContent = todayLabel(cur);
     var items = su.items && su.items.length ? su.items : [{ subject: cur, count: 0 }];
     host.innerHTML = '<div class="stitle">学习空间</div>' +
       items.map(function (it) {
@@ -354,8 +390,8 @@
         return '<button type="button" class="space' + (on ? ' on' : '') + '" data-act="switch-subject" data-subject="' +
           esc(it.subject) + '"' + (on ? ' aria-current="true"' : '') + '>' +
           ic(SUBJECT_ICON[it.subject] || 'circle-dot', 'sm') +
-          '<span class="n">' + esc(it.subject) + '</span>' +
-          (it.count ? '<span class="c">' + numWrap(it.count) + '</span>' : '') +
+          '<span class="n">' + esc(todayLabel(it.subject)) + '</span>' +
+          (it.subject === '全部' ? '' : (it.count ? '<span class="c">' + numWrap(it.count) + '</span>' : '')) +
           '</button>';
       }).join('');
   }
@@ -485,7 +521,7 @@
     state.catalog = null;
     state.catalogState = 'loading';
     state.msgState = 'loading';
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
     render();
     if (state.settings && state.settings.provider_id != null) {
       await loadModelsFor(state.settings.provider_id);
@@ -497,6 +533,8 @@
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
     renderSpaces();
+    var sp = q('#spaces');
+    if (sp) sp.hidden = state.view !== 'chat';
     renderTop();
     renderRail();
     var isChat = state.view === 'chat';
@@ -519,7 +557,7 @@
     if (!el) return;
     var cur = (state.subjects && state.subjects.current)
       || (state.conversation && state.conversation.subject);
-    if (cur) el.textContent = cur;
+    if (cur) el.textContent = todayLabel(cur);
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
@@ -630,6 +668,13 @@
 
   function renderStream(force) {
     var el = q('#stream');
+    if (isToday()) {
+      document.body.classList.add('today');
+      el.innerHTML = todayHtml();
+      el.setAttribute('aria-busy', 'false');
+      return;
+    }
+    document.body.classList.remove('today');
     var prev = el.scrollTop;
     el.setAttribute('aria-busy', state.msgState === 'loading' ? 'true' : 'false');
 
@@ -1021,7 +1066,7 @@ function typesetMath(el) {
   }
 
   var SUBJECT_ICON = {
-    '全部': 'circle-dot', '语文': 'book-open-text', '数学': 'sigma', '英语': 'languages',
+    '全部': 'sun', '语文': 'book-open-text', '数学': 'sigma', '英语': 'languages',
     '物理': 'atom', '化学': 'flask-conical', '生物': 'leaf', '政治': 'landmark',
     '历史': 'book', '地理': 'globe'
   };
@@ -1295,7 +1340,7 @@ function typesetMath(el) {
       var on = it.subject === cur;
       return '<button type="button" class="mrow' + (on ? ' on' : '') + '" data-act="switch-subject" data-subject="' +
         esc(it.subject) + '"><span class="nm">' + esc(it.subject) + '</span>' +
-        (it.count ? '<span class="cnt">' + numWrap(it.count) + '</span>' : '') +
+        (it.subject === '全部' ? '' : (it.count ? '<span class="cnt">' + numWrap(it.count) + '</span>' : '')) +
         (on ? '<span class="chk">' + ic('check', 'sm') + '</span>' : '<span class="chk"></span>') +
         '</button>';
     }).join('');
@@ -1329,7 +1374,7 @@ function typesetMath(el) {
     state.messages = [];
     state.liveMsg = null;
     state.msgState = 'loading';
-    await Promise.all([loadSubjects(), loadMessages()]);
+    await Promise.all([loadSubjects(), loadMessages(), loadToday()]);
     render();
     var s2 = q('#stream');
     if (s2) s2.scrollTop = state.subjectScroll[name] || s2.scrollHeight;
@@ -2788,7 +2833,7 @@ function typesetMath(el) {
     autosize();
     render();
 
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
     render();
 
     if (state.settings && state.settings.provider_id != null) {
