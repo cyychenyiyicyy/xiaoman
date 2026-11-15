@@ -167,7 +167,22 @@ def tool_question_add(payload: QAddIn, db: Session = Depends(get_db)):
     fp = _q_fp(payload.stem)
     existing = db.scalar(select(Question).where(Question.stem_fp == fp))
     if existing is not None:
-        return {"item": _q_out(existing), "already": True}
+        filled = False
+        if (payload.answer or "").strip() and not (existing.answer_md or "").strip():
+            existing.answer_md = payload.answer.strip()
+            filled = True
+        if payload.options and not (existing.options or []):
+            existing.options = payload.options
+            filled = True
+        if filled:
+            db.commit()
+            db.refresh(existing)
+        return {
+            "item": _q_out(existing),
+            "already": True,
+            "filled_answer": filled,
+            "hint": "题库已有这道题" + ("，答案刚补上" if filled else "；若答案仍为空，用 question_update 补"),
+        }
 
     q = Question(
         id=_uuid.uuid4().hex,

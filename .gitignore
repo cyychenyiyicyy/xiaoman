@@ -33,9 +33,12 @@ server/.pytest_cache/
 
 # Pi 网关（依赖与运行期）
 agent/node_modules/
-agent/.pi-home/
+agent/.pi-home/*
+!agent/.pi-home/skills/
+!agent/.pi-home/skills/**
 agent/.pi-sessions/
 
 agent/.pi-probe/
 agent/probe*.mjs
+
 

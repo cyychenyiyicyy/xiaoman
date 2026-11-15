@@ -220,6 +220,7 @@ async def _relay_gateway(
     thinking: str,
     subject: str,
     image_paths: list[str] | None = None,
+    question_sources: list[dict] | None = None,
 ) -> AsyncIterator[str]:
     """PI_GATEWAY 开着时：流由 Pi 产出，消息仍落我们的库。"""
     gateway = settings.pi_gateway.rstrip("/")
@@ -233,9 +234,12 @@ async def _relay_gateway(
             "thinking": thinking,
         }
     )
+    for _qs in question_sources or []:
+        yield _sse({"type": "source", "item": _qs})
+
     text_parts: list[str] = []
     reason_parts: list[str] = []
-    sources: list[dict] = []
+    sources: list[dict] = list(question_sources or [])
     tools: list[str] = []
     usage: dict = {}
     remembered: list[dict] = []
@@ -401,6 +405,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 "type": q.qtype,
                 "stem": q.stem_md,
                 "options": q.options or [],
+                "answer": q.answer_md or "",
+                "subject": q.subject,
                 "image": q.stem_preview_png or "",
             }
         )
@@ -492,6 +498,16 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             thinking, conv.subject,
             image_paths=[a.path for a in attachments]
             + [qr["image"] for qr in question_refs if qr.get("image")],
+            question_sources=[
+                {
+                    "type": "question",
+                    "id": qr["id"],
+                    "title": qr["stem"],
+                    "subject": qr.get("subject", ""),
+                    "answer": qr.get("answer", ""),
+                }
+                for qr in question_refs
+            ],
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

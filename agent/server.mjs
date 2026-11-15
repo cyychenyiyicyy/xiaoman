@@ -4,7 +4,7 @@
 import { createAgentSession, DefaultResourceLoader, defineTool, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,12 +22,32 @@ mkdirSync(SESS_DIR, { recursive: true });
 
 const SUBJECTS = ["全部", "语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"];
 
+// 把 .pi-home/skills/*/SKILL.md 正文拼进人设：我们的工具白名单挡掉了 Pi 的 skill 触发，
+// 直接注入保证「讲题 → 查库 → 补答案」这套流程一定生效
+function loadSkills() {
+  var dir = resolve(AGENT_DIR, "skills");
+  if (!existsSync(dir)) return "";
+  var out = [];
+  for (const name of readdirSync(dir)) {
+    const f = resolve(dir, name, "SKILL.md");
+    if (!existsSync(f)) continue;
+    const raw = readFileSync(f, "utf8");
+    const body = raw.replace(/^---[\s\S]*?---\s*/, "").trim();
+    if (body) out.push(`## 技能：${name}\n${body}`);
+  }
+  return out.length ? "\n\n" + out.join("\n\n") : "";
+}
+
 function xiaomanPrompt(subject) {
   const d = new Date();
   const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
   return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
 
 今天是 ${today}。当前学科空间：${subject || "全部"}。
+
+硬规则（讲题）：凡是被问「这题怎么做 / 为什么 / 对不对」，第一件事必须调用 question_search；
+题库没有这道题就用 question_add（连答案一起写）；题库有但答案是空的就用 question_update 补上。
+补完才回答。不要问她「要不要收进题库」，直接做。
 
 说话方式：
 - 短。一条回复一般不超过 4 行；要展开时先给结论，再给细节。
@@ -38,7 +58,8 @@ function xiaomanPrompt(subject) {
 
 你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）。
 不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
-她问「记住…」时，用 memory_add 记下来再简短确认。`;
+她问「记住…」时，用 memory_add 记下来再简短确认。
+回答题目时按下面 answer-question 技能的流程做：先 question_search，缺题就 question_add（连答案一起写），答案空着就 question_update 补上，再讲解析。` + loadSkills();
 }
 
 function writeModels() {
@@ -98,12 +119,13 @@ function cardsText(result, limit = 2000) {
 
 // 每个请求一份收集器：工具来源 / 新记忆
 function makeTools(collect) {
-  const wrap = (name, label, description, parameters, run) =>
+  const wrap = (name, label, description, parameters, run, extra) =>
     defineTool({
       name,
       label,
       description,
       parameters,
+      ...(extra || {}),
       async execute(_id, params) {
         const result = await run(params);
         if (Array.isArray(result.sources)) {
@@ -172,7 +194,8 @@ function makeTools(collect) {
           query: p.query || "",
           subject: p.subject || "",
           limit: Math.min(10, Math.max(1, p.limit || 5)),
-        })
+        }),
+      { promptGuidelines: ["回答任何题目之前，先调用 question_search 确认题库里有没有这道题。"] }
     ),
     wrap(
       "question_add",
@@ -196,7 +219,8 @@ function makeTools(collect) {
           answer: p.answer || "",
           options: p.options || [],
           qtype: p.qtype || "short",
-        })
+        }),
+      { promptGuidelines: ["答案算出来后必须写进题库，不要问用户是否要收录。"] }
     ),
     wrap(
       "question_update",
@@ -210,7 +234,8 @@ function makeTools(collect) {
         subject: Type.Optional(Type.String()),
         qtype: Type.Optional(Type.String()),
       }),
-      (p) => callTool("/internal/tools/question_update", p)
+      (p) => callTool("/internal/tools/question_update", p),
+      { promptGuidelines: ["题库里已有题目但答案为空或题干有错时，直接改，不要询问。"] }
     ),
     wrap(
       "web_search",

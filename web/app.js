@@ -1699,6 +1699,7 @@
     var body = [];
     var ms = 0;
     var tools = 0;
+    var toolNames = [];
     (m.parts || []).forEach(function (p) {
       if (!p || !p.type) return;
       if (p.type === 'reasoning') {
@@ -1707,9 +1708,19 @@
           renderMarkdown(p.text || '') + '</div></div>');
       } else if (p.type === 'tool') {
         tools += 1;
+        toolNames.push(p.name || '');
         var q = (p.queries && p.queries.length) ? '「' + p.queries.join('、') + '」' : '';
-        var tname = p.name === 'memory_search' ? '检索记忆' : '联网搜索';
-        var ticon = p.name === 'memory_search' ? 'database' : 'search';
+        var TOOL_LABEL = {
+          memory_search: ['检索记忆', 'database'], memory_add: ['记住', 'database'],
+          memory_update: ['修正记忆', 'database'], memory_delete: ['忘掉', 'database'],
+          web_search: ['联网搜索', 'search'],
+          question_search: ['查题库', 'book-open-text'],
+          question_add: ['收进题库', 'book-open-text'],
+          question_update: ['改题库', 'book-open-text']
+        };
+        var tl = TOOL_LABEL[p.name] || [p.name, 'search'];
+        var tname = tl[0];
+        var ticon = tl[1];
         body.push('<button type="button" class="tstep tstep-tool" data-act="open-sources" data-key="' +
           esc(m._key) + '">' + ic(ticon, 'sm') +
           '<span class="tstep-l">' + tname + '</span>' +
@@ -1731,7 +1742,17 @@
     if (!body.length) return '';
     var head = [];
     head.push(totalMs ? '思考 ' + stepSecs(totalMs) : (tools ? '调用工具' : '记忆'));
-    if (tools) head.push('搜索 ' + tools + ' 次');
+    if (tools) {
+      var cat = { question: 0, web: 0, memory: 0 };
+      toolNames.forEach(function (n) {
+        if (n.indexOf('question_') === 0) cat.question += 1;
+        else if (n === 'web_search') cat.web += 1;
+        else if (n.indexOf('memory_') === 0) cat.memory += 1;
+      });
+      var kinds = Object.keys(cat).filter(function (k) { return cat[k]; });
+      var label = kinds.length === 1 ? (kinds[0] === 'question' ? '查题库' : kinds[0] === 'web' ? '搜索' : '查记忆') : '工具';
+      head.push(label + ' ' + tools + ' 次');
+    }
     if (rem.length) head.push('记忆 +' + rem.length);
     return '<details class="tgroup">' +
       '<summary class="tgsum">' + ic('zap', 'sm') +
@@ -1785,8 +1806,10 @@
   function sourceLineHtml(m) {
     var mem = srcCount(m, 'memory');
     var web = srcCount(m, 'web');
-    if (!mem && !web) return '';
+    var qn = srcCount(m, 'question');
+    if (!mem && !web && !qn) return '';
     var parts = [];
+    if (qn) parts.push(ic('book-open-text', 'sm') + '题库 ' + numWrap(qn) + ' 题');
     if (mem) parts.push(ic('database', 'sm') + '根据 ' + numWrap(mem) + ' 条记忆');
     if (web) parts.push(ic('globe', 'sm') + '参考 ' + numWrap(web) + ' 个网页');
     return '<button type="button" class="srcline" data-act="open-sources" data-key="' + esc(m._key) + '">' +
@@ -2313,7 +2336,17 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     var m = findMessageByKey(o.key);
     var mem = m ? (m.sources || []).filter(function (s) { return s && s.type === 'memory'; }) : [];
     var web = m ? (m.sources || []).filter(function (s) { return s && s.type === 'web'; }) : [];
+    var qs = m ? (m.sources || []).filter(function (s) { return s && s.type === 'question'; }) : [];
     var body = '';
+    if (qs.length) {
+      body += '<div class="slabel">题库 · ' + qs.length + '</div><div class="scard">' +
+        qs.map(function (s) {
+          return '<button type="button" class="srow srowq" data-act="qsrc-open" data-id="' + esc(s.id || '') + '">' +
+            '<span class="md"><span class="n1">' + esc((s.title || '').slice(0, 60)) + '</span>' +
+            '<span class="n2">' + esc(s.subject || '') + '</span></span>' +
+            ic('chevron-right', 'sm chev') + '</button>';
+        }).join('') + '</div>';
+    }
     if (mem.length) {
       body += '<div class="slabel">记忆 · ' + mem.length + '</div><div class="scard">' +
         mem.map(function (s) {
@@ -3697,6 +3730,12 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
     'cap-add': function () { captureAddToChat(); },
     'open-qrefs': function () { openQrefs(state.pendingQuestions || [], true); },
+    'qsrc-open': function (el) {
+      var id = el.getAttribute('data-id');
+      if (!id) return;
+      state.overlay = null;
+      openQuestionPanel(id);
+    },
     'open-qrefs-msg': function (el) {
       var key = el.getAttribute('data-key');
       var m = (state.messages || []).filter(function (x) { return x._key === key; })[0];
