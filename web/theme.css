@@ -987,3 +987,23 @@ body.today .composer,body.today #to-bottom{display:none}
 .pickstem{font-size:var(--s5);color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
 .pickmeta{font-size:var(--s6);color:var(--ink3)}
+
+
+/* ── 对话内题目：右侧面板（不跳页）────────────────── */
+.qpanel{position:fixed;inset:0;z-index:60;pointer-events:none}
+.qpanel[hidden]{display:none}
+.qpanel-scrim{position:absolute;inset:0;background:color-mix(in srgb, var(--ink) 7%, transparent);
+  pointer-events:auto;animation:fadein .16s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.qpanel-body{position:absolute;top:0;right:0;bottom:0;width:min(460px,92vw);
+  background:var(--card);border-left:1px solid var(--line);display:flex;flex-direction:column;
+  pointer-events:auto;animation:slidein .18s ease;box-shadow:-8px 0 28px rgba(0,0,0,.18)}
+@keyframes slidein{from{transform:translateX(24px);opacity:.6}to{transform:none;opacity:1}}
+.qp-head{display:flex;align-items:center;gap:var(--q2);padding:var(--q3) var(--q3) var(--q3) var(--q4);
+  border-bottom:1px solid var(--line);flex:none}
+.qp-head .tbox{flex:1;min-width:0}
+.qp-head .ttl{font-size:var(--s3);color:var(--ink)}
+.qp-head .sub{font-size:var(--s6);color:var(--ink3);margin-top:2px}
+.qp-scroll{flex:1;min-height:0;overflow-y:auto;padding:var(--q3) var(--q4) var(--q4)}
+.qp-foot{flex:none;border-top:1px solid var(--line);padding:var(--q3) var(--q4)}
+.qp-foot .btn{width:100%}

@@ -15,7 +15,8 @@
     captureQueue: [],        // 待复核的 task id 队列
     capturePending: [],      // 处理中/待复核的任务（角标用）
     bank: null,              // {items,total,subject,q}
-    question: null,          // 当前打开的题目详情
+    question: null,          // 当前打开的题目详情（整页）
+    qpanel: null,            // {id, data} 右侧题目面板
     pendingQuestions: [],    // 已选好、要随下一条消息发出的题目
     view: 'chat',            // chat | page
     page: null,              // {kind:'models'} | {kind:'provider',providerId} | {kind:'form',providerId}
@@ -784,8 +785,63 @@
       '</div>';
   }
 
+  async function openQuestionPanel(id) {
+    try {
+      var r = await api('/questions/' + encodeURIComponent(id));
+    } catch (e) {
+      toast('打开失败：' + e.message);
+      return;
+    }
+    state.qpanel = { id: id, data: r };
+    render();
+  }
+
+  function qpanelHtml() {
+    var pnl = state.qpanel;
+    if (!pnl || !pnl.data) return '';
+    var r = pnl.data;
+    var opts = (r.options || []).map(function (o) {
+      return '<div class="qopt">' + stemHtml(o) + '</div>';
+    }).join('');
+    var img = r.image_url ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">' : '';
+    var answer = r.answer_md ? '<div class="pbody"><div class="slabel">答案</div>' + escText(r.answer_md) + '</div>' : '';
+    return '<div class="qpanel-scrim" data-act="close-qpanel"></div>' +
+      '<div class="qpanel-body" role="dialog" aria-modal="false" aria-label="题目">' +
+        '<div class="qp-head">' +
+          '<div class="tbox"><div class="ttl">题目</div><div class="sub">' + esc(r.subject || '') + '</div></div>' +
+          '<button type="button" class="hit" data-act="close-qpanel" aria-label="关闭">' + ic('x') + '</button>' +
+        '</div>' +
+        '<div class="qp-scroll">' +
+          '<div class="qattach detail">' +
+            '<div class="tags"><span class="tag">' +
+              esc(r.qtype === 'choice' ? '选择题' : r.qtype === 'blank' ? '填空题' : '题目') +
+            '</span><span class="tag">' + esc(r.subject || '全部') + '</span></div>' +
+            '<div class="stem">' + stemHtml(r.stem_md || '') + '</div>' +
+            (opts ? '<div class="qopts">' + opts + '</div>' : '') +
+            answer +
+          '</div>' +
+          img +
+        '</div>' +
+        '<div class="qp-foot"><button type="button" class="btn p" data-act="qpanel-quote">引用该题</button></div>' +
+      '</div>';
+  }
+
+  function renderQpanel() {
+    var host = q('#qpanel');
+    if (!host) return;
+    if (!state.qpanel) {
+      host.hidden = true;
+      host.innerHTML = '';
+      return;
+    }
+    host.hidden = false;
+    host.innerHTML = qpanelHtml();
+    typesetMath(host);
+  }
+
   async function quoteQuestion(q) {
     if (!q) return;
+    state.qpanel = null;
     var ref = {
       id: q.id,
       number: '',
@@ -1136,6 +1192,7 @@
     try {
       state.subjects = await api('/subjects');
       renderSpaces();
+    renderQpanel();
     } catch (e) {
       state.subjects = { current: '全部', items: [] };
     }
@@ -1267,6 +1324,7 @@
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
+    if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();
       await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));
@@ -1275,7 +1333,7 @@
     if (location.hash.indexOf('#capture') === 0) {
       await loadMessages();
       openCapture();
-      var tid = location.hash.indexOf('#capture=') === 0 ? decodeURIComponent(location.hash.slice(9)) : '';
+      var tid = location.hash.indexOf('#capture=') === 0 ? decodeURIComponent(location.hash.slice(8)) : '';
       if (tid) {
         try {
           var ct = await api('/capture/tasks/' + encodeURIComponent(tid) + '?full=true');
@@ -1303,6 +1361,7 @@
   function render() {
     renderSpaces();
     renderQchips();
+    renderQpanel();
     var sp = q('#spaces');
     if (sp) sp.hidden = state.view !== 'chat';
     renderTop();
@@ -3553,7 +3612,15 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
     'rail-bank': function () { openBank(); },
-    'open-question': function (el) { openQuestionDetail(el.getAttribute('data-id')); },
+    'open-question': function (el) {
+      var id = el.getAttribute('data-id');
+      if (!state.page) openQuestionPanel(id);
+      else openQuestionDetail(id);
+    },
+    'close-qpanel': function () { state.qpanel = null; render(); },
+    'qpanel-quote': function () {
+      if (state.qpanel && state.qpanel.data) quoteQuestion(state.qpanel.data);
+    },
     'bank-filter': function (el) { bankFilter(el.getAttribute('data-subject') || ''); },
     'bank-search': function () { bankSearch(); },
     'bank-reload': function () { loadBank(); },
@@ -3701,6 +3768,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
+    if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();
       await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));
@@ -3709,7 +3777,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     if (location.hash.indexOf('#capture') === 0) {
       await loadMessages();
       openCapture();
-      var tid = location.hash.indexOf('#capture=') === 0 ? decodeURIComponent(location.hash.slice(9)) : '';
+      var tid = location.hash.indexOf('#capture=') === 0 ? decodeURIComponent(location.hash.slice(8)) : '';
       if (tid) {
         try {
           var ct = await api('/capture/tasks/' + encodeURIComponent(tid) + '?full=true');
