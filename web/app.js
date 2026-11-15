@@ -815,7 +815,8 @@
     var img = r.image_url
       ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">'
       : '';
-    var answer = r.answer_md ? '<div class="pbody"><div class="slabel">答案</div>' + escText(r.answer_md) + '</div>' : '';
+    var answer = '<div class="pbody"><div class="slabel">答案</div>' +
+      (r.answer_md ? escText(r.answer_md) : '<span class="noanswer">暂无</span>') + '</div>';
     return nav +
       '<div class="settings qdetail">' +
         '<div class="qattach detail">' +
@@ -851,7 +852,8 @@
       return '<div class="qopt">' + stemHtml(o) + '</div>';
     }).join('');
     var img = r.image_url ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">' : '';
-    var answer = r.answer_md ? '<div class="pbody"><div class="slabel">答案</div>' + escText(r.answer_md) + '</div>' : '';
+    var answer = '<div class="pbody"><div class="slabel">答案</div>' +
+      (r.answer_md ? escText(r.answer_md) : '<span class="noanswer">暂无</span>') + '</div>';
     return '<div class="qpanel-scrim" data-act="close-qpanel"></div>' +
       '<div class="qpanel-body" role="dialog" aria-modal="false" aria-label="题目">' +
         '<div class="qp-head">' +

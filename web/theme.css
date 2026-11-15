@@ -1041,3 +1041,6 @@ body.today .composer,body.today #to-bottom{display:none}
 .ubx .qstacksum{box-sizing:border-box;width:100%}
 .qss-go{white-space:nowrap}
 .qstacksum .qss-l{min-width:0}
+
+
+.noanswer{color:var(--ink3);font-size:var(--s6)}

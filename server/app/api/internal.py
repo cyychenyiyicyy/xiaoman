@@ -95,3 +95,115 @@ async def tool_web_search(payload: SearchIn, db: Session = Depends(get_db)):
         key = row.api_key if row else ""
     items = await search_service.search(provider, key, payload.query, int(cfg.get("max_results") or 5))
     return {"items": items, "sources": _web_sources(items)}
+
+# ── 题库工具（给 Pi 用）────────────────────────────────
+
+import uuid as _uuid  # noqa: E402
+import hashlib as _hashlib  # noqa: E402
+import re as _re  # noqa: E402
+
+
+class QSearchIn(BaseModel):
+    query: str = ""
+    subject: str = ""
+    limit: int = 8
+
+
+class QAddIn(BaseModel):
+    subject: str = "全部"
+    stem: str
+    options: list[str] = []
+    answer: str = ""
+    qtype: str = "short"
+
+
+class QUpdateIn(BaseModel):
+    id: str
+    stem: str | None = None
+    options: list[str] | None = None
+    answer: str | None = None
+    subject: str | None = None
+    qtype: str | None = None
+
+
+def _q_fp(stem: str) -> str:
+    norm = _re.sub(r"\s+", "", stem or "")
+    norm = _re.sub(r"[$\\{}_^]", "", norm)
+    return _hashlib.sha1(norm[:48].encode()).hexdigest()
+
+
+def _q_out(q) -> dict:
+    return {
+        "id": q.id,
+        "subject": q.subject,
+        "type": q.qtype,
+        "stem": q.stem_md,
+        "options": q.options or [],
+        "answer": q.answer_md or "",
+        "source_page": q.source_page,
+        "created_at": q.created_at.isoformat() if q.created_at else None,
+        "image": f"/api/v1/questions/{q.id}/image" if q.stem_preview_png else "",
+    }
+
+
+@router.post("/internal/tools/question_search", dependencies=[Depends(guard)])
+def tool_question_search(payload: QSearchIn, db: Session = Depends(get_db)):
+    from ..models import Question
+
+    stmt = select(Question).order_by(Question.created_at.desc()).limit(max(1, min(payload.limit, 20)))
+    if payload.subject:
+        stmt = stmt.where(Question.subject == payload.subject)
+    if payload.query:
+        stmt = stmt.where(Question.stem_md.ilike(f"%{payload.query}%"))
+    rows = db.scalars(stmt).all()
+    items = [_q_out(q) for q in rows]
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/internal/tools/question_add", dependencies=[Depends(guard)])
+def tool_question_add(payload: QAddIn, db: Session = Depends(get_db)):
+    from ..models import Question
+
+    fp = _q_fp(payload.stem)
+    existing = db.scalar(select(Question).where(Question.stem_fp == fp))
+    if existing is not None:
+        return {"item": _q_out(existing), "already": True}
+
+    q = Question(
+        id=_uuid.uuid4().hex,
+        subject=(payload.subject or "全部")[:20],
+        stem_md=payload.stem.strip(),
+        answer_md=(payload.answer or "").strip(),
+        qtype=(payload.qtype or "short")[:16],
+        options=payload.options or [],
+        source="chat",
+        source_page=1,
+        stem_fp=fp,
+    )
+    db.add(q)
+    db.commit()
+    db.refresh(q)
+    return {"item": _q_out(q), "already": False}
+
+
+@router.post("/internal/tools/question_update", dependencies=[Depends(guard)])
+def tool_question_update(payload: QUpdateIn, db: Session = Depends(get_db)):
+    from ..models import Question
+
+    q = db.get(Question, payload.id)
+    if q is None:
+        return {"ok": False, "error": "题目不存在"}
+    if payload.stem is not None:
+        q.stem_md = payload.stem.strip()
+        q.stem_fp = _q_fp(q.stem_md)
+    if payload.options is not None:
+        q.options = payload.options
+    if payload.answer is not None:
+        q.answer_md = payload.answer.strip()
+    if payload.subject is not None:
+        q.subject = payload.subject[:20]
+    if payload.qtype is not None:
+        q.qtype = payload.qtype[:16]
+    db.commit()
+    db.refresh(q)
+    return {"ok": True, "item": _q_out(q)}

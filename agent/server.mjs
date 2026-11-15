@@ -36,7 +36,7 @@ function xiaomanPrompt(subject) {
 - 不确定就说不确定；库里没有的不要编。公式用行内 LaTeX（$...$）。
 - 中文回答。
 
-你可以用的工具只有：memory_search / memory_add / memory_update / memory_delete（你自己长期记住的关于她的事）和 web_search（联网搜索，时效问题用）。
+你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）。
 不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
 她问「记住…」时，用 memory_add 记下来再简短确认。`;
 }
@@ -157,6 +157,60 @@ function makeTools(collect) {
       "删掉一条记忆（归档、可恢复）。用户说「忘掉这条」时用，先用 memory_search 拿 id。",
       Type.Object({ id: Type.String() }),
       (p) => callTool("/internal/tools/memory_delete", { id: p.id })
+    ),
+    wrap(
+      "question_search",
+      "查题库",
+      "在她的题库里检索题目（按题干关键词 / 学科）。她自己问「我那道题」「题库里有没有…」时用。返回题目 id、题干、选项、答案。",
+      Type.Object({
+        query: Type.Optional(Type.String({ description: "题干关键词" })),
+        subject: Type.Optional(Type.String({ description: "学科，留空=全部" })),
+        limit: Type.Optional(Type.Number({ description: "最多几条，默认 5" })),
+      }),
+      (p) =>
+        callTool("/internal/tools/question_search", {
+          query: p.query || "",
+          subject: p.subject || "",
+          limit: Math.min(10, Math.max(1, p.limit || 5)),
+        })
+    ),
+    wrap(
+      "question_add",
+      "新增题目",
+      "把一道题存进她的题库。她说「把这道题收进题库」或你整理出新题时用。题干和答案都要完整。",
+      Type.Object({
+        subject: Type.String({ description: "学科" }),
+        stem: Type.String({ description: "题干（含选项也可以）" }),
+        answer: Type.Optional(Type.String({ description: "答案" })),
+        options: Type.Optional(Type.Array(Type.String(), { description: "选项数组，可空" })),
+        qtype: Type.Optional(
+          Type.Union([Type.Literal("choice"), Type.Literal("blank"), Type.Literal("short"), Type.Literal("essay")], {
+            description: "题型",
+          })
+        ),
+      }),
+      (p) =>
+        callTool("/internal/tools/question_add", {
+          subject: p.subject || "全部",
+          stem: p.stem,
+          answer: p.answer || "",
+          options: p.options || [],
+          qtype: p.qtype || "short",
+        })
+    ),
+    wrap(
+      "question_update",
+      "改题库题目",
+      "修改题库里已有的题目（先用 question_search 拿到 id）。只改她说的字段，其它不要动。",
+      Type.Object({
+        id: Type.String({ description: "题目 id" }),
+        stem: Type.Optional(Type.String()),
+        answer: Type.Optional(Type.String()),
+        options: Type.Optional(Type.Array(Type.String())),
+        subject: Type.Optional(Type.String()),
+        qtype: Type.Optional(Type.String()),
+      }),
+      (p) => callTool("/internal/tools/question_update", p)
     ),
     wrap(
       "web_search",
