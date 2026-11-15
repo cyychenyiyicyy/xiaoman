@@ -90,7 +90,7 @@
 |---|---|
 | **拍题用平板自己的前摄** | 学习机前摄高清、顶部有镜面 → 前摄即俯视桌面视角。**不要设计"手机拍照→上传"的依赖** |
 | **必须提供「选择摄像头」** | 前摄（默认）/ 后摄 / USB。**只写这三个名词，不写任何解释** |
-| **深色模式只换 token** | 在 `theme.css` 用 `@media (prefers-color-scheme: dark)` + `.dark` 类；组件不加任何 `if(dark)` 分支 |
+| **深色模式只换 token** | `theme.css` 的 `[data-theme="dark"]` + 媒体查询（`:root:not([data-theme="light"])`）+ `.dark` 类；手动开关只改 `<html data-theme>`，组件不加任何 `if(dark)` 分支 |
 | **赤陶上的文字用 `--on-clay`** | 浅色下是白字、深色下是深字。**不要写死 #fff**（浅色 clay 上白字对比度不足 4.5:1） |
 
 

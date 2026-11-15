@@ -262,7 +262,7 @@ body{margin:0;background:#111110;color:#EDEAE3;font-family:var(--sans);font-size
    ink/paper ≈ 15.8:1 · ink2/card ≈ 7.4:1 · ink3/card ≈ 4.8:1 · on-clay/clay ≈ 4.6:1
    ═══════════════════════════════════════════════════════════════════ */
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]){
     --paper:#151412; --card:#1D1C19; --fill:#25231F; --fill2:#2F2C27;
     --ink:#EFEBE3; --ink2:#A9A499; --ink3:#8C877C;
     --line:#2C2A25; --line2:#3A362F;
@@ -272,7 +272,7 @@ body{margin:0;background:#111110;color:#EDEAE3;font-family:var(--sans);font-size
     --knob:#EFEBE3; --clay-a06:rgba(201,122,94,.10);
   }
 }
-.dark{
+.dark, [data-theme="dark"]{
   --paper:#151412; --card:#1D1C19; --fill:#25231F; --fill2:#2F2C27;
   --ink:#EFEBE3; --ink2:#A9A499; --ink3:#8C877C;
   --line:#2C2A25; --line2:#3A362F;
@@ -1276,3 +1276,9 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
   .mapstage{flex:none;height:52vh;min-height:360px;border-radius:var(--rc) var(--rc) 0 0}
   .mapside{max-height:none;overflow:visible;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:0 0 var(--rc) var(--rc)}
 }
+
+
+/* 弹层菜单行里的勾选（主题 / 题库筛选共用）：不要用取景框那种绝对定位圆点 */
+.caprow .capchk{position:static;top:auto;right:auto;width:18px;height:18px;background:transparent;
+  color:var(--clay);box-shadow:none;display:grid;place-items:center}
+.caprow .capchk .ic{color:var(--clay)}

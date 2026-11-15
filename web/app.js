@@ -21,6 +21,7 @@
     mapCy: null,             // cytoscape 实例
     mapKey: '',              // 当前图对应的 subject|module|chapter|ver
     mapHtmlKey: '',          // 已渲染 HTML 的 key（避免弹层重开时丢图）
+    theme: 'system',         // system | light | dark（本地偏好，index.html 已先应用）
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -3184,6 +3185,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'newchat' ? newChatSheetHtml()
       : kind === 'qedit' ? qeditSheetHtml()
       : kind === 'bankfilter' ? bankFilterSheetHtml()
+      : kind === 'theme' ? themeSheetHtml()
       : kind === 'kpsel' ? kpSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
@@ -3419,15 +3421,87 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       '</span></span></div>';
   }
 
+  /* ── 主题：跟随系统 / 浅色 / 深色 ─────────────────── */
+
+  function themeMode() {
+    try {
+      var t = localStorage.getItem('xm_theme');
+      if (t === 'light' || t === 'dark' || t === 'system') return t;
+    } catch (e) { /* 无痕模式 */ }
+    return 'system';
+  }
+
+  function resolvedTheme(mode) {
+    mode = mode || themeMode();
+    if (mode === 'light' || mode === 'dark') return mode;
+    try {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {
+      return 'light';
+    }
+  }
+
+  function themeLabel(mode) {
+    return mode === 'light' ? '浅色' : mode === 'dark' ? '深色' : '跟随系统';
+  }
+
+  function applyTheme(mode, persist) {
+    mode = (mode === 'light' || mode === 'dark') ? mode : 'system';
+    var root = document.documentElement;
+    if (mode === 'system') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme', mode);
+    var dark = resolvedTheme(mode) === 'dark';
+    root.style.colorScheme = dark ? 'dark' : 'light';
+    if (persist) {
+      try { localStorage.setItem('xm_theme', mode); } catch (e) { /* noop */ }
+    }
+    state.theme = mode;
+    if (state.mapCy) {
+      try { state.mapCy.style(mapStyle()); } catch (e) { /* noop */ }
+    }
+  }
+
+  function themeSheetHtml() {
+    var cur = themeMode();
+    var opts = [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']];
+    var rows = opts.map(function (o) {
+      var on = cur === o[0];
+      return '<button type="button" class="caprow' + (on ? ' on' : '') + '" data-act="theme-pick" data-v="' + o[0] + '">' +
+        '<span>' + o[1] + '</span><span class="sp"></span>' +
+        (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="th-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="th-ttl">主题</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="capmenu">' + rows + '</div></div>' +
+      '</div>';
+  }
+
+  function pickTheme(mode) {
+    applyTheme(mode, true);
+    closeOverlay();
+    render();
+  }
+
   function settingsPageHtml() {
     var nav = navbar('设置', '', 'goto-chat', '对话', false);
     var cur = settingModel();
 
+    var themeGroup = groupHtml('外观',
+      '<button type="button" class="srow" data-act="open-theme">' +
+        '<span class="lead">' + ic('sun') + '</span>' +
+        '<span class="md"><span class="n1">主题</span></span>' +
+        '<span class="trail"><span class="val">' + esc(themeLabel(themeMode())) + '</span>' +
+        ic('chevron-right', 'sm chev') + '</span></button>');
+
     if (state.searchState === 'loading' && !state.search) {
-      return nav + '<div class="det"><div class="skel">' + skelRows(4) + '</div></div>';
+      return nav + '<div class="det">' + themeGroup +
+        '<div class="skel">' + skelRows(4) + '</div></div>';
     }
     if (state.searchState === 'error') {
-      return nav + '<div class="det">' +
+      return nav + '<div class="det">' + themeGroup +
         pageErrorState('加载失败', state.searchError, 'reload-settings', 'goto-chat', '返回对话') + '</div>';
     }
 
@@ -3460,6 +3534,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
 
     return nav + '<div class="det">' +
+      themeGroup +
       groupHtml('模型', '<button type="button" class="srow" data-act="open-models">' +
         '<span class="lead">' + ic('cpu') + '</span>' +
         '<span class="md"><span class="n1">当前模型</span></span>' +
@@ -5135,6 +5210,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-map': function () { openMap(); },
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
+    'open-theme': function () { setOverlay({ kind: 'theme' }); },
+    'theme-pick': function (el) { pickTheme(el.getAttribute('data-v') || 'system'); },
     'map-reload': function () { loadMap(); },
     'map-subject': function (el) { mapSubject(el.getAttribute('data-subject') || ''); },
     'map-module': function (el) { mapModule(el.getAttribute('data-module') || ''); },
@@ -5324,6 +5401,15 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       }, 180);
     });
 
+    if (window.matchMedia) {
+      var scheme = window.matchMedia('(prefers-color-scheme: dark)');
+      var onScheme = function () {
+        if (themeMode() === 'system') applyTheme('system', false);
+      };
+      if (scheme.addEventListener) scheme.addEventListener('change', onScheme);
+      else if (scheme.addListener) scheme.addListener(onScheme);
+    }
+
     ta.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !state.sending) {
         e.preventDefault();
@@ -5353,6 +5439,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   }
 
   async function boot() {
+    applyTheme(themeMode(), false);
     await loadSprite();
     hydrateIcons();
     bindEvents();
