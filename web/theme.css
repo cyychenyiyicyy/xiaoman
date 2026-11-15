@@ -863,3 +863,61 @@ body.today .composer,body.today #to-bottom{display:none}
   font-size:var(--s6);color:var(--ink2)}
 .qmsg .qn{color:var(--clay);font-weight:500;flex:none}
 .qmsg .qms{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+
+/* ── 添加（相机/相册）与扫描选题 ─────────────────── */
+.capmenu{display:flex;flex-direction:column;gap:var(--q2)}
+.caprow{display:flex;align-items:center;gap:var(--q3);min-height:56px;padding:var(--q2) var(--q3);
+  border:1px solid var(--line);border-radius:var(--rc);background:var(--card);
+  font-family:inherit;font-size:var(--s4);color:var(--ink);text-align:left;cursor:pointer}
+.caprow:active{background:var(--fill)}
+.caprow .ic{color:var(--ink2);flex:none}
+.caprow .caparr{color:var(--ink3);font-size:var(--s3);margin-left:0}
+.caprow .sp{flex:1}
+
+.scanwrap{position:relative;border-radius:var(--rc);overflow:hidden;background:#0b0b0a;
+  display:flex;justify-content:center;align-items:flex-start;max-height:54vh;margin-bottom:var(--q2)}
+.scanwrap>img{display:block;max-height:54vh;max-width:100%;width:auto}
+.scanmask{position:absolute;inset:0;overflow:hidden;background:color-mix(in srgb, var(--ink) 26%, transparent)}
+.scanbeam{position:absolute;left:-10%;right:-10%;height:24%;
+  background:linear-gradient(180deg,transparent,
+    color-mix(in srgb, var(--clay) 45%, transparent) 45%,
+    color-mix(in srgb, var(--clay) 95%, transparent) 52%,
+    transparent);
+  animation:scanmove 1.5s ease-in-out infinite}
+@keyframes scanmove{0%{top:-28%}100%{top:100%}}
+.scanhud{position:absolute;left:var(--q3);bottom:var(--q3);display:flex;align-items:baseline;gap:var(--q2);
+  background:color-mix(in srgb, var(--ink) 70%, transparent);color:var(--paper);
+  border-radius:var(--rp);padding:3px var(--q3);font-size:var(--s6)}
+.scanhud .rsp{color:var(--paper)}
+.scanhud .rsec{color:color-mix(in srgb, var(--paper) 72%, transparent)}
+
+.capbox{position:absolute;border:1.5px solid color-mix(in srgb, var(--clay) 55%, transparent);
+  background:color-mix(in srgb, var(--clay) 9%, transparent);border-radius:10px;padding:0;cursor:pointer;
+  transition:background .12s ease,border-color .12s ease}
+.capbox:active{background:color-mix(in srgb, var(--clay) 18%, transparent)}
+.capbox.on{border-color:var(--clay);background:color-mix(in srgb, var(--clay) 20%, transparent)}
+.capchk{position:absolute;top:-10px;right:-10px;width:22px;height:22px;border-radius:999px;
+  background:var(--clay);color:var(--on-clay);display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.28)}
+.capchk .ic{display:block}
+
+/* ── 题目卡片（错题卡样式）────────────────────────── */
+.qattach{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:13px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.qattach .rowtop{display:flex;align-items:center;gap:var(--q2);min-height:18px}
+.qattach .qno{font-size:var(--s6);color:var(--clay);font-weight:500;flex:none}
+.qattach .sp{flex:1}
+.qattach .rmd{width:22px;height:22px;display:grid;place-items:center;border:0;background:none;
+  color:var(--ink3);cursor:pointer;padding:0}
+.qattach .stem{font-size:var(--s5);line-height:1.68;color:var(--ink);white-space:pre-wrap;
+  overflow-wrap:anywhere;word-break:break-word}
+.qattach .tags{display:flex;gap:5px;flex-wrap:wrap}
+.qattach .tag{font-size:var(--s6);line-height:1.4;background:var(--fill);
+  border-radius:6px;padding:3px 7px;color:var(--ink2);white-space:nowrap}
+#qchips{gap:var(--q2)}
+.ubx .qattach{background:color-mix(in srgb, var(--paper) 55%, transparent);border-color:transparent}
+
+
+.scancanvas{position:relative;display:inline-block;max-width:100%}
+.scancanvas>img{display:block;max-height:54vh;max-width:100%;height:auto}
+.scanwrap>img{display:none}

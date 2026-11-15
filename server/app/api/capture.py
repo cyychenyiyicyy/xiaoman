@@ -1,5 +1,6 @@
 """录入（M1.1）：上传一页 → 任务状态机 → 解析 → 抽取 → 待确认。"""
 import hashlib
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -108,7 +109,12 @@ async def upload_page(
     if mime not in ALLOWED:
         raise HTTPException(415, f"不支持的图片格式：{mime}")
 
-    task = CaptureTask(subject=subject[:20], paper_id=paper_id[:32], page_no=max(1, int(page_no)))
+    task = CaptureTask(
+        id=uuid.uuid4().hex,
+        subject=subject[:20],
+        paper_id=paper_id[:32],
+        page_no=max(1, int(page_no)),
+    )
     dest_dir = settings.data_path.parent / "captures"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"{task.id}{EXT[mime]}"
