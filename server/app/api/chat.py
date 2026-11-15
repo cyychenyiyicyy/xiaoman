@@ -229,8 +229,12 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
 
     # ── 回合前：记忆检索 +（非原生）联网检索 ─────────────────
     # 记忆放 system（只放与本轮相关的；多数轮次为空 → 前缀不变）
-    # 记忆改由 memory_search 工具按需取（不再自动注入），system 保持完全静态
-    memory_sources: list[dict] = []
+    # 原生搜索轮没有函数工具（实测混用会让服务端工具被静默忽略），这轮记忆走 system 注入；
+    # 非原生轮用 memory_search 工具按需取。
+    used_memories = memory_service.retrieve(db, text) if text else []
+    memory_sources = memory_service.sources_payload(used_memories)
+    memory_block = memory_service.prompt_block(used_memories)
+    memory_service.touch(db, used_memories)
 
     search_cfg = get_search_cfg(db)
     web_sources: list[dict] = []
@@ -391,26 +395,20 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         fn_tools: list[dict] = [MEMORY_TOOL, MEMORY_ADD_TOOL, MEMORY_UPDATE_TOOL, MEMORY_DELETE_TOOL]
         if not native_search and search_on and (search_cfg.get("provider") or "deepseek") != "deepseek":
             fn_tools.append(WEB_TOOL)
-        server_tools = [{"type": "deepseek_web_search"}] if native_search else []
 
         try:
-            if getattr(provider_snap, "kind", "") == "mock" or (provider_snap.base_url or "").startswith("mock://"):
+            if native_search or getattr(provider_snap, "kind", "") == "mock" or (provider_snap.base_url or "").startswith("mock://"):
+                # 原生服务端工具 / mock：单次请求，记忆已注入 system
                 stream = stream_chat(
                     provider_snap, model_snap, hist, text, atts, thinking,
-                    memory_block="", web_block=web_hint, native_search=False,
-                    summary_block=summary_block,
+                    memory_block=memory_block, web_block=web_hint,
+                    native_search=native_search, summary_block=summary_block,
                 )
             else:
                 base_msgs = build_openai_messages(hist, text, atts, "", web_hint, summary_block=summary_block)
                 stream = stream_with_tools(
-                provider_snap,
-                model_snap,
-                base_msgs,
-                thinking,
-                fn_tools,
-                _exec_tool,
-                server_tools=server_tools,
-            )
+                    provider_snap, model_snap, base_msgs, thinking, fn_tools, _exec_tool,
+                )
             async for ev in stream:
                 kind = ev.get("type")
                 if kind == "text":
