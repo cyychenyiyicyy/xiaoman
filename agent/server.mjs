@@ -24,11 +24,12 @@ const SUBJECTS = ["全部", "语文", "数学", "英语", "物理", "化学", "�
 
 // 把 .pi-home/skills/*/SKILL.md 正文拼进人设：我们的工具白名单挡掉了 Pi 的 skill 触发，
 // 直接注入保证「讲题 → 查库 → 补答案」这套流程一定生效
-function loadSkills() {
+function loadSkills(only) {
   var dir = resolve(AGENT_DIR, "skills");
   if (!existsSync(dir)) return "";
   var out = [];
   for (const name of readdirSync(dir)) {
+    if (only && only.indexOf(name) < 0) continue;
     const f = resolve(dir, name, "SKILL.md");
     if (!existsSync(f)) continue;
     const raw = readFileSync(f, "utf8");
@@ -38,16 +39,12 @@ function loadSkills() {
   return out.length ? "\n\n" + out.join("\n\n") : "";
 }
 
-function xiaomanPrompt(subject) {
+function xiaomanPrompt(subject, activeSkills) {
   const d = new Date();
   const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
   return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
 
 今天是 ${today}。当前学科空间：${subject || "全部"}。
-
-硬规则（讲题）：凡是被问「这题怎么做 / 为什么 / 对不对」，第一件事必须调用 question_search；
-题库没有这道题就用 question_add（连答案一起写）；题库有但答案是空的就用 question_update 补上。
-补完才回答。不要问她「要不要收进题库」，直接做。
 
 说话方式：
 - 短。一条回复一般不超过 4 行；要展开时先给结论，再给细节。
@@ -59,7 +56,7 @@ function xiaomanPrompt(subject) {
 你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）。
 不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
 她问「记住…」时，用 memory_add 记下来再简短确认。
-回答题目时按下面 answer-question 技能的流程做：先 question_search，缺题就 question_add（连答案一起写），答案空着就 question_update 补上，再讲解析。` + loadSkills();
+当前启用了讲题流程时，按下面技能里的步骤做。` + loadSkills(activeSkills);
 }
 
 function writeModels() {
@@ -118,7 +115,7 @@ function cardsText(result, limit = 2000) {
 }
 
 // 每个请求一份收集器：工具来源 / 新记忆
-function makeTools(collect) {
+function makeTools(collect, caps) {
   const wrap = (name, label, description, parameters, run, extra) =>
     defineTool({
       name,
@@ -142,7 +139,7 @@ function makeTools(collect) {
       },
     });
 
-  return [
+  const base = [
     wrap(
       "memory_search",
       "检索记忆",
@@ -180,6 +177,18 @@ function makeTools(collect) {
       Type.Object({ id: Type.String() }),
       (p) => callTool("/internal/tools/memory_delete", { id: p.id })
     ),
+    wrap(
+      "web_search",
+      "联网搜索",
+      "联网搜索。涉及新闻、价格、赛事、最新数据这类时效问题时调用。",
+      Type.Object({ query: Type.String({ description: "搜索词" }) }),
+      (p) => callTool("/internal/tools/web_search", { query: p.query })
+    ),
+  ];
+
+  // 题库三件套：只在「讲题」场景装载，其余时候不挂（不用就卸载）
+  if (!caps || !caps.questions) return base;
+  return base.concat([
     wrap(
       "question_search",
       "查题库",
@@ -237,17 +246,20 @@ function makeTools(collect) {
       (p) => callTool("/internal/tools/question_update", p),
       { promptGuidelines: ["题库里已有题目但答案为空或题干有错时，直接改，不要询问。"] }
     ),
-    wrap(
-      "web_search",
-      "联网搜索",
-      "联网搜索。涉及新闻、价格、赛事、最新数据这类时效问题时调用。",
-      Type.Object({ query: Type.String({ description: "搜索词" }) }),
-      (p) => callTool("/internal/tools/web_search", { query: p.query })
-    ),
-  ];
+  ]);
 }
 
 const THINK = { off: "off", low: "low", med: "medium", high: "high" };
+
+// 这一轮要不要装「讲题」能力：引用题目了，或者话里在问题目
+const QUESTION_RE = /(这|那|哪)道?题|怎么(做|解|写|选)|为什么(选|错)|解析|答案解析|题库|对不对|答案是什么|求[解值]/;
+
+function planCapabilities(body, text) {
+  const byRef = Array.isArray(body.question_ids) && body.question_ids.length > 0;
+  const byText = QUESTION_RE.test(text || "");
+  const questions = byRef || byText;
+  return { questions, skills: questions ? ["answer-question"] : [] };
+}
 
 function sse(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
@@ -286,12 +298,13 @@ async function handleChat(res, body) {
   });
 
   const collect = { sources: [], remembered: [], parts: [], emit: (o) => sse(res, o) };
-  const tools = makeTools(collect);
+  const caps = planCapabilities(body, body.text || "");
+  const tools = makeTools(collect, caps);
 
   const loader = new DefaultResourceLoader({
     cwd: CWD,
     agentDir: AGENT_DIR,
-    systemPromptOverride: () => xiaomanPrompt(subject),
+    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills),
     appendSystemPromptOverride: () => [],
   });
   await loader.reload();
@@ -422,6 +435,15 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true, subjects: Object.keys(readIndex()), port: PORT }));
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/debug/plan") {
+    const text = url.searchParams.get("text") || "";
+    const caps = planCapabilities({ question_ids: (url.searchParams.get("qids") || "").split(",").filter(Boolean) }, text);
+    const dummy = { sources: [], remembered: [], parts: [], emit: () => {} };
+    const names = makeTools(dummy, caps).map((t) => t.name);
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ text, caps, tools: names }, null, 2));
     return;
   }
   if (req.method === "POST" && url.pathname === "/agent/chat") {
