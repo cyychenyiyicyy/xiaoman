@@ -395,7 +395,14 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         if q is None:
             continue
         question_refs.append(
-            {"id": q.id, "number": "", "type": q.qtype, "stem": q.stem_md, "options": q.options or []}
+            {
+                "id": q.id,
+                "number": "",
+                "type": q.qtype,
+                "stem": q.stem_md,
+                "options": q.options or [],
+                "image": q.stem_preview_png or "",
+            }
         )
 
     if question_refs:
@@ -483,7 +490,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             db, conv, user_msg, assistant,
             (question_block + text) if question_block else text,
             thinking, conv.subject,
-            image_paths=[a.path for a in attachments],
+            image_paths=[a.path for a in attachments]
+            + [qr["image"] for qr in question_refs if qr.get("image")],
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

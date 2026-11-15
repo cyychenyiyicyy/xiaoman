@@ -48,7 +48,10 @@ def jaccard(a: str, b: str) -> float:
 
 
 def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memory]:
-    """与本轮文本有 2-gram 交集的优先，再用最近 2 条补位。"""
+    """只返回与本轮文本真正相关的记忆；没命中就返回空（不再兜底最近几条）。
+
+    之前的兜底会导致「每条回复都自称根据 5 条记忆」，而其中没有一条与问题相关。
+    """
     rows = list(
         db.scalars(
             select(Memory).where(Memory.status == "active").order_by(Memory.created_at.desc()).limit(400)
@@ -56,18 +59,15 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
     )
     if not rows:
         return []
-    q = bigrams(user_text)
-    scored: list[tuple[float, Memory]] = []
-    for r in rows:
-        hit = len(q & bigrams(r.text))
-        scored.append((hit, r))
-    # 只认真正相关的：至少 2 个 2-gram 命中。无关时一条都不注入（否则每条回复都自称「根据记忆」）
-    # 打分：交集 / 较短一侧的 bigram 数；放宽到 1 个交集也算（短问句本来就没几个 bigram）
+
     qn = bigrams(user_text)
-    ranked = []
+    if not qn:
+        return []
+
+    ranked: list[tuple[float, Memory]] = []
     for r in rows:
         rn = bigrams(r.text)
-        if not qn or not rn:
+        if not rn:
             continue
         inter = len(qn & rn)
         if inter <= 0:
@@ -76,11 +76,8 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
         if score < 0.1:
             continue
         ranked.append((score, r))
-    matched = [r for _, r in sorted(ranked, key=lambda x: -x[0])]
 
-    # 工具是按需调用：模型明确来查时，就算词面对不上，也给最近几条兜底（空手而归更差）
-    if not matched:
-        matched = rows[:5]
+    matched = [r for _, r in sorted(ranked, key=lambda x: -x[0])]
     out: list[Memory] = []
     seen: set[str] = set()
     for r in matched:
@@ -91,6 +88,7 @@ def retrieve(db: Session, user_text: str, limit: int = MAX_INJECT) -> list[Memor
         if len(out) >= limit:
             break
     return out
+
 
 
 def prompt_block(memories: list[Memory]) -> str:

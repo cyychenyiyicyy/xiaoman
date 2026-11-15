@@ -921,3 +921,37 @@ body.today .composer,body.today #to-bottom{display:none}
 .scancanvas{position:relative;display:inline-block;max-width:100%}
 .scancanvas>img{display:block;max-height:54vh;max-width:100%;height:auto}
 .scanwrap>img{display:none}
+
+
+/* ── 题库 / 题目详情 ─────────────────────────────── */
+.bankbar{display:flex;gap:var(--q2);padding:var(--q3) var(--q4) var(--q2)}
+.bankbar .fi{flex:1;height:44px}
+.bankchips{display:flex;gap:var(--q2);flex-wrap:wrap;padding:0 var(--q4) var(--q3)}
+.banklist{display:flex;flex-direction:column;gap:var(--q2)}
+.qbank{width:100%;text-align:left;font-family:inherit;cursor:pointer}
+.qbank:active{background:var(--fill)}
+.qbank .rowtop{min-height:0}
+.qthumb{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  white-space:pre-wrap;overflow-wrap:anywhere}
+.qfoot{display:flex;align-items:center;gap:var(--q2);margin-top:2px}
+.qmore{border:0;background:none;padding:0;font-family:inherit;font-size:var(--s6);color:var(--clay);cursor:pointer}
+.qpreview .stem{font-size:var(--s5);line-height:1.62}
+.qdetail{padding-bottom:var(--q5)}
+.qfull{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line);margin-top:var(--q3)}
+.qopts{display:flex;flex-direction:column;gap:var(--q1);margin-top:var(--q2);color:var(--ink2);font-size:var(--s5);line-height:1.6}
+.qopt{white-space:pre-wrap;overflow-wrap:anywhere}
+.qdetail .stem{white-space:pre-wrap;overflow-wrap:anywhere}
+.qno{font-size:var(--s6);color:var(--ink3);font-variant-numeric:tabular-nums}
+
+
+/* L0 一级页：无返回键，标题与内容左对齐 */
+.navbar.l0{padding-left:var(--q4)}
+.navbar.l0 .tbox{margin-left:0}
+
+/* 题库：平板上多列 */
+.banklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:var(--q3);align-content:start;overflow-y:auto}
+.banklist .empty{grid-column:1 / -1}
+.banklist .qattach{height:100%}
+@media (max-width: 900px){ .banklist{grid-template-columns:1fr} }

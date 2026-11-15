@@ -19,6 +19,32 @@ from ..models import CaptureTask, Question
 router = APIRouter(tags=["questions"])
 
 
+def _crop_question(page_path: str, bbox: list, out_path) -> str:
+    """按 bbox（归一化 0–1000）从原页裁出题目图，带 1% 边距。图题靠它给模型看。"""
+    if not page_path or not bbox or len(bbox) < 4:
+        return ""
+    try:
+        from PIL import Image
+    except ImportError:
+        return ""
+    try:
+        im = Image.open(page_path)
+        w, h = im.size
+        x1, y1, x2, y2 = (float(v) for v in bbox[:4])
+        pad = max(4, int(0.012 * max(w, h)))
+        left = max(0, int(x1 * w / 1000) - pad)
+        top = max(0, int(y1 * h / 1000) - pad)
+        right = min(w, int(x2 * w / 1000) + pad)
+        bottom = min(h, int(y2 * h / 1000) + pad)
+        if right - left < 8 or bottom - top < 8:
+            return ""
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        im.crop((left, top, right, bottom)).save(out_path, "PNG")
+        return str(out_path)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 class QuestionOut(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -42,6 +68,7 @@ def _out(q: Question) -> dict:
     return {
         "id": q.id,
         "subject": q.subject,
+        "image_url": f"/api/v1/questions/{q.id}/image" if q.stem_preview_png else "",
         "stem_md": q.stem_md,
         "answer_md": q.answer_md,
         "solution_md": q.solution_md,
@@ -83,8 +110,9 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
                 continue
             if shared and not stem.startswith(shared):
                 stem = f"{shared}\n\n{stem}"
+            qid = uuid.uuid4().hex
             row = Question(
-                id=uuid.uuid4().hex,
+                id=qid,
                 subject=task.subject,
                 stem_md=stem,
                 answer_md=(q.get("answer") or "").strip(),
@@ -95,8 +123,18 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
                 source_page=int(q.get("source_page") or task.page_no or 1),
                 bbox=q.get("bbox") or [],
                 page_path=task.page_path,
-                stem_preview_png="",  # 服务端预渲染留到 M1.4 末尾
+                stem_preview_png="",
             )
+            from pathlib import Path
+
+            from ..config import settings as _settings
+
+            crop = _crop_question(
+                task.page_path,
+                q.get("bbox") or [],
+                Path(_settings.data_path).parent / "questions" / f"{qid}.png",
+            )
+            row.stem_preview_png = crop
             db.add(row)
             created.append(row.id)
 
@@ -110,6 +148,7 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
 @router.get("/questions")
 def list_questions(
     subject: str = "",
+    q: str = "",
     limit: int = 50,
     before: str | None = None,
     db: Session = Depends(get_db),
@@ -117,6 +156,8 @@ def list_questions(
     stmt = select(Question).order_by(Question.created_at.desc()).limit(max(1, min(limit, 200)))
     if subject:
         stmt = stmt.where(Question.subject == subject)
+    if q:
+        stmt = stmt.where(Question.stem_md.ilike(f"%{q}%"))
     if before:
         anchor = db.get(Question, before)
         if anchor is not None:
@@ -131,3 +172,15 @@ def get_question(qid: str, db: Session = Depends(get_db)):
     if q is None:
         raise HTTPException(404, "题目不存在")
     return _out(q)
+
+@router.get("/questions/{qid}/image")
+def question_image(qid: str, db: Session = Depends(get_db)):
+    """题目裁图（带图题靠它看原题）。"""
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    q = db.get(Question, qid)
+    if q is None or not q.stem_preview_png or not Path(q.stem_preview_png).exists():
+        raise HTTPException(404, "没有题目图")
+    return FileResponse(q.stem_preview_png)

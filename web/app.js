@@ -14,6 +14,8 @@
     review: null,            // {task, groups} 复核中的一页
     captureQueue: [],        // 待复核的 task id 队列
     capturePending: [],      // 处理中/待复核的任务（角标用）
+    bank: null,              // {items,total,subject,q}
+    question: null,          // 当前打开的题目详情
     pendingQuestions: [],    // 已选好、要随下一条消息发出的题目
     view: 'chat',            // chat | page
     page: null,              // {kind:'models'} | {kind:'provider',providerId} | {kind:'form',providerId}
@@ -585,16 +587,18 @@
   }
 
   function qaCardHtml(q, i, removable) {
-    var tags = '<span class="tag">' + esc(q.typeLabel || (q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目')) + '</span>' +
+    var tags = '<span class="tag">' + esc(q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目') + '</span>' +
       (q.subject ? '<span class="tag">' + esc(q.subject) + '</span>' : '');
-    return '<div class="qattach">' +
-      '<div class="rowtop"><span class="qno">' + esc(q.number || String(i + 1)) + '</span>' +
-      '<span class="sp"></span>' +
-      (removable ? '<button type="button" class="rmd" data-act="drop-question" data-i="' + i + '" aria-label="移除">' +
-        ic('x', 'sm') + '</button>' : '') +
-      '</div>' +
-      '<div class="stem">' + escText(q.stem || '') + '</div>' +
+    return '<div class="qattach qpreview">' +
+      '<div class="stem clamp2">' + stemHtml(q.stem || '') + '</div>' +
       '<div class="tags">' + tags + '</div>' +
+      '<div class="qfoot">' +
+        (q.id ? '<button type="button" class="qmore" data-act="open-question" data-id="' + esc(q.id) + '">查看详情 ›</button>'
+              : '<span></span>') +
+        '<span class="sp"></span>' +
+        (removable ? '<button type="button" class="rmd" data-act="drop-question" data-i="' + i + '" aria-label="移除">' +
+          ic('x', 'sm') + '</button>' : '') +
+      '</div>' +
       '</div>';
   }
 
@@ -638,6 +642,120 @@
     state.captureQueue = ids;
     await loadCapturePending();
     await openReview(ids[0]);
+  }
+
+  /* ── 题库（P-题库）：列表 / 筛选 / 详情 ───────────── */
+
+  function openBank() {
+    openPage({ kind: 'bank' });
+    loadBank();
+  }
+
+  async function loadBank() {
+    var b = state.bank || { items: [], total: 0, subject: '', q: '' };
+    try {
+      var params = [];
+      if (b.subject) params.push('subject=' + encodeURIComponent(b.subject));
+      if (b.q) params.push('q=' + encodeURIComponent(b.q));
+      params.push('limit=100');
+      var r = await api('/questions?' + params.join('&'));
+      state.bank = { items: r.items || [], total: r.total || 0, subject: b.subject, q: b.q };
+    } catch (e) {
+      state.bank = { items: [], total: 0, subject: b.subject, q: b.q, error: e.message };
+    }
+    render();
+  }
+
+  function bankFilter(subject) {
+    var b = state.bank || {};
+    state.bank = { items: b.items || [], total: b.total || 0, subject: subject, q: b.q || '' };
+    loadBank();
+  }
+
+  function bankSearch() {
+    var el = q('#bank-q');
+    var b = state.bank || {};
+    state.bank = { items: b.items || [], total: b.total || 0, subject: b.subject || '', q: (el && el.value || '').trim() };
+    loadBank();
+  }
+
+  function bankCardHtml(q, i) {
+    var tags = '<span class="tag">' + esc(q.subject || '全部') + '</span>' +
+      '<span class="tag">' + esc(q.qtype === 'choice' ? '选择题' : q.qtype === 'blank' ? '填空题' : '题目') + '</span>';
+    var thumb = q.image_url
+      ? '<img class="qthumb" src="' + esc(q.image_url) + '" alt="">'
+      : '';
+    return '<button type="button" class="qattach qbank" data-act="open-question" data-id="' + esc(q.id) + '">' +
+      '<div class="rowtop"><div class="tags">' + tags + '</div><span class="sp"></span>' + thumb + '</div>' +
+      '<div class="stem clamp2">' + stemHtml(q.stem_md || '') + '</div>' +
+      '</button>';
+  }
+
+  function bankPageHtml() {
+    var b = state.bank || { items: [], total: 0, subject: '', q: '' };
+    var nav = navbar('题库', (b.total || 0) + ' 题', '', '', false);
+    if (b.error) {
+      return nav + '<div class="settings">' +
+        pageErrorState('加载失败', b.error, 'bank-reload', 'rail-chat', '返回对话') + '</div>';
+    }
+
+    var subjects = ['', '语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+    var chips = subjects.map(function (s) {
+      var on = (b.subject || '') === s;
+      return '<button type="button" class="tpill hit44' + (on ? ' on' : '') + '" data-act="bank-filter" data-subject="' + esc(s) + '">' +
+        (s || '全部') + '</button>';
+    }).join('');
+
+    var list = (b.items || []).map(bankCardHtml).join('');
+    if (!list) {
+      list = '<div class="empty"><div class="t">还没有题目</div><div class="m">拍一张卷子，选几道题加进来</div></div>';
+    }
+
+    return nav +
+      '<div class="bankbar">' +
+        '<input type="search" id="bank-q" class="fi" placeholder="搜题干" value="' + esc(b.q || '') + '">' +
+        '<button type="button" class="btn" data-act="bank-search">搜索</button>' +
+      '</div>' +
+      '<div class="bankchips">' + chips + '</div>' +
+      '<div class="settings banklist">' + list + '</div>';
+  }
+
+  async function openQuestionDetail(id) {
+    try {
+      var r = await api('/questions/' + encodeURIComponent(id));
+    } catch (e) {
+      toast('打开失败：' + e.message);
+      return;
+    }
+    state.question = r;
+    openPage({ kind: 'question', id: id });
+  }
+
+  function questionPageHtml() {
+    var r = state.question;
+    if (!r) return navbar('题目详情', '', 'rail-bank', '返回', false);
+    var nav = navbar('题目详情', r.subject || '', 'rail-bank', '返回', false);
+    var opts = (r.options || []).map(function (o) {
+      return '<div class="qopt">' + stemHtml(o) + '</div>';
+    }).join('');
+    var img = r.image_url
+      ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">'
+      : '';
+    var answer = r.answer_md ? '<div class="pbody"><div class="slabel">答案</div>' + escText(r.answer_md) + '</div>' : '';
+    return nav +
+      '<div class="settings qdetail">' +
+        '<div class="qattach detail">' +
+          '<div class="tags"><span class="tag">' + esc(r.qtype === 'choice' ? '选择题' : r.qtype === 'blank' ? '填空题' : '题目') + '</span>' +
+          '<span class="tag">' + esc(r.subject || '全部') + '</span></div>' +
+          '<div class="stem">' + stemHtml(r.stem_md || '') + '</div>' +
+          (opts ? '<div class="qopts">' + opts + '</div>' : '') +
+          answer +
+        '</div>' +
+        img +
+        '<div class="btnbar full" style="margin-top:var(--q3)">' +
+          '<button type="button" class="btn" data-act="question-back-chat">在对话里打开</button>' +
+        '</div>' +
+      '</div>';
   }
 
   var REVIEW_STAGES = {
@@ -1003,6 +1121,12 @@
       await openReview(decodeURIComponent(location.hash.slice(8)));
       return;
     }
+    if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash.indexOf('#question=') === 0) {
+      await loadMessages();
+      await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));
+      return;
+    }
     if (location.hash.indexOf('#capture') === 0) {
       await loadMessages();
       openCapture();
@@ -1066,10 +1190,18 @@
     var chat = q('#rail-chat');
     var set = q('#rail-settings');
     var mem = q('#rail-memories');
-    var onSettings = !!(state.view === 'page' && state.page &&
-      (state.page.kind === 'settings' || state.page.kind === 'memories'));
+    var kind = state.view === 'page' && state.page ? state.page.kind : '';
+    var onBank = kind === 'bank' || kind === 'question';
+    var onSettings = kind === 'settings';
+    var onMem = kind === 'memories';
+    var bank = q('#rail-bank');
+    if (bank) {
+      bank.classList.toggle('on', onBank);
+      if (onBank) bank.setAttribute('aria-current', 'page');
+      else bank.removeAttribute('aria-current');
+    }
     if (chat) {
-      chat.classList.toggle('on', !onSettings);
+      chat.classList.toggle('on', !onSettings && !onMem && !onBank);
       if (onSettings) chat.removeAttribute('aria-current');
       else chat.setAttribute('aria-current', 'page');
     }
@@ -1078,7 +1210,6 @@
       if (onSettings) set.setAttribute('aria-current', 'page');
       else set.removeAttribute('aria-current');
       if (mem) {
-        var onMem = !!(state.view === 'page' && state.page && state.page.kind === 'memories');
         mem.classList.toggle('on', onMem);
         if (onMem) mem.setAttribute('aria-current', 'page');
         else mem.removeAttribute('aria-current');
@@ -1216,10 +1347,12 @@
       }).join('');
       var text = m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '';
       var qs = (m.questions || []).map(function (q, i) {
-        return '<div class="qattach">' +
-          '<div class="rowtop"><span class="qno">' + esc(q.number || String(i + 1)) + '</span></div>' +
-          '<div class="stem">' + escText(q.stem || '') + '</div>' +
+        return '<div class="qattach qpreview">' +
+          '<div class="stem clamp2">' + stemHtml(q.stem || '') + '</div>' +
           '<div class="tags"><span class="tag">' + esc(q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目') + '</span></div>' +
+          '<div class="qfoot">' +
+            (q.id ? '<button type="button" class="qmore" data-act="open-question" data-id="' + esc(q.id) + '">查看详情 ›</button>' : '') +
+          '</div>' +
           '</div>';
       }).join('');
       return '<div class="me"><div class="ubx">' +
@@ -1511,7 +1644,27 @@
     return q('#stream .ag[data-key="' + m._key + '"]');
   }
 
-function typesetMath(el) {
+var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+
+  // OCR 常输出 \textcircled{1} 与 $$…$$；卡片里统一成 ①②… 与行内 $…$
+  function stemText(t) {
+    var x = String(t || '');
+    x = x.replace(/\\\\/g, '\\');
+    x = x.replace(/\\textcircled\s*\{?\s*(\d)\s*\}?/g, function (_, d) {
+      var ch = CIRCLED[Number(d) - 1] || ('(' + d + ')');
+      return '\\text{' + ch + '}';
+    });
+    x = x.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+    x = x.replace(/\\\[/g, '$').replace(/\\\]/g, '$');
+    x = x.replace(/\$\$/g, '$');
+    return x;
+  }
+
+  function stemHtml(t) {
+    return escText(stemText(t));
+  }
+
+  function typesetMath(el) {
     if (!el || typeof window.renderMathInElement !== "function") return;
     try {
       window.renderMathInElement(el, {
@@ -2038,9 +2191,11 @@ function typesetMath(el) {
 
   /* ── 渲染：模型管理 / provider 详情 / 表单 ─────────── */
   function navbar(title, sub, backAct, backLabel, closeIcon) {
-    var btn = '<button type="button" class="hit back" data-act="' + backAct + '" aria-label="' + esc(backLabel) + '">' +
-      ic(closeIcon ? 'x' : 'chevron-left') + '</button>';
-    return '<div class="navbar' + (closeIcon ? ' flow' : '') + '">' + btn +
+    var btn = backAct
+      ? '<button type="button" class="hit back" data-act="' + backAct + '" aria-label="' + esc(backLabel) + '">' +
+        ic(closeIcon ? 'x' : 'chevron-left') + '</button>'
+      : '';
+    return '<div class="navbar' + (closeIcon ? ' flow' : '') + (backAct ? '' : ' l0') + '">' + btn +
       '<div class="tbox"><div class="ttl">' + esc(title) + '</div>' +
       (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div></div>';
   }
@@ -2374,10 +2529,15 @@ function typesetMath(el) {
       html = settingsPageHtml();
     } else if (page.kind === 'review') {
       html = reviewPageHtml();
+    } else if (page.kind === 'bank') {
+      html = bankPageHtml();
+    } else if (page.kind === 'question') {
+      html = questionPageHtml();
     } else if (page.kind === 'memories') {
       html = memoriesPageHtml();
     }
     host.innerHTML = html;
+    typesetMath(host);
     if (page.kind === 'form') {
       var form = q('#provider-form', host);
       if (form) form.addEventListener('submit', onProviderSubmit);
@@ -3245,6 +3405,16 @@ function typesetMath(el) {
     'switch-subject': function (el) { switchSubject(el.getAttribute('data-subject')); },
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
+    'rail-bank': function () { openBank(); },
+    'open-question': function (el) { openQuestionDetail(el.getAttribute('data-id')); },
+    'bank-filter': function (el) { bankFilter(el.getAttribute('data-subject') || ''); },
+    'bank-search': function () { bankSearch(); },
+    'bank-reload': function () { loadBank(); },
+    'question-back-chat': function () {
+      var qr = state.question;
+      if (!qr) return;
+      switchSubject(qr.subject).then(function () { openPage(null); });
+    },
     'confirm-capture': function () { confirmCapture(); },
     'cap-camera': function () { var f = q('#cap-camera'); if (f) f.click(); },
     'cap-album': function () { var f = q('#cap-file'); if (f) f.click(); },
@@ -3380,6 +3550,12 @@ function typesetMath(el) {
     if (location.hash.indexOf('#review=') === 0) {
       await loadMessages();
       await openReview(decodeURIComponent(location.hash.slice(8)));
+      return;
+    }
+    if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash.indexOf('#question=') === 0) {
+      await loadMessages();
+      await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));
       return;
     }
     if (location.hash.indexOf('#capture') === 0) {
