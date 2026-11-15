@@ -2,7 +2,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Identity, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Identity, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -136,3 +136,22 @@ class Memory(Base):
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class CaptureTask(Base):
+    """一页卷子的录入任务（M1）：queued → parsing → extracting → review → done|failed。"""
+
+    __tablename__ = "capture_task"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued", index=True)
+    page_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    page_no: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="全部")
+    paper_id: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    blocks_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    groups_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
