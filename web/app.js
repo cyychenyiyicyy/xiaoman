@@ -16,6 +16,11 @@
     capturePending: [],      // 处理中/待复核的任务（角标用）
     bank: null,              // {items,total,subject,q}
     question: null,          // 当前打开的题目详情（整页）
+    conversations: [],       // 对话列表
+    convId: '',              // 当前对话 id
+    convSubject: '全部',
+    convTitle: '',
+    convFilter: '',          // 列表按学科筛选
     qpanel: null,            // {id, data} 右侧题目面板
     pendingQuestions: [],    // 已选好、要随下一条消息发出的题目
     view: 'chat',            // chat | page
@@ -289,7 +294,7 @@
     state.stick = true;
     renderStream();
     try {
-      var data = await api('/messages?limit=50');
+      var data = await api('/messages?limit=100' + (state.convId ? ('&conversation_id=' + encodeURIComponent(state.convId)) : ''));
       var items = data && Array.isArray(data.items) ? data.items : [];
       // 首屏加载慢于发送时，保留尚在流式中的本地占位消息（id 前缀 tmp-）
       var local = state.messages.filter(function (m) {
@@ -349,9 +354,8 @@
     })[0] || null;
   }
 
-  function isToday() {
-    return ((state.subjects && state.subjects.current) || '全部') === '全部';
-  }
+  // 现在是对话列表 + 单条对话，不再有「今天」首页
+  function isToday() { return false; }
 
   function todayLabel(name) { return name === '全部' ? '今天' : name; }
 
@@ -696,6 +700,125 @@
 
   /* ── 题库（P-题库）：列表 / 筛选 / 详情 ───────────── */
 
+  /* ── 对话列表（ChatGPT 式）────────────────────────── */
+
+  async function loadConversations() {
+    try {
+      var params = state.convFilter ? ('?subject=' + encodeURIComponent(state.convFilter)) : '';
+      var r = await api('/conversations' + params);
+      state.conversations = r.items || [];
+    } catch (e) {
+      state.conversations = [];
+    }
+    render();
+  }
+
+  function openConversations() {
+    openPage({ kind: 'convs' });
+    loadConversations();
+  }
+
+  function convGroupDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var now = new Date();
+    if (d.toDateString() === now.toDateString()) return '今天';
+    var y = new Date(now.getTime() - 86400000);
+    if (d.toDateString() === y.toDateString()) return '昨天';
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  }
+
+  function convsPageHtml() {
+    var list = state.conversations || [];
+    var nav = navbar('对话', list.length + ' 个', '', '', false);
+    var subjects = ['', '语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+    var chips = subjects.map(function (x) {
+      var on = (state.convFilter || '') === x;
+      return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="conv-filter" data-subject="' + esc(x) + '">' +
+        (x || '全部') + '</span>';
+    }).join('');
+
+    var groups = [], byDay = {};
+    list.forEach(function (c) {
+      var k = convGroupDate(c.updated_at);
+      if (!byDay[k]) { byDay[k] = []; groups.push(k); }
+      byDay[k].push(c);
+    });
+    var rows = groups.map(function (k) {
+      return '<div class="dhead">' + esc(k || '更早') + '</div>' +
+        byDay[k].map(function (c) {
+          return '<button type="button" class="convrow" data-act="open-conv" data-id="' + esc(c.id) + '">' +
+            '<span class="convttl">' + esc(c.title || '新对话') + '</span>' +
+            '<span class="convmeta"><span class="tag">' + esc(c.subject || '全部') + '</span>' +
+            '<span class="convprev">' + esc(c.preview || '') + '</span></span>' +
+            '</button>';
+        }).join('');
+    }).join('');
+
+    if (!rows) {
+      rows = '<div class="empty"><div class="t">还没有对话</div>' +
+        '<div class="m">新建一个，选好科目就开始</div>' +
+        '<div class="acts"><button type="button" class="btn p" data-act="new-conv">新对话</button></div></div>';
+    }
+
+    return nav +
+      '<div class="convbar">' +
+        '<button type="button" class="btn p" data-act="new-conv">新对话</button>' +
+        '<span class="sp"></span>' +
+      '</div>' +
+      '<div class="bankchips">' + chips + '</div>' +
+      '<div class="settings convwrap">' + rows + '</div>';
+  }
+
+  function openNewChatSheet() {
+    setOverlay({ kind: 'newchat' });
+  }
+
+  function newChatSheetHtml() {
+    var subjects = ['语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+    var rows = subjects.map(function (x) {
+      return '<button type="button" class="caprow" data-act="new-conv-subject" data-subject="' + esc(x) + '">' +
+        ic('book', 'sm') + '<span>' + esc(x) + '</span><span class="sp"></span>' +
+        ic('chevron-right', 'sm chev') + '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="nc-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="nc-ttl">新对话</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="revhint" style="margin-bottom:8px">选一门科目</div>' +
+      '<div class="capmenu">' + rows + '</div></div>' +
+      '</div>';
+  }
+
+  async function newConversation(subject) {
+    try {
+      var r = await api('/conversations', { method: 'POST', json: { subject: subject } });
+      state.convId = r.id;
+      state.convSubject = subject;
+      state.convTitle = '新对话';
+      state.messages = [];
+      state.overlay = null;
+      openPage(null);
+      await loadMessages();
+      render();
+    } catch (e) {
+      toast('新建失败：' + e.message);
+    }
+  }
+
+  async function openConversation(id) {
+    var c = (state.conversations || []).filter(function (x) { return x.id === id; })[0];
+    state.convId = id;
+    state.convSubject = c ? c.subject : state.convSubject;
+    state.convTitle = c ? c.title : '';
+    state.messages = [];
+    openPage(null);
+    await loadMessages();
+    render();
+  }
+
   function openBank() {
     openPage({ kind: 'bank' });
     loadBank();
@@ -896,14 +1019,24 @@
       number: '',
       stem: q.stem_md || '',
       type: q.qtype || 'short',
-      subject: q.subject || currentSubjectName(),
+      subject: q.subject || '全部',
       options: q.options || []
     };
     if (!state.pendingQuestions.some(function (x) { return x.id === ref.id; })) {
       state.pendingQuestions.push(ref);
     }
-    await switchSubject(ref.subject);
+    // 当前对话科不同（或还没有对话）→ 新建一个该科目的对话
+    if (!state.convId || (state.convSubject || '') !== ref.subject) {
+      try {
+        var r = await api('/conversations', { method: 'POST', json: { subject: ref.subject } });
+        state.convId = r.id;
+        state.convSubject = ref.subject;
+        state.convTitle = '新对话';
+        state.messages = [];
+      } catch (e) { /* 建不了就留在当前对话 */ }
+    }
     openPage(null);
+    await loadMessages();
     render();
     toast('已引用 1 题');
   }
@@ -1374,7 +1507,12 @@
     } else {
       await forceToday();
     }
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
+    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations()]);
+    if (location.hash.indexOf('#c=') === 0) {
+      await openConversation(decodeURIComponent(location.hash.slice(3)));
+    } else {
+      openConversations();
+    }
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
       await loadMessages();
@@ -1441,11 +1579,23 @@
   }
 
   function renderTop() {
-    var el = q('#top-subject');
-    if (!el) return;
-    var cur = (state.subjects && state.subjects.current)
-      || (state.conversation && state.conversation.subject);
-    if (cur) el.textContent = todayLabel(cur);
+    var brand = q('#top-brand');
+    var sub = q('#top-subject');
+    var back = q('#top-back');
+    var inChat = state.view === 'chat' && !!state.convId;
+    if (back) back.hidden = !inChat || (state.page && state.page.kind === 'convs');
+    var pill = q('#top-subj');
+    if (brand) {
+      brand.classList.toggle('chat', inChat);
+      if (inChat) {
+        brand.innerHTML = esc(state.convTitle || '新对话') +
+          (state.convSubject ? ' <span class="topsubj">' + esc(state.convSubject) + '</span>' : '');
+      } else {
+        brand.textContent = '小满';
+      }
+    }
+    if (pill) pill.hidden = inChat;
+    if (sub) sub.textContent = inChat ? '' : '对话';
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
@@ -1455,6 +1605,7 @@
     var mem = q('#rail-memories');
     var kind = state.view === 'page' && state.page ? state.page.kind : '';
     var onBank = kind === 'bank' || kind === 'question';
+    var onConvs = kind === 'convs';
     var onSettings = kind === 'settings';
     var onMem = kind === 'memories';
     var bank = q('#rail-bank');
@@ -2486,6 +2637,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'capture' ? captureSheetHtml()
       : kind === 'qpicker' ? qpickerSheetHtml()
       : kind === 'qrefs' ? qrefsSheetHtml()
+      : kind === 'newchat' ? newChatSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -2832,6 +2984,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       html = settingsPageHtml();
     } else if (page.kind === 'review') {
       html = reviewPageHtml();
+    } else if (page.kind === 'convs') {
+      html = convsPageHtml();
     } else if (page.kind === 'bank') {
       html = bankPageHtml();
     } else if (page.kind === 'question') {
@@ -3310,7 +3464,10 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   }
 
   async function doSend(text, imageIds, imgs, questions, questionIds) {
-    var payload = { text: text, image_ids: imageIds || [], question_ids: questionIds || [], thinking: thinkValue() };
+    var payload = {
+      text: text, image_ids: imageIds || [], question_ids: questionIds || [],
+      thinking: thinkValue(), conversation_id: state.convId || '', subject: state.convSubject || '全部'
+    };
     var userMsg = {
       id: 'tmp-u-' + Date.now(), _key: newKey('u'), role: 'user',
       kind: (imgs && imgs.length) ? 'image' : 'text',
@@ -3709,6 +3866,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'switch-subject': function (el) { switchSubject(el.getAttribute('data-subject')); },
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
+    'back-convs': function () { openConversations(); },
+    'new-conv': function () { openNewChatSheet(); },
+    'new-conv-subject': function (el) { newConversation(el.getAttribute('data-subject')); },
+    'open-conv': function (el) { openConversation(el.getAttribute('data-id')); },
+    'conv-filter': function (el) { state.convFilter = el.getAttribute('data-subject') || ''; loadConversations(); },
     'rail-bank': function () { openBank(); },
     'open-question': function (el) {
       var id = el.getAttribute('data-id');
@@ -3893,7 +4055,12 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     } else {
       await forceToday();
     }
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
+    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations()]);
+    if (location.hash.indexOf('#c=') === 0) {
+      await openConversation(decodeURIComponent(location.hash.slice(3)));
+    } else {
+      openConversations();
+    }
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
       await loadMessages();
@@ -3902,17 +4069,6 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
-    if (location.hash === '#refs') {
-      await switchSubject('化学');
-      openPage(null);
-      await loadMessages();
-      var rr = await api('/questions?limit=3');
-      state.pendingQuestions = (rr.items || []).map(function (q) {
-        return { id: q.id, stem: q.stem_md, type: q.qtype, subject: q.subject, options: q.options || [] };
-      });
-      render();
-      return;
-    }
     if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();

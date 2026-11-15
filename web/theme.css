@@ -1044,3 +1044,27 @@ body.today .composer,body.today #to-bottom{display:none}
 
 
 .noanswer{color:var(--ink3);font-size:var(--s6)}
+
+
+/* ── 对话列表 ───────────────────────────────────── */
+#spaces{display:none !important}
+.topback{flex:none}
+.convbar{display:flex;align-items:center;padding:var(--q3) var(--q4) var(--q2)}
+.convbar .btn{padding:0 var(--q4);height:44px}
+.convwrap{overflow-y:auto;padding:0 var(--q4) var(--q5)}
+.convrow{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;
+  background:none;border:0;border-bottom:1px solid var(--line);padding:var(--q3) 0;
+  font-family:inherit;cursor:pointer}
+.convrow:active{background:var(--fill)}
+.convttl{font-size:var(--s4);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.convmeta{display:flex;align-items:center;gap:var(--q2);min-width:0}
+.convprev{font-size:var(--s6);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+
+/* 对话页顶栏：标题为主、科目为小标记 */
+.top .l1.chat{font-size:var(--s3);color:var(--ink);font-weight:500}
+.topsubj{font-size:var(--s6);color:var(--ink3);font-weight:400;margin-left:6px}
+
+
+.subj[hidden]{display:none !important}
+.top .l2:has(.subj[hidden]){display:none}

@@ -286,8 +286,9 @@ async function handleChat(res, body) {
     return;
   }
 
+  const convKey = body.conversation_id ? `conv:${body.conversation_id}` : `subj:${subject}`;
   const idx = readIndex();
-  const saved = idx[subject];
+  const saved = idx[convKey];
   const sm = saved && existsSync(saved) ? SessionManager.open(saved, SESS_DIR, CWD) : SessionManager.create(CWD, SESS_DIR);
 
   res.writeHead(200, {

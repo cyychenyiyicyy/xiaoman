@@ -60,3 +60,20 @@ def overview(db: Session) -> dict:
         {"subject": s, "count": int(counts.get(s) or 0)} for s in SUBJECTS
     ]
     return {"current": current_subject(db), "items": items}
+
+def create_conversation(db: Session, subject: str) -> Conversation:
+    conv = Conversation(subject=subject, title="")
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+
+def latest_conversation(db: Session, subject: str | None = None, create: bool = True) -> Conversation | None:
+    stmt = select(Conversation).order_by(Conversation.updated_at.desc()).limit(1)
+    if subject:
+        stmt = select(Conversation).where(Conversation.subject == subject).order_by(Conversation.updated_at.desc()).limit(1)
+    conv = db.scalar(stmt)
+    if conv is None and create:
+        conv = create_conversation(db, subject or "全部")
+    return conv

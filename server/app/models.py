@@ -65,6 +65,7 @@ class Conversation(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
     subject: Mapped[str] = mapped_column(String(20), nullable=False, default="全部")
+    title: Mapped[str] = mapped_column(String(80), nullable=False, default="")
     summary_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
     summary_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     summary_until_seq: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
@@ -149,6 +150,7 @@ class CaptureTask(Base):
     page_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     page_no: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     subject: Mapped[str] = mapped_column(String(20), nullable=False, default="全部")
+    title: Mapped[str] = mapped_column(String(80), nullable=False, default="")
     paper_id: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     blocks_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     groups_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

@@ -70,8 +70,13 @@ def _msg_out(m: Message) -> dict:
     }
 
 
-def _conversation(db: Session) -> Conversation:
-    return spaces.current_conversation(db)
+def _conversation(db: Session, conversation_id: str | None = None, subject: str | None = None) -> Conversation:
+    """有 conversation_id 就取那条；否则按学科取最近一条（没有就新建）。"""
+    if conversation_id:
+        conv = db.get(Conversation, conversation_id)
+        if conv is not None:
+            return conv
+    return spaces.latest_conversation(db, subject, create=True)
 
 
 @router.get("/subjects")
@@ -94,8 +99,13 @@ def switch_subject(payload: dict, db: Session = Depends(get_db)):
 
 
 @router.get("/conversation")
-def get_conversation(db: Session = Depends(get_db)):
-    conv = _conversation(db)
+def get_conversation(conversation_id: str | None = None, db: Session = Depends(get_db)):
+    if conversation_id:
+        conv = db.get(Conversation, conversation_id)
+    else:
+        conv = spaces.latest_conversation(db, None, create=False)
+    if conv is None:
+        return {"id": "", "subject": "全部", "message_count": 0}
     count = db.scalar(
         select(func.count()).select_from(Message).where(Message.conversation_id == conv.id)
     )
@@ -172,8 +182,18 @@ def overview_today(db: Session = Depends(get_db)):
 
 
 @router.get("/messages")
-def list_messages(before: str | None = None, limit: int = 50, db: Session = Depends(get_db)):
-    conv = _conversation(db)
+def list_messages(
+    before: str | None = None,
+    limit: int = 50,
+    conversation_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    if conversation_id:
+        conv = db.get(Conversation, conversation_id)
+    else:
+        conv = spaces.latest_conversation(db, None, create=False)
+    if conv is None:
+        return {"total": 0, "items": []}
     limit = max(1, min(limit, 200))
     stmt = (
         select(Message)
@@ -232,6 +252,7 @@ async def _relay_gateway(
             "provider_id": user_msg.provider_id,
             "model_key": user_msg.model_key,
             "thinking": thinking,
+            "conversation_id": conv.id,
         }
     )
     for _qs in question_sources or []:
@@ -388,7 +409,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     if provider is None or model is None:
         raise HTTPException(409, "还没有可用的模型，先添加一个 provider")
 
-    conv = _conversation(db)
+    conv = _conversation(db, payload.conversation_id, payload.subject or spaces.current_subject(db))
 
     from ..models import Question
 
@@ -420,6 +441,10 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         question_block = (
             "\n\n本轮她附上了这些题目（已经结构化，直接用，不要重述题面）：\n" + "\n".join(lines) + "\n"
         )
+
+    if not (conv.title or "").strip() and text:
+        conv.title = text[:30]
+        db.commit()
 
     attachments: list[Attachment] = []
     image_refs: list[dict] = []
