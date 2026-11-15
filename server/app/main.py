@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
-from .api import capture, catalog_api, chat, internal, memories, providers, settings as settings_api, uploads
+from .api import capture, catalog_api, chat, internal, memories, providers, questions, settings as settings_api, uploads
 from .config import settings
 from .db import Base, SessionLocal, engine
 from .seed import ensure_seed
@@ -45,6 +45,7 @@ app.include_router(catalog_api.router, prefix="/api/v1")
 app.include_router(memories.router, prefix="/api/v1")
 app.include_router(internal.router, prefix="/api/v1")
 app.include_router(capture.router, prefix="/api/v1")
+app.include_router(questions.router, prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(settings_api.router, prefix="/api/v1")
 app.include_router(uploads.router, prefix="/api/v1")

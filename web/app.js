@@ -11,6 +11,8 @@
   var state = {
     subjects: null,          // GET /subjects: {current, items}
     subjectScroll: {},       // 每个学科记住滚动位置（docs/11 §3.1）
+    review: null,            // {task, groups} 复核中的一页
+    captureQueue: [],        // 待复核的 task id 队列
     view: 'chat',            // chat | page
     page: null,              // {kind:'models'} | {kind:'provider',providerId} | {kind:'form',providerId}
     overlay: null,           // {kind:'models'} | {kind:'confirm',pid,name}
@@ -376,6 +378,167 @@
       '</div></div>';
   }
 
+  /* ── 采集（M1.4）：拍照上传 → 复核 → 确认入库 ─────────── */
+
+  function currentSubjectName() {
+    return (state.subjects && state.subjects.current) || '全部';
+  }
+
+  async function onCaptureFiles(files) {
+    if (!files || !files.length) return;
+    toast('上传中…');
+    var ids = [];
+    for (var i = 0; i < files.length; i++) {
+      var fd = new FormData();
+      fd.append('file', files[i]);
+      fd.append('subject', currentSubjectName());
+      fd.append('page_no', String(i + 1));
+      try {
+        var r = await api('/capture/pages', { method: 'POST', form: fd });
+        ids.push(r.task_id);
+      } catch (e) {
+        toast('上传失败：' + e.message);
+      }
+    }
+    if (!ids.length) return;
+    state.captureQueue = ids;
+    await openReview(ids[0]);
+  }
+
+  async function openReview(taskId) {
+    try {
+      var t = await api('/capture/tasks/' + encodeURIComponent(taskId) + '?full=true');
+    } catch (e) {
+      toast('读取任务失败：' + e.message);
+      return;
+    }
+    state.review = {
+      task: t,
+      groups: JSON.parse(JSON.stringify((t.groups && t.groups.groups) || []))
+    };
+    openPage({ kind: 'review', taskId: taskId });
+  }
+
+  function flatQuestions(groups) {
+    var out = [];
+    (groups || []).forEach(function (g, gi) {
+      (g.questions || []).forEach(function (q, qi) { out.push({ g: gi, q: qi, item: q }); });
+    });
+    return out;
+  }
+
+  function reviewPageHtml() {
+    var r = state.review;
+    if (!r) return navbar('采集校对', '', 'rail-chat', '返回', false) +
+      '<div class="settings">' + pageErrorState('没有任务', '这一页不存在或已处理', 'rail-chat', 'rail-chat', '返回对话') + '</div>';
+    var t = r.task;
+    var nav = navbar('采集校对', '第 ' + t.page_no + ' 页 · ' + flatQuestions(r.groups).length + ' 题',
+      'rail-chat', '返回', false);
+
+    if (t.status === 'failed') {
+      return nav + '<div class="settings">' +
+        pageErrorState('解析失败', t.error || '不知道原因', 'retry-capture', 'rail-chat', '返回对话') +
+        '</div>';
+    }
+
+    var boxes = flatQuestions(r.groups).map(function (f, i) {
+      var b = f.item.bbox || [];
+      if (b.length < 4) return '';
+      return '<span class="rbox" data-n="' + (i + 1) + '" style="left:' + (b[0] / 10) + '%;top:' + (b[1] / 10) +
+        '%;width:' + ((b[2] - b[0]) / 10) + '%;height:' + ((b[3] - b[1]) / 10) + '%"></span>';
+    }).join('');
+
+    var cards = flatQuestions(r.groups).map(function (f, i) {
+      var q = f.item;
+      return '<div class="rcard" data-gi="' + f.g + '" data-qi="' + f.q + '">' +
+        '<div class="rchead"><span class="rn">' + esc(q.number || String(i + 1)) + '</span>' +
+        '<span class="rt">' + esc(q.type || 'short') + '</span>' +
+        '<span class="sp"></span>' +
+        '<button type="button" class="iconbtn" data-act="rev-del" data-gi="' + f.g + '" data-qi="' + f.q + '" aria-label="删除">' + ic('x', 'sm') + '</button></div>' +
+        '<textarea class="fi rta revstem" rows="2" data-gi="' + f.g + '" data-qi="' + f.q + '">' + escText(q.stem || '') + '</textarea>' +
+        ((q.options || []).length
+          ? '<textarea class="fi rta revopts" rows="' + Math.max(2, q.options.length) + '" data-gi="' + f.g + '" data-qi="' + f.q + '">' +
+            escText((q.options || []).join('\n')) + '</textarea>'
+          : '') +
+        '</div>';
+    }).join('');
+
+    var warn = ((t.groups && t.groups.warnings) || []).slice(0, 3).map(function (w) {
+      return '<div class="rwarn">' + esc(w) + '</div>';
+    }).join('');
+
+    var queue = state.captureQueue.length;
+    return nav +
+      '<div class="rev">' +
+        '<div class="revimg"><div class="revcanvas"><img alt="原页" src="/api/v1/capture/page/' +
+          esc(t.id) + '">' + boxes + '</div></div>' +
+        '<div class="revside">' +
+          (warn ? '<div class="rwarns">' + warn + '</div>' : '') +
+          '<div class="revlist">' + (cards || '<div class="empty"><div class="t">没有题目</div></div>') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="revfoot"><div class="btnbar full">' +
+        '<button type="button" class="btn" data-act="rail-chat">取消</button>' +
+        (t.status === 'done'
+          ? '<button type="button" class="btn" disabled>已入库</button>'
+          : '<button type="button" class="btn p" data-act="confirm-capture">' +
+            (queue > 1 ? '确认并下一张' : '确认入库') + '</button>') +
+      '</div></div>';
+  }
+
+  async function confirmCapture() {
+    var r = state.review;
+    if (!r) return;
+    var payload = { groups: r.groups };
+    try {
+      var res = await api('/capture/tasks/' + encodeURIComponent(r.task.id) + '/confirm', { method: 'POST', json: payload });
+      toast('已入库 ' + res.created + ' 题');
+    } catch (e) {
+      toast('入库失败：' + e.message);
+      return;
+    }
+    state.captureQueue = state.captureQueue.filter(function (id) { return id !== r.task.id; });
+    state.review = null;
+    if (state.captureQueue.length) await openReview(state.captureQueue[0]);
+    else { openPage(null); await loadMessages(); render(); }
+  }
+
+  async function retryCapture() {
+    var r = state.review;
+    if (!r) return;
+    try {
+      await api('/capture/tasks/' + encodeURIComponent(r.task.id) + '/retry', { method: 'POST' });
+      toast('重新解析中…');
+      setTimeout(function () { openReview(r.task.id); }, 2500);
+    } catch (e) {
+      toast('重试失败：' + e.message);
+    }
+  }
+
+  async function deleteReviewQuestion(gi, qi) {
+    var r = state.review;
+    if (!r) return;
+    r.groups[gi].questions.splice(qi, 1);
+    if (!r.groups[gi].questions.length) r.groups.splice(gi, 1);
+    render();
+  }
+
+  function bindReviewInputs() {
+    var host = q('#view-page');
+    if (!host) return;
+    host.addEventListener('input', function (e) {
+      var el = e.target;
+      if (!el.classList) return;
+      var gi = Number(el.getAttribute('data-gi'));
+      var qi = Number(el.getAttribute('data-qi'));
+      var r = state.review;
+      if (!r || !r.groups[gi] || !r.groups[gi].questions[qi]) return;
+      var qq = r.groups[gi].questions[qi];
+      if (el.classList.contains('revstem')) qq.stem = el.value;
+      else if (el.classList.contains('revopts')) qq.options = el.value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+    });
+  }
+
   function renderSpaces() {
     var host = q('#spaces');
     if (!host) return;
@@ -523,6 +686,12 @@
     state.msgState = 'loading';
     await forceToday();
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
+    // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
+    if (location.hash.indexOf('#review=') === 0) {
+      await loadMessages();
+      await openReview(decodeURIComponent(location.hash.slice(8)));
+      return;
+    }
     render();
     if (state.settings && state.settings.provider_id != null) {
       await loadModelsFor(state.settings.provider_id);
@@ -1863,6 +2032,8 @@ function typesetMath(el) {
       html = formHtml(page);
     } else if (page.kind === 'settings') {
       html = settingsPageHtml();
+    } else if (page.kind === 'review') {
+      html = reviewPageHtml();
     } else if (page.kind === 'memories') {
       html = memoriesPageHtml();
     }
@@ -2730,6 +2901,9 @@ function typesetMath(el) {
     'switch-subject': function (el) { switchSubject(el.getAttribute('data-subject')); },
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
+    'confirm-capture': function () { confirmCapture(); },
+    'retry-capture': function () { retryCapture(); },
+    'rev-del': function (el) { deleteReviewQuestion(Number(el.getAttribute('data-gi')), Number(el.getAttribute('data-qi'))); },
     'reload-memories': function () { loadMemories().then(function () { render(); }); },
     'ask-delete-memory': function (el) { askDeleteMemory(el.getAttribute('data-id')); },
     'confirm-delete-memory': function () { doDeleteMemory(); },
@@ -2816,7 +2990,7 @@ function typesetMath(el) {
     q('#btn-attach').addEventListener('click', function () { pickFile('file-attach'); });
     q('#btn-camera').addEventListener('click', function () { pickFile('file-camera'); });
     q('#file-attach').addEventListener('change', function (e) { onFiles(e.target.files); });
-    q('#file-camera').addEventListener('change', function (e) { onFiles(e.target.files); });
+    q('#file-camera').addEventListener('change', function (e) { onCaptureFiles(e.target.files); });
 
     var stream = q('#stream');
     stream.addEventListener('scroll', function () {
@@ -2835,11 +3009,18 @@ function typesetMath(el) {
     await loadSprite();
     hydrateIcons();
     bindEvents();
+    bindReviewInputs();
     autosize();
     render();
 
     await forceToday();
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
+    // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
+    if (location.hash.indexOf('#review=') === 0) {
+      await loadMessages();
+      await openReview(decodeURIComponent(location.hash.slice(8)));
+      return;
+    }
     render();
 
     if (state.settings && state.settings.provider_id != null) {

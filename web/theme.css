@@ -790,3 +790,30 @@ body.today .composer,body.today #to-bottom{display:none}
 .tcard .tt{font-size:var(--s6);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
 .tcard .tr{display:flex;align-items:center;gap:var(--q2);flex:none;color:var(--ink3)}
 .tcard .tc{font-size:var(--s5);font-variant-numeric:tabular-nums;color:var(--ink2)}
+
+
+/* ── 采集复核（M1.4）────────────────────────────── */
+.rev{flex:1;min-height:0;display:flex;gap:var(--q4);padding:var(--q4)}
+.revimg{position:relative;flex:0 0 46%;min-width:0;background:var(--fill);border:1px solid var(--line);
+  border-radius:var(--rc);overflow:hidden;display:grid;place-items:center}
+.revimg img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.revimg .rbox{position:absolute;border:1px solid var(--clay);border-radius:2px;pointer-events:none}
+.revside{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--q2);overflow-y:auto}
+.rwarns{display:flex;flex-direction:column;gap:var(--q1);margin-bottom:var(--q2)}
+.rwarn{font-size:var(--s6);color:var(--ink3);background:var(--fill);border-radius:var(--rb);padding:var(--q2) var(--q3)}
+.revlist{display:flex;flex-direction:column;gap:var(--q3)}
+.rcard{border:1px solid var(--line);border-radius:var(--rc);background:var(--card);padding:var(--q3)}
+.rchead{display:flex;align-items:center;gap:var(--q2);margin-bottom:var(--q2)}
+.rn{font-size:var(--s5);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.rt{font-size:var(--s6);color:var(--ink3)}
+.rta{width:100%;height:auto;min-height:56px;padding:var(--q2) var(--q3);resize:vertical}
+.revopts{margin-top:var(--q2);color:var(--ink2)}
+.revfoot{flex:none;border-top:1px solid var(--line);background:var(--card);padding:0 var(--q4)}
+.revfoot .btnbar{padding:var(--q3) 0}
+@media (max-width: 900px){ .rev{flex-direction:column} .revimg{flex:0 0 40vh} }
+
+
+/* bbox 百分比相对图片实际盒子，不相对留白的容器 */
+.revcanvas{position:relative;display:inline-block;max-width:100%;max-height:100%}
+.revcanvas img{display:block;max-width:100%;max-height:100%}
+.revimg{display:grid;place-items:center;padding:var(--q2)}

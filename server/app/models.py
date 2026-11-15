@@ -152,6 +152,27 @@ class CaptureTask(Base):
     blocks_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     groups_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    question_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class Question(Base):
+    """题目（Anki 的 note 语义）。M1 只建这一张，kp/mistake/card 留给 M2/M3。"""
+
+    __tablename__ = "question"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="全部", index=True)
+    stem_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    answer_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    solution_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    qtype: Mapped[str] = mapped_column(String(16), nullable=False, default="short")
+    options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="capture")
+    source_page: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    bbox: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    page_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    stem_preview_png: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
