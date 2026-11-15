@@ -5,6 +5,7 @@ v3：回合前注入记忆（命中的 id 记进 sources，让「根据记忆生
 """
 import asyncio
 import json
+
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -14,6 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
+import httpx
 
 from ..config import settings
 from ..db import SessionLocal, get_db
@@ -207,6 +210,86 @@ def _web_block(sources: list[dict]) -> str:
     return "\n\n本轮联网检索到的资料（用得上就引用，按编号标出来源）：\n" + "\n".join(lines) + "\n"
 
 
+async def _relay_gateway(
+    db: Session,
+    conv: Conversation,
+    user_msg: Message,
+    assistant: Message,
+    text: str,
+    thinking: str,
+    subject: str,
+) -> AsyncIterator[str]:
+    """PI_GATEWAY 开着时：流由 Pi 产出，消息仍落我们的库。"""
+    gateway = settings.pi_gateway.rstrip("/")
+    yield _sse(
+        {
+            "type": "meta",
+            "user_message_id": user_msg.id,
+            "assistant_message_id": assistant.id,
+            "provider_id": user_msg.provider_id,
+            "model_key": user_msg.model_key,
+            "thinking": thinking,
+        }
+    )
+    text_parts: list[str] = []
+    reason_parts: list[str] = []
+    error = None
+    t0 = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=15.0)) as client:
+            async with client.stream(
+                "POST",
+                f"{gateway}/agent/chat",
+                json={"subject": subject, "text": text, "thinking": thinking},
+            ) as resp:
+                if resp.status_code >= 400:
+                    raw = (await resp.aread()).decode(errors="replace")[:400]
+                    error = {"code": f"gateway_{resp.status_code}", "message": raw}
+                    yield _sse({"type": "error", **error})
+                else:
+                    async for line in resp.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        try:
+                            ev = json.loads(line[5:].strip())
+                        except json.JSONDecodeError:
+                            continue
+                        kind = ev.get("type")
+                        if kind == "text":
+                            text_parts.append(ev.get("delta", ""))
+                            yield _sse({"type": "text", "delta": ev.get("delta", "")})
+                        elif kind == "reasoning":
+                            reason_parts.append(ev.get("delta", ""))
+                            yield _sse({"type": "reasoning", "delta": ev.get("delta", "")})
+                        elif kind in ("tool", "source"):
+                            yield _sse(ev)
+                        elif kind == "error":
+                            error = {"code": ev.get("code", "pi"), "message": ev.get("message", "")}
+                            yield _sse({"type": "error", **error})
+                        elif kind == "done":
+                            break
+    except Exception as exc:  # noqa: BLE001
+        error = {"code": "gateway", "message": str(exc)[:300]}
+        yield _sse({"type": "error", **error})
+
+    with SessionLocal() as s2:
+        row = s2.get(Message, assistant.id)
+        if row is not None:
+            row.content_md = "".join(text_parts)
+            row.reasoning_md = "".join(reason_parts)
+            row.status = "error" if error else "done"
+            row.error = error["message"] if error else ""
+            row.thinking_ms = int((time.monotonic() - t0) * 1000) if reason_parts else 0
+            row.parts = (
+                ([{"type": "reasoning", "text": "".join(reason_parts), "ms": row.thinking_ms}] if reason_parts else [])
+                + [{"type": "text", "text": "".join(text_parts)}]
+            )
+            s2.commit()
+    if error is None:
+        yield _sse({"type": "done", "message_id": assistant.id, "usage": {}, "thinking_ms": 0,
+                    "sources": [], "tools": [], "parts": []})
+
+
 @router.post("/chat")
 async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     text = (payload.text or "").strip()
@@ -288,6 +371,13 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         supports_thinking=model.supports_thinking,
         context_len=model.context_len,
     )
+    if settings.pi_gateway:
+        return StreamingResponse(
+            _relay_gateway(db, conv, user_msg, assistant, text, thinking, conv.subject),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     provider_id, model_ref, assistant_id = provider.id, model.model_key, assistant.id
     user_id = user_msg.id
     conv_id = conv.id
