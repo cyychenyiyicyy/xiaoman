@@ -30,3 +30,9 @@ server/.pytest_cache/
 .vscode/
 .DS_Store
 
+
+# Pi 网关（依赖与运行期）
+agent/node_modules/
+agent/.pi-home/
+agent/.pi-sessions/
+
