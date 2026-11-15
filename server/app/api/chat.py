@@ -24,7 +24,9 @@ from ..models import Attachment, Conversation, Message, Memory
 from ..schemas import ChatIn
 from ..seed import get_current, get_memory_cfg, get_search_cfg
 from ..services import compact as compact_service
+from ..services import deposit as deposit_service
 from ..services import memory as memory_service
+from ..services import quiz as quiz_service
 from ..services import spaces
 from ..services import search as search_service
 from ..services.llm import (
@@ -64,6 +66,7 @@ def _msg_out(m: Message) -> dict:
         "tools": m.tools or [],
         "remembered": m.remembered or [],
         "parts": m.parts or [],
+        "deposits": m.deposits or [],
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -279,6 +282,8 @@ async def _relay_gateway(
                     "text": text,
                     "thinking": thinking,
                     "images": image_paths or [],
+                    "conversation_id": conv.id,
+                    "assistant_message_id": assistant.id,
                 },
             ) as resp:
                 if resp.status_code >= 400:
@@ -379,11 +384,30 @@ async def _relay_gateway(
                 row.completion_tokens = int(usage.get("completion_tokens") or 0)
                 row.cache_hit_tokens = int(usage.get("cache_hit") or 0)
                 row.cache_miss_tokens = int(usage.get("cache_miss") or 0)
+            try:
+                parts = quiz_service.append_quiz_parts(s2, row)
+                row.parts = parts
+            except Exception:  # noqa: BLE001
+                pass
             s2.commit()
         conv2 = s2.get(Conversation, conv.id)
         if conv2 is not None:
             conv2.updated_at = datetime.now(timezone.utc)
             s2.commit()
+
+    # 回合后：自动沉淀（独立任务，不挡流；失败也不影响这次回答）
+    if error is None and text_parts:
+        try:
+            deposit_service.spawn_after_turn(
+                conv.id,
+                assistant.id,
+                user_msg.content_md or "",
+                "".join(text_parts),
+                [{"id": q.get("id", ""), "stem": q.get("stem") or q.get("title", ""), "subject": q.get("subject", "")} for q in (question_sources or [])],
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
     if error is None:
         yield _sse(
             {

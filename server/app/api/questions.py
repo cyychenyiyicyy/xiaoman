@@ -75,6 +75,12 @@ def _out(q: Question, kps: list[dict] | None = None) -> dict:
         "options": q.options or [],
         "grade": q.grade or "",
         "difficulty": int(q.difficulty or 0),
+        "status": q.status or "learning",
+        "error_type": q.error_type or "",
+        "next_due_at": q.next_due_at.isoformat() if q.next_due_at else None,
+        "asked_count": int(q.asked_count or 0),
+        "last_asked_at": q.last_asked_at.isoformat() if q.last_asked_at else None,
+        "streak": int(q.streak or 0),
         "solve_status": q.solve_status or "",
         "solve_error": q.solve_error or "",
         "solved": bool((q.answer_md or "").strip() and (q.solution_md or "").strip()),
@@ -175,6 +181,7 @@ def list_questions(
     kp: str = "",
     q: str = "",
     has_answer: str = "",
+    status: str = "",
     limit: int = 50,
     before: str | None = None,
     db: Session = Depends(get_db),
@@ -186,6 +193,12 @@ def list_questions(
         where.append(Question.grade == grade)
     if difficulty:
         where.append(Question.difficulty == int(difficulty))
+    if status == "due":
+        where.append(Question.status != "mastered")
+        where.append(Question.next_due_at.isnot(None))
+        where.append(Question.next_due_at <= datetime.now(timezone.utc))
+    elif status in ("weak", "learning", "mastered"):
+        where.append(Question.status == status)
     if has_answer == "1":
         where.append(Question.answer_md != "")
     elif has_answer == "0":
@@ -253,6 +266,8 @@ class EditIn(BaseModel):
     qtype: str | None = None
     grade: str | None = None
     difficulty: int | None = None
+    status: str | None = None
+    error_type: str | None = None
     kps: list[str] | None = None
 
 
@@ -278,6 +293,11 @@ def edit_question(qid: str, payload: EditIn, db: Session = Depends(get_db)):
         q.grade = payload.grade.strip()[:10] if payload.grade.strip() in ("高一", "高二", "高三") else ""
     if payload.difficulty is not None:
         q.difficulty = max(0, min(5, int(payload.difficulty)))
+    if payload.status is not None:
+        v = payload.status.strip()
+        q.status = v if v in ("learning", "weak", "mastered") else "learning"
+    if payload.error_type is not None:
+        q.error_type = payload.error_type.strip()[:16]
     if payload.kps is not None:
         knowledge.set_question_kps(db, q, payload.kps)
     db.commit()

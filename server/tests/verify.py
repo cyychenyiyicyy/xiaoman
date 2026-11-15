@@ -36,13 +36,19 @@ EXPECTED_TABLES = {
     "kp",
     "kp_edge",
     "question_kp",
+    "quiz",
+    "deposit",
+    "kp_evidence",
 }
 
 EXPECTED_COLUMNS = {
     "llm_provider": {"id", "name", "base_url", "api_style", "api_key", "api_key_tail", "connected", "kind", "sort"},
     "llm_model": {"id", "provider_id", "model_key", "display_name", "context_len", "supports_images", "supports_thinking", "enabled"},
-    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "status", "created_at"},
-    "question": {"id", "subject", "stem_md", "answer_md", "solution_md", "grade", "difficulty", "solve_status", "solve_error", "solved_at", "ai_meta"},
+    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "deposits", "status", "created_at"},
+    "quiz": {"id", "conversation_id", "stem_md", "options", "answer", "status", "chosen", "correct", "source"},
+    "deposit": {"id", "message_id", "kind", "status", "question_ids", "kp_ids", "meta"},
+    "kp_evidence": {"id", "kp_id", "kind", "weight", "source"},
+    "question": {"id", "subject", "stem_md", "answer_md", "solution_md", "grade", "difficulty", "status", "error_type", "next_due_at", "asked_count", "streak", "solve_status", "solve_error", "solved_at", "ai_meta"},
     "kp": {"id", "subject", "name", "name_norm", "kind", "parent_id", "grade", "q_count"},
     "kp_edge": {"id", "from_kp_id", "to_kp_id", "type", "subject"},
     "question_kp": {"question_id", "kp_id", "weight", "is_primary"},
@@ -229,6 +235,12 @@ def check_api(run: Run) -> None:
                 f"{len(graph.get('nodes') or [])} 点 / {len(graph.get('edges') or [])} 边 / "
                 f"{len(graph.get('modules') or [])} 模块",
             )
+            nudge = client.post("/api/v1/nudges/check").json()
+            run.add(
+                "api.nudges",
+                "PASS" if isinstance(nudge, dict) and "created" in nudge else "FAIL",
+                f"created={nudge.get('created')} due={nudge.get('due')}" if isinstance(nudge, dict) else "bad",
+            )
             qs = client.get("/api/v1/questions?difficulty=3&limit=3").json()
             run.add(
                 "api.questions_filter",
@@ -382,11 +394,33 @@ def check_knowledge(run: Run) -> None:
     run.results[-1].ms = int((time.perf_counter() - started) * 1000)
 
 
+def check_learn(run: Run) -> None:
+    """出题检测的判分（纯函数，不落库）。"""
+    from types import SimpleNamespace
+
+    from app.services import quiz as quiz_service
+
+    started = time.perf_counter()
+    try:
+        choice = SimpleNamespace(options=["A. 甲", "B. 乙", "C. 丙"], answer="B")
+        short = SimpleNamespace(options=[], answer="21%")
+        ok = (
+            quiz_service.grade(choice, "B")
+            and not quiz_service.grade(choice, "A")
+            and quiz_service.grade(short, "21%")
+            and not quiz_service.grade(short, "22%")
+        )
+        run.add("learn.quiz_grade", "PASS" if ok else "FAIL", "选择题按字母、短答按文本")
+    except Exception as exc:  # noqa: BLE001
+        run.add("learn.quiz_grade", "FAIL", f"{type(exc).__name__}: {exc}"[:200])
+    run.results[-1].ms = int((time.perf_counter() - started) * 1000)
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", default="schema,migration,api,catalog,memory,kp")
+    parser.add_argument("--only", default="schema,migration,api,catalog,memory,kp,learn")
     parser.add_argument("--selftest", action="store_true", help="注入一个假失败，验证脚本会 exit 1")
     parser.add_argument("--destructive", action="store_true")
     args = parser.parse_args()
@@ -411,6 +445,8 @@ def main() -> int:
         check_memory(run)
     if "kp" in selected:
         check_knowledge(run)
+    if "learn" in selected:
+        check_learn(run)
     for name in ("fsrs", "export"):
         if name in selected:
             run.add(name, "SKIP", "MVP 未实现（M2 / M3 末）")

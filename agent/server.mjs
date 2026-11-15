@@ -53,7 +53,7 @@ function xiaomanPrompt(subject, activeSkills) {
 - 不确定就说不确定；库里没有的不要编。公式用行内 LaTeX（$...$）。
 - 中文回答。
 
-你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）。
+你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）、quiz_create（给她出一道检测题）。
 不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
 她问「记住…」时，用 memory_add 记下来再简短确认。
 当前启用了讲题流程时，按下面技能里的步骤做。` + loadSkills(activeSkills);
@@ -115,7 +115,7 @@ function cardsText(result, limit = 2000) {
 }
 
 // 每个请求一份收集器：工具来源 / 新记忆
-function makeTools(collect, caps) {
+function makeTools(collect, caps, ctx) {
   const wrap = (name, label, description, parameters, run, extra) =>
     defineTool({
       name,
@@ -186,7 +186,7 @@ function makeTools(collect, caps) {
     ),
   ];
 
-  // 题库三件套：只在「讲题」场景装载，其余时候不挂（不用就卸载）
+  // 题库 + 出题：只在「讲题 / 检测」场景装载，其余时候不挂（不用就卸载）
   if (!caps || !caps.questions) return base;
   return base.concat([
     wrap(
@@ -246,13 +246,46 @@ function makeTools(collect, caps) {
       (p) => callTool("/internal/tools/question_update", p),
       { promptGuidelines: ["题库里已有题目但答案为空或题干有错时，直接改，不要询问。"] }
     ),
+    wrap(
+      "quiz_create",
+      "出题检测",
+      "给她出一道题，检查她真的会了没有。讲完一道题、她说「考考我 / 测一测」，或你想确认她是否听懂时调用。题目会变成一张可作答的卡片出现在对话里。",
+      Type.Object({
+        stem: Type.String({ description: "题干（完整、可独立作答）" }),
+        options: Type.Array(Type.String(), { description: "四个选项，形如 ['A. …','B. …']；开放题传空数组" }),
+        answer: Type.String({ description: "正确答案（选择题写字母，如 B）" }),
+        explanation: Type.Optional(Type.String({ description: "一句解析，答完才展示" })),
+        kps: Type.Optional(Type.Array(Type.String(), { description: "考的知识点名（用教材叫法）" })),
+        question_id: Type.Optional(Type.String({ description: "如果就是题库里那道题的重做，传它的 id" })),
+        difficulty: Type.Optional(Type.Number({ description: "1–5" })),
+      }),
+      (p) =>
+        callTool("/internal/tools/quiz_create", {
+          conversation_id: (ctx && ctx.conversation_id) || "",
+          message_id: (ctx && ctx.message_id) || "",
+          subject: (ctx && ctx.subject) || "全部",
+          stem: p.stem,
+          options: p.options || [],
+          answer: p.answer || "",
+          explanation: p.explanation || "",
+          kps: p.kps || [],
+          question_id: p.question_id || "",
+        }),
+      {
+        promptGuidelines: [
+          "出完题只用一句话说「来，做一道」，不要在这轮里报答案或解析；卡片会自己收答案。",
+          "一次只出一道；优先考她刚问的那个知识点，不要超纲。",
+          "选择题给四个选项；答案只写字母。",
+        ],
+      }
+    ),
   ]);
 }
 
 const THINK = { off: "off", low: "low", med: "medium", high: "high" };
 
 // 这一轮要不要装「讲题」能力：引用题目了，或者话里在问题目
-const QUESTION_RE = /(这|那|哪)道?题|怎么(做|解|写|选)|为什么(选|错)|解析|答案解析|题库|对不对|答案是什么|求[解值]/;
+const QUESTION_RE = /(这|那|哪)道?题|怎么(做|解|写|选)|为什么(选|错)|解析|答案解析|题库|对不对|答案是什么|求[解值]|考考|考我|测一测|测一下|检测|会不会|出(一)?道题/;
 
 function planCapabilities(body, text) {
   const byRef = Array.isArray(body.question_ids) && body.question_ids.length > 0;
@@ -300,7 +333,7 @@ async function handleChat(res, body) {
 
   const collect = { sources: [], remembered: [], parts: [], emit: (o) => sse(res, o) };
   const caps = planCapabilities(body, body.text || "");
-  const tools = makeTools(collect, caps);
+  const tools = makeTools(collect, caps, { conversation_id: body.conversation_id || "", message_id: body.assistant_message_id || "", subject });
 
   const loader = new DefaultResourceLoader({
     cwd: CWD,

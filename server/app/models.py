@@ -99,6 +99,7 @@ class Message(Base):
     tools: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     remembered: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     parts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    deposits: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cache_hit_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -237,6 +238,12 @@ class Question(Base):
     options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     grade: Mapped[str] = mapped_column(String(10), nullable=False, default="")  # 高一/高二/高三
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 0 未评 / 1..5
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="learning", index=True)  # learning|weak|mastered
+    error_type: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    asked_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     solve_status: Mapped[str] = mapped_column(String(12), nullable=False, default="")  # ''|queued|running|done|failed|skipped
     solve_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -247,4 +254,67 @@ class Question(Base):
     page_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     stem_preview_png: Mapped[str] = mapped_column(Text, nullable=False, default="")
     stem_fp: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class Quiz(Base):
+    """她出给用户的一道检测题（Agent 工具 / 主动消息 / 题库重做都走这张表）。"""
+
+    __tablename__ = "quiz"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    message_id: Mapped[str | None] = mapped_column(
+        ForeignKey("message.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    question_id: Mapped[str | None] = mapped_column(
+        ForeignKey("question.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    stem_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    answer: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    kp_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    kp_names: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="pending")  # pending|answered|skipped
+    chosen: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    source: Mapped[str] = mapped_column(String(12), nullable=False, default="agent")  # agent|question|kp|nudge
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Deposit(Base):
+    """一次「自动沉淀」：她记下了哪几道题、哪几个点（可撤销）。"""
+
+    __tablename__ = "deposit"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    message_id: Mapped[str] = mapped_column(
+        ForeignKey("message.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, default="question")  # question|knowledge|mixed
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="active")  # active|undone
+    question_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    kp_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class KpEvidence(Base):
+    """知识点掌握度的证据（只追加）：问过、测验错、测验对、沉淀。"""
+
+    __tablename__ = "kp_evidence"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    kp_id: Mapped[str] = mapped_column(ForeignKey("kp.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="asked")  # asked|deposit|quiz_wrong|quiz_right
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.3)
+    source: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

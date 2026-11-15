@@ -16,6 +16,7 @@
     capturePending: [],      // 处理中/待复核的任务（角标用）
     bank: null,              // {items,total,subject,q,grade,difficulty,kp}
     bankSolvedTimer: 0,      // 解析轮询计时器
+    depositTimer: 0,         // 自动沉淀轮询
     kpPick: null,            // 知识点选择/筛选弹层的数据
     map: null,               // 知识地图：{subject,module,chapter,data,loading,error,selected,q,ver}
     mapCy: null,             // cytoscape 实例
@@ -333,6 +334,7 @@
       sources: Array.isArray(m.sources) ? m.sources : [],
       remembered: Array.isArray(m.remembered) ? m.remembered : [],
       parts: Array.isArray(m.parts) ? m.parts : [],
+      deposits: Array.isArray(m.deposits) ? m.deposits : [],
       thinking_ms: m.thinking_ms || 0,
       provider_id: m.provider_id,
       model_key: m.model_key,
@@ -968,6 +970,8 @@
       qtype: q.qtype || 'short',
       grade: q.grade || '',
       difficulty: Number(q.difficulty || 0),
+      status: q.status || 'learning',
+      error_type: q.error_type || '',
       stem: q.stem_md || '',
       answer: q.answer_md || '',
       solution: q.solution_md || '',
@@ -983,6 +987,9 @@
     }).join('');
     var diffOpts = [0, 1, 2, 3, 4, 5].map(function (n) {
       return '<option value="' + n + '"' + (Number(o.difficulty) === n ? ' selected' : '') + '>' + (n ? n + ' · ' + diffLabel(n) : '未评') + '</option>';
+    }).join('');
+    var statusOpts = [['learning', '在学'], ['weak', '待解决'], ['mastered', '已掌握']].map(function (x) {
+      return '<option value="' + x[0] + '"' + ((o.status || 'learning') === x[0] ? ' selected' : '') + '>' + x[1] + '</option>';
     }).join('');
     return '<div class="scrim" data-act="close-sheet"></div>' +
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qe-ttl" tabindex="-1">' +
@@ -1002,6 +1009,10 @@
           '<label class="ffield"><span class="slabel">年级</span><select class="fi" id="qe-grade">' + gradeOpts + '</select></label>' +
           '<label class="ffield"><span class="slabel">难度</span><select class="fi" id="qe-diff">' + diffOpts + '</select></label>' +
         '</div>' +
+        '<div class="frow2">' +
+          '<label class="ffield"><span class="slabel">状态</span><select class="fi" id="qe-status">' + statusOpts + '</select></label>' +
+          '<label class="ffield"><span class="slabel">错因</span><input class="fi" id="qe-error" placeholder="概念 / 计算 / 审题…" value="' + esc(o.error_type || '') + '"></label>' +
+        '</div>' +
       '</div>' +
       '<div class="sheet-foot"><div class="btnbar full">' +
         '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
@@ -1018,7 +1029,9 @@
       answer: (q('#qe-answer') || {}).value || '',
       solution: (q('#qe-solution') || {}).value || '',
       grade: (q('#qe-grade') || {}).value || '',
-      difficulty: Number((q('#qe-diff') || {}).value || 0)
+      difficulty: Number((q('#qe-diff') || {}).value || 0),
+      status: (q('#qe-status') || {}).value || 'learning',
+      error_type: (q('#qe-error') || {}).value || ''
     };
     try {
       var r = await api('/questions/' + encodeURIComponent(o.id), { method: 'PATCH', json: body });
@@ -1039,8 +1052,11 @@
 
   function diffLabel(n) { return DIFFS[Number(n)] || ''; }
 
+  var Q_STATUS = { weak: '待解决', learning: '在学', mastered: '已掌握' };
+  function qStatusLabel(s) { return Q_STATUS[s] || '在学'; }
+
   function bankState() {
-    return state.bank || { items: [], total: 0, subject: '', q: '', grade: '', difficulty: 0, kp: '', kpName: '' };
+    return state.bank || { items: [], total: 0, subject: '', q: '', grade: '', difficulty: 0, kp: '', kpName: '', status: '' };
   }
 
   function openBank() {
@@ -1053,7 +1069,7 @@
     state.bank = {
       items: b.items || [], total: b.total || 0, subject: b.subject || '', q: b.q || '',
       grade: b.grade || '', difficulty: b.difficulty || 0, kp: b.kp || '', kpName: b.kpName || '',
-      error: ''
+      status: b.status || '', error: ''
     };
     Object.keys(patch || {}).forEach(function (k) { state.bank[k] = patch[k]; });
     loadBank();
@@ -1068,15 +1084,16 @@
       if (b.grade) params.push('grade=' + encodeURIComponent(b.grade));
       if (b.difficulty) params.push('difficulty=' + Number(b.difficulty));
       if (b.kp) params.push('kp=' + encodeURIComponent(b.kp));
+      if (b.status) params.push('status=' + encodeURIComponent(b.status));
       var r = await api('/questions?' + params.join('&'));
       state.bank = {
         items: r.items || [], total: r.total || 0, subject: b.subject, q: b.q,
-        grade: b.grade, difficulty: b.difficulty, kp: b.kp, kpName: b.kpName
+        grade: b.grade, difficulty: b.difficulty, kp: b.kp, kpName: b.kpName, status: b.status
       };
     } catch (e) {
       state.bank = {
         items: [], total: 0, subject: b.subject, q: b.q, grade: b.grade,
-        difficulty: b.difficulty, kp: b.kp, kpName: b.kpName, error: e.message
+        difficulty: b.difficulty, kp: b.kp, kpName: b.kpName, status: b.status, error: e.message
       };
     }
     render();
@@ -1100,12 +1117,13 @@
     var o = state.overlay;
     if (!o || o.kind !== 'bankfilter') return;
     if (o.field === 'grade') bankPatch({ grade: value || '' });
+    else if (o.field === 'status') bankPatch({ status: value || '' });
     else bankPatch({ difficulty: Number(value) || 0 });
     closeOverlay();
   }
 
   function bankReset() {
-    bankPatch({ subject: '', grade: '', difficulty: 0, kp: '', kpName: '', q: '' });
+    bankPatch({ subject: '', grade: '', difficulty: 0, kp: '', kpName: '', q: '', status: '' });
   }
 
   function bankHasPendingSolve() {
@@ -1218,20 +1236,31 @@
     if (!o || o.kind !== 'bankfilter') return '';
     var b = bankState();
     var field = o.field;
-    var options = field === 'grade'
-      ? [{ v: '', t: '全部' }].concat(GRADES.map(function (g) { return { v: g, t: g }; }))
-      : [{ v: 0, t: '全部' }].concat([1, 2, 3, 4, 5].map(function (n) { return { v: n, t: diffLabel(n) }; }));
-    var cur = field === 'grade' ? (b.grade || '') : (Number(b.difficulty) || 0);
+    var options;
+    if (field === 'grade') {
+      options = [{ v: '', t: '全部' }].concat(GRADES.map(function (g) { return { v: g, t: g }; }));
+    } else if (field === 'status') {
+      options = [
+        { v: '', t: '全部' }, { v: 'weak', t: '待解决' }, { v: 'learning', t: '在学' },
+        { v: 'mastered', t: '已掌握' }, { v: 'due', t: '待复习' }
+      ];
+    } else {
+      options = [{ v: 0, t: '全部' }].concat([1, 2, 3, 4, 5].map(function (n) { return { v: n, t: diffLabel(n) }; }));
+    }
+    var cur = field === 'grade' ? (b.grade || '')
+      : field === 'status' ? (b.status || '')
+        : (Number(b.difficulty) || 0);
     var rows = options.map(function (op) {
       var on = String(op.v) === String(cur);
       return '<button type="button" class="caprow' + (on ? ' on' : '') + '" data-act="bank-filter-pick" data-v="' + esc(String(op.v)) + '">' +
         '<span>' + esc(op.t) + '</span><span class="sp"></span>' +
         (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
     }).join('');
+    var title = field === 'grade' ? '年级' : field === 'status' ? '状态' : '难度';
     return '<div class="scrim" data-act="close-sheet"></div>' +
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bf-ttl" tabindex="-1">' +
       '<div class="grab"></div>' +
-      '<div class="shd"><div class="ttl" id="bf-ttl">' + (field === 'grade' ? '年级' : '难度') + '</div>' +
+      '<div class="shd"><div class="ttl" id="bf-ttl">' + title + '</div>' +
       '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
       '<div class="sheet-body"><div class="capmenu">' + rows + '</div></div>' +
       '</div>';
@@ -1284,6 +1313,12 @@
     var tags = '<span class="tag">' + esc(q.subject || '全部') + '</span>' +
       (q.grade ? '<span class="tag">' + esc(q.grade) + '</span>' : '') +
       (q.difficulty ? '<span class="tag">' + esc(diffLabel(q.difficulty)) + '</span>' : '');
+    var state = q.status || 'learning';
+    if (state === 'weak') tags += '<span class="tag stweak">待解决</span>';
+    else if (state === 'mastered') tags += '<span class="tag stok">已掌握</span>';
+    if (q.error_type) tags += '<span class="tag">' + esc(q.error_type) + '</span>';
+    var due = q.next_due_at && new Date(q.next_due_at).getTime() <= Date.now() && state !== 'mastered';
+    if (due) tags += '<span class="tag stdue">待复习</span>';
     var thumb = q.image_url
       ? '<img class="qthumb" src="' + esc(q.image_url) + '" alt="">'
       : '';
@@ -1334,11 +1369,13 @@
         (s || '全部') + (s ? '' : ' ' + (b.total || 0)) + '</span>';
     }).join('');
 
-    var anyFilter = !!(b.grade || b.difficulty || b.kp);
+    var anyFilter = !!(b.grade || b.difficulty || b.kp || b.status);
     var missing = (b.items || []).filter(function (x) {
       return !(x.solution_md || '').trim() && x.solve_status !== 'queued' && x.solve_status !== 'running';
     }).length;
     var filters = '<div class="bankfilters">' +
+      '<button type="button" class="fchip' + (b.status ? ' on' : '') + '" data-act="bank-open-filter" data-field="status">' +
+        (b.status ? (b.status === 'due' ? '待复习' : qStatusLabel(b.status)) : '状态') + '</button>' +
       '<button type="button" class="fchip' + (b.grade ? ' on' : '') + '" data-act="bank-open-filter" data-field="grade">' +
         (b.grade || '年级') + '</button>' +
       '<button type="button" class="fchip' + (b.difficulty ? ' on' : '') + '" data-act="bank-open-filter" data-field="difficulty">' +
@@ -1388,6 +1425,12 @@
       '<span class="tag">' + esc(r.subject || '全部') + '</span>';
     if (r.grade) out += '<span class="tag">' + esc(r.grade) + '</span>';
     if (r.difficulty) out += '<span class="tag">' + esc(diffLabel(r.difficulty)) + '</span>';
+    if (r.status === 'weak') out += '<span class="tag stweak">待解决</span>';
+    else if (r.status === 'mastered') out += '<span class="tag stok">已掌握</span>';
+    if (r.error_type) out += '<span class="tag">' + esc(r.error_type) + '</span>';
+    if (r.next_due_at && r.status !== 'mastered' && new Date(r.next_due_at).getTime() <= Date.now()) {
+      out += '<span class="tag stdue">待复习</span>';
+    }
     return out;
   }
 
@@ -2299,6 +2342,189 @@
     else el.scrollTop = prev;
   }
 
+  /* ── 检测卡 / 沉淀条 / 主动消息 ─────────────────── */
+
+  function quizCardHtml(q) {
+    if (!q || !q.id) return '';
+    var answered = q.status === 'answered';
+    var rm = /[A-F]/.exec(String(q.answer || '').toUpperCase());
+    var rightLetter = rm ? rm[0] : '';
+    var cm = /[A-F]/.exec(String(q.chosen || '').toUpperCase());
+    var chosenLetter = cm ? cm[0] : '';
+    var opts = (q.options || []).map(function (o, i) {
+      var letter = String.fromCharCode(65 + i);
+      var cls = '';
+      if (answered) {
+        if (letter === rightLetter) cls = ' right';
+        else if (letter === chosenLetter) cls = ' wrong';
+      }
+      var text = String(o).replace(/^[A-F][.、．]\s*/, '');
+      return '<button type="button" class="quizopt' + cls + '" data-act="quiz-pick" data-id="' + esc(q.id) +
+        '" data-choice="' + letter + '"' + (answered ? ' disabled' : '') + '>' +
+        '<span class="k">' + letter + '</span><span class="t">' + stemHtml(text) + '</span></button>';
+    }).join('');
+    var res = '';
+    if (answered) {
+      res = '<div class="quizres ' + (q.correct ? 'ok' : 'bad') + '">' +
+        (q.correct ? '答对了' : '答错了，正确答案是 ' + esc(rightLetter || q.answer)) + '</div>' +
+        (q.explanation ? '<div class="quizexp">' + stemHtml(q.explanation) + '</div>' : '') +
+        '<div class="quizfoot"><button type="button" class="quizask" data-act="quiz-ask" data-id="' + esc(q.id) + '">让她讲</button></div>';
+    }
+    return '<div class="quizcard" data-quiz="' + esc(q.id) + '">' +
+      '<div class="quizhd"><span class="tag">检测</span>' +
+      ((q.kp_names || []).length ? '<span class="quizkp">' + esc(q.kp_names[0]) + '</span>' : '') +
+      '</div>' +
+      '<div class="quizstem">' + stemHtml(q.stem_md || '') + '</div>' +
+      (opts ? '<div class="quizopts">' + opts + '</div>'
+        : '<div class="quizhint">开放题：写在纸上，再让我看</div>') +
+      res +
+      '</div>';
+  }
+
+  function quizPartsHtml(m) {
+    return (m.parts || []).filter(function (p) { return p && p.type === 'quiz' && p.quiz; })
+      .map(function (p) { return quizCardHtml(p.quiz); }).join('');
+  }
+
+  function findQuizPart(id) {
+    for (var i = 0; i < state.messages.length; i++) {
+      var parts = state.messages[i].parts || [];
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j] && parts[j].type === 'quiz' && parts[j].quiz && parts[j].quiz.id === id) return parts[j];
+      }
+    }
+    return null;
+  }
+
+  async function answerQuiz(id, choice) {
+    try {
+      var res = await api('/quizzes/' + encodeURIComponent(id) + '/answer', { method: 'POST', json: { chosen: choice } });
+      var part = findQuizPart(id);
+      if (part) part.quiz = res.quiz;
+      renderStream(true);
+      scrollToBottom(false);
+    } catch (e) {
+      toast('提交失败：' + e.message);
+    }
+  }
+
+  function quizAsk(id) {
+    var part = findQuizPart(id);
+    var qz = part && part.quiz;
+    if (!qz) return;
+    var ta = q('#ta');
+    if (!ta) return;
+    var kp = (qz.kp_names || [])[0] || '这道题';
+    ta.value = '「' + kp + '」我还是没太懂，换个讲法。';
+    autosize();
+    syncSend();
+    ta.focus();
+  }
+
+  function nudgeHtml(m) {
+    var p = (m.parts || []).filter(function (x) { return x && x.type === 'nudge'; })[0];
+    if (!p) return '';
+    var acts = (p.actions || []).map(function (a) {
+      return '<button type="button" class="btn" data-act="nudge-act" data-kind="' + esc(a.act || '') +
+        '" data-kp="' + esc(a.kp || '') + '">' + esc(a.label || '') + '</button>';
+    }).join('');
+    return '<div class="agbody nudgebody">' + renderMarkdown(m.content_md || '') + '</div>' +
+      (acts ? '<div class="nudgeacts">' + acts + '</div>' : '');
+  }
+
+  async function nudgeAct(el) {
+    var kind = el.getAttribute('data-kind');
+    if (kind === 'bank-due') {
+      bankPatch({ status: 'due', subject: '', grade: '', difficulty: 0, kp: '', kpName: '', q: '' });
+      openBank();
+      return;
+    }
+    if (kind === 'nudge-quiz') {
+      var kp = el.getAttribute('data-kp') || '';
+      try {
+        var res = await api('/quizzes/auto', {
+          method: 'POST',
+          json: { conversation_id: state.convId || '', kp_id: kp, due: !kp }
+        });
+        if (res.conversation_id && res.conversation_id !== state.convId) {
+          await openConversation(res.conversation_id);
+        } else {
+          await loadMessages();
+          render();
+        }
+        toast('出了一道');
+        setTimeout(function () { scrollToBottom(true); }, 120);
+      } catch (e) {
+        toast('出题失败：' + e.message);
+      }
+    }
+  }
+
+  function depositBarHtml(m) {
+    var list = m.deposits || [];
+    if (!list.length) return '';
+    var active = list.filter(function (d) { return d.status === 'active'; });
+    if (!active.length) return '<div class="depbar done">已撤销</div>';
+    var d = active[active.length - 1];
+    var bits = [];
+    if (d.questions) bits.push('错题 ' + d.questions);
+    if ((d.kps || []).length) bits.push('知识点 ' + d.kps.length);
+    return '<div class="depbar">' + ic('book-open-text', 'sm') +
+      '<span>已记：' + esc(bits.join(' · ')) + '</span><span class="sp"></span>' +
+      '<button type="button" data-act="dep-undo" data-id="' + esc(d.id) + '" data-key="' + esc(m._key) + '">撤销</button>' +
+      '</div>';
+  }
+
+  async function undoDeposit(id, key) {
+    try {
+      var res = await api('/deposits/' + encodeURIComponent(id) + '/undo', { method: 'POST' });
+      var m = findMessageByKey(key);
+      if (m) m.deposits = res.deposits || [];
+      renderStream(true);
+    } catch (e) {
+      toast('撤销失败：' + e.message);
+    }
+  }
+
+  function pollDeposit(messageId) {
+    clearTimeout(state.depositTimer);
+    var tries = 0;
+    var tick = async function () {
+      tries += 1;
+      if (!state.convId) return;
+      try {
+        var r = await api('/messages?conversation_id=' + encodeURIComponent(state.convId) + '&limit=60');
+        var found = (r.items || []).filter(function (x) { return x.id === messageId; })[0];
+        var local = null;
+        for (var i = 0; i < state.messages.length; i++) if (state.messages[i].id === messageId) local = state.messages[i];
+        if (found && local && (found.deposits || []).length &&
+          JSON.stringify(found.deposits) !== JSON.stringify(local.deposits || [])) {
+          local.deposits = found.deposits;
+          local.parts = found.parts || local.parts;
+          renderStream(true);
+          scrollToBottom(false);
+          return;
+        }
+      } catch (e) { /* 下一轮再试 */ }
+      if (tries < 3) state.depositTimer = setTimeout(tick, 5000);
+    };
+    state.depositTimer = setTimeout(tick, 4500);
+  }
+
+  async function checkNudge() {
+    try {
+      var r = await api('/nudges/check', { method: 'POST' });
+      if (!r || !r.created) return;
+      await loadConversations();
+      if (state.convId && state.convId === r.conversation_id) {
+        await loadMessages();
+        render();
+      } else {
+        toast('小满给你留了句话');
+      }
+    } catch (e) { /* 主动消息失败不打扰 */ }
+  }
+
   function msgHtml(m) {
     if (m.role === 'user') {
       var imgs = (m.images || []).map(function (im) {
@@ -2322,10 +2548,14 @@
         (imgs ? '<div class="ustack">' + imgs + '</div>' : '') + text + '</div></div>';
     }
     var inner = '';
+    if (m.kind === 'nudge') {
+      return '<div class="ag nudgeag" data-key="' + esc(m._key) + '">' + nudgeHtml(m) + '</div>';
+    }
     var useParts = !!(m.parts && m.parts.length && m.status !== 'streaming');
     if (useParts) {
       inner += thinkingGroupHtml(m);
       inner += partsAnswersHtml(m);
+      inner += quizPartsHtml(m);
     } else {
       if (m.reasoning_md) inner += reasoningHtml(m);
       if (m._st) {
@@ -2339,6 +2569,7 @@
     }
     if (!useParts) inner += statusRowHtml(m);
     inner += sourceLineHtml(m);
+    inner += depositBarHtml(m);
     if (m.error) inner += msgErrorHtml(m);
     return '<div class="ag" data-key="' + esc(m._key) + '">' + inner + '</div>';
   }
@@ -4924,6 +5155,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
           asst.usage = ev.usage || null;
           if (ev.thinking_ms) { asst.thinking_ms = ev.thinking_ms; asst._thinkMs = ev.thinking_ms; }
           if (ev.parts && ev.parts.length) asst.parts = ev.parts;
+          asst._hasQuiz = (asst.parts || []).some(function (p) { return p && p.type === 'quiz'; });
           if (Array.isArray(ev.tools)) asst.tools = ev.tools.slice();
           if (Array.isArray(ev.sources)) asst.sources = ev.sources.slice();
           if (Array.isArray(ev.remembered)) mergeRemembered(asst, ev.remembered);
@@ -4951,7 +5183,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       asst.error = '连接中断';
       asst.canRetry = true;
       dropLive(asst);
-    } else if (!asst.content_md) {
+    } else if (!asst.content_md && !asst._hasQuiz) {
       asst.status = 'error';
       asst.error = '空回复';
       dropLive(asst);
@@ -4959,13 +5191,18 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       asst.status = 'done';
     }
 
-    if (asst._st) {
+    if (asst._hasQuiz) {
+      dropLive(asst);
+      renderStream(true);
+      scrollToBottom(false);
+    } else if (asst._st) {
       asst._st.target = asst.content_md;
       asst._st.final = true;
       pumpReveal(asst);
     } else {
       renderStream(true);
     }
+    if (sawDone && !srvErr && asst.id) pollDeposit(asst.id);
   }
 
   async function retryMessage(key) {
@@ -5224,6 +5461,10 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'map-zoom-fit': function () { mapZoomFit(); },
     'map-bank': function (el) { mapOpenBank(el.getAttribute('data-id') || ''); },
     'map-open-q': function (el) { openQuestionPanel(el.getAttribute('data-id') || ''); },
+    'quiz-pick': function (el) { answerQuiz(el.getAttribute('data-id') || '', el.getAttribute('data-choice') || ''); },
+    'quiz-ask': function (el) { quizAsk(el.getAttribute('data-id') || ''); },
+    'dep-undo': function (el) { undoDeposit(el.getAttribute('data-id') || '', el.getAttribute('data-key') || ''); },
+    'nudge-act': function (el) { nudgeAct(el); },
     'kp-open-map': function (el) { openMapPoint(el.getAttribute('data-id') || ''); },
     'edit-question': function () { openEditQuestion(state.question); },
     'qedit-save': function () { saveEditQuestion(); },
@@ -5521,6 +5762,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     await loadMessages();
     render();
+    checkNudge();
   }
 
   boot();

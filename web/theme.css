@@ -1282,3 +1282,41 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
 .caprow .capchk{position:static;top:auto;right:auto;width:18px;height:18px;background:transparent;
   color:var(--clay);box-shadow:none;display:grid;place-items:center}
 .caprow .capchk .ic{color:var(--clay)}
+
+/* ══ 检测卡 / 沉淀条 / 主动消息（P5.5）═══════════════ */
+.quizcard{margin-top:var(--q3);border:1px solid var(--line);border-radius:var(--rc);background:var(--card);padding:var(--q3);max-width:640px}
+.quizhd{display:flex;align-items:center;gap:var(--q2);margin-bottom:var(--q2)}
+.quizhd .tag{margin:0;border-color:var(--clayline);color:var(--clay)}
+.quizkp{font-size:var(--s6);color:var(--ink3)}
+.quizstem{font-size:var(--s4);line-height:var(--l4);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.quizopts{display:flex;flex-direction:column;gap:var(--q2);margin-top:var(--q2)}
+.quizopt{display:flex;gap:var(--q2);align-items:flex-start;min-height:44px;padding:var(--q2) var(--q3);border:1px solid var(--line2);border-radius:var(--rb);background:var(--paper);color:var(--ink);font-family:inherit;font-size:var(--s5);line-height:var(--l5);text-align:left;cursor:pointer}
+.quizopt:active{background:var(--fill)}
+.quizopt .k{width:20px;height:20px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--fill);color:var(--ink2);font-size:var(--s6)}
+.quizopt .t{flex:1;min-width:0}
+.quizopt.right{border-color:var(--clay);background:var(--claybg)}
+.quizopt.right .k{background:var(--clay);color:var(--on-clay)}
+.quizopt.wrong{border-color:var(--clayline);background:var(--claybg)}
+.quizopt.wrong .k{background:var(--clayline);color:var(--clay)}
+.quizopt:disabled{cursor:default}
+.quizres{margin-top:var(--q2);font-size:var(--s5);font-weight:500}
+.quizres.ok{color:var(--sage)}
+.quizres.bad{color:var(--clay)}
+.quizexp{margin-top:var(--q1);font-size:var(--s5);color:var(--ink2);line-height:var(--l5);white-space:pre-wrap}
+.quizfoot{margin-top:var(--q2)}
+.quizask{border:0;background:none;color:var(--clay);font-family:inherit;font-size:var(--s5);padding:0;cursor:pointer}
+.quizhint{font-size:var(--s6);color:var(--ink3);margin-top:var(--q2)}
+.depbar{display:flex;align-items:center;gap:var(--q1);margin-top:var(--q2);font-size:var(--s6);color:var(--ink3)}
+.depbar .sp{flex:1}
+.depbar button{border:0;background:none;color:var(--clay);font-family:inherit;font-size:var(--s6);padding:2px var(--q1);cursor:pointer}
+.depbar.done{color:var(--ink3)}
+.nudgeag .nudgebody{background:var(--claybg);border:1px solid var(--clayline);border-radius:var(--rc);padding:var(--q3);color:var(--ink)}
+.nudgeacts{display:flex;gap:var(--q2);margin-top:var(--q2);flex-wrap:wrap}
+.nudgeacts .btn{height:40px}
+.tag.stweak{background:var(--claybg);border-color:var(--clayline);color:var(--clay)}
+.tag.stok{background:var(--sagebg);border-color:var(--sagebg);color:var(--sage)}
+.tag.stdue{border-color:var(--clayline);color:var(--clay)}
+
+/* 主动消息的动作按钮：描边，不抢 filled */
+.nudgeacts .btn{border:1px solid var(--line2);background:var(--card);padding:0 var(--q4)}
+.nudgeacts .btn:active{background:var(--fill)}

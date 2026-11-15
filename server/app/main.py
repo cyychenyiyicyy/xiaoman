@@ -16,6 +16,7 @@ from .api import (
     conversations,
     internal,
     kp,
+    learn,
     memories,
     providers,
     questions,
@@ -61,6 +62,7 @@ app.include_router(internal.router, prefix="/api/v1")
 app.include_router(capture.router, prefix="/api/v1")
 app.include_router(questions.router, prefix="/api/v1")
 app.include_router(kp.router, prefix="/api/v1")
+app.include_router(learn.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
 app.include_router(providers.router, prefix="/api/v1")
 app.include_router(settings_api.router, prefix="/api/v1")

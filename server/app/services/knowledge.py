@@ -104,6 +104,8 @@ def resolve(db: Session, subject: str, name: str, grade: str = "") -> Kp | None:
     # 新建：至少 3 个字、不是纯符号，避免把「略」「其他」这类词灌成知识点
     if len(n) < 3 or n in ("无", "其他", "略", "条件不足"):
         return None
+    if subject not in ("语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"):
+        return None  # 「全部」这类虚拟学科不往树里灌点
     kid = "kp_llm_" + hashlib.sha1(f"{subject}|{n}".encode()).hexdigest()[:24]
     row = db.get(Kp, kid)
     if row is not None:

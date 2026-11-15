@@ -231,3 +231,48 @@ def tool_question_update(payload: QUpdateIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(q)
     return {"ok": True, "item": _q_out(q)}
+
+class QuizIn(BaseModel):
+    conversation_id: str
+    message_id: str = ""
+    subject: str = "全部"
+    stem: str
+    options: list[str] = []
+    answer: str = ""
+    explanation: str = ""
+    kps: list[str] = []
+    question_id: str = ""
+
+
+@router.post("/internal/tools/quiz_create", dependencies=[Depends(guard)])
+def tool_quiz_create(payload: QuizIn, db: Session = Depends(get_db)):
+    """Pi 工具：给用户出一道检测题。卡片会挂到这一轮 assistant 消息上。"""
+    from ..models import Conversation
+    from ..services import quiz as quiz_service
+
+    conv = db.get(Conversation, payload.conversation_id)
+    if conv is None:
+        return {"ok": False, "error": "对话不存在"}
+    try:
+        quiz = quiz_service.create_quiz(
+            db,
+            conv.id,
+            subject=payload.subject or conv.subject,
+            stem=payload.stem,
+            options=payload.options,
+            answer=payload.answer,
+            explanation=payload.explanation,
+            kp_names=payload.kps,
+            question_id=payload.question_id or None,
+            message_id=payload.message_id or None,
+            source="agent",
+        )
+        db.commit()
+        return {
+            "ok": True,
+            "quiz_id": quiz.id,
+            "hint": "检测卡已经发给她了，等她作答；这轮不要先报答案",
+        }
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        return {"ok": False, "error": str(exc)[:200]}
