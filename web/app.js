@@ -521,6 +521,7 @@
     state.catalog = null;
     state.catalogState = 'loading';
     state.msgState = 'loading';
+    await forceToday();
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
     render();
     if (state.settings && state.settings.provider_id != null) {
@@ -2826,6 +2827,10 @@ function typesetMath(el) {
   }
 
   /* ── 启动 ─────────────────────────────────────────── */
+  async function forceToday() {
+    try { await api('/subject', { method: 'PATCH', json: { subject: '全部' } }); } catch (e) { /* 忽略 */ }
+  }
+
   async function boot() {
     await loadSprite();
     hydrateIcons();
@@ -2833,6 +2838,7 @@ function typesetMath(el) {
     autosize();
     render();
 
+    await forceToday();
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
     render();
 

@@ -229,32 +229,19 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
 
     # ── 回合前：记忆检索 +（非原生）联网检索 ─────────────────
     # 记忆放 system（只放与本轮相关的；多数轮次为空 → 前缀不变）
-    # 原生搜索轮没有函数工具（实测混用会让服务端工具被静默忽略），这轮记忆走 system 注入；
-    # 非原生轮用 memory_search 工具按需取。
-    used_memories = memory_service.retrieve(db, text) if text else []
-    memory_sources = memory_service.sources_payload(used_memories)
-    memory_block = memory_service.prompt_block(used_memories)
-    memory_service.touch(db, used_memories)
+    # 记忆由 memory_search 工具按需取（不注入 system），system 保持完全静态
+    memory_sources: list[dict] = []
 
     search_cfg = get_search_cfg(db)
     web_sources: list[dict] = []
-    native_search = False
-    web_hint = ""
     search_on = bool(search_cfg.get("enabled") and text)
-    if search_cfg.get("enabled") and text:
-        prov = search_cfg.get("provider") or "deepseek"
-        if prov == "deepseek" and (
-            (provider.catalog_id or "") == "deepseek"
-            or "deepseek.com" in (provider.base_url or "")
-        ):
-            native_search = True
-            web_hint = (
-                "\n\n本轮已开启联网搜索工具（deepseek_web_search）："
-                "涉及新闻、价格、赛事、最新数据这类时效问题时直接调用它，不要回答「我无法联网」。\n"
-            )
-        elif prov in ("tavily", "bocha"):
-            # 不再预检索：改成模型自己调 web_search 工具（见 stream_with_tools）
-            pass
+    # 搜索统一走我们自己的 web_search 工具（DeepSeek 用它的 Search API，5 元/千次），
+    # 这样记忆工具和搜索可以同轮，不受「服务端工具不能混用」的限制。
+    search_provider = search_cfg.get("provider") or "deepseek"
+    search_key = (search_cfg.get("api_key") or "").strip()
+    if search_provider == "deepseek" and not search_key:
+        search_key = provider.api_key  # DeepSeek 搜索复用模型 provider 的 key
+    web_hint = "\n\n本轮已开启联网搜索工具（web_search）：涉及新闻、价格、赛事、最新数据这类时效问题时直接调用它，不要回答「我无法联网」。\n" if search_on else ""
 
     # 历史：append-only；超过预算时由 compact 把最旧一段压成摘要，只保留最近的原文
     summary_block, hist_rows = compact_service.history(db, conv)
@@ -283,7 +270,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         model_key=model.model_key,
         thinking=thinking,
         status="streaming",
-        sources=memory_sources + web_sources,
+        sources=web_sources,
         tools=["web_search"] if web_sources else [],
     )
     db.add(assistant)
@@ -308,7 +295,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     hist = [
         SimpleNamespace(role=m.role, content_md=m.content_md, images=m.images or []) for m in history
     ]
-    initial_sources = list(memory_sources) + list(web_sources)
+    initial_sources = list(web_sources)
     auto_memory = bool(get_memory_cfg(db).get("auto", True))
 
     async def event_stream() -> AsyncIterator[str]:
@@ -380,8 +367,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 return out
             if name == "web_search":
                 items = await search_service.search(
-                    search_cfg.get("provider") or "tavily",
-                    search_cfg.get("api_key") or "",
+                    search_provider,
+                    search_key,
                     query,
                     int(search_cfg.get("max_results") or 5),
                 )
@@ -393,16 +380,15 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
             return []
 
         fn_tools: list[dict] = [MEMORY_TOOL, MEMORY_ADD_TOOL, MEMORY_UPDATE_TOOL, MEMORY_DELETE_TOOL]
-        if not native_search and search_on and (search_cfg.get("provider") or "deepseek") != "deepseek":
+        if search_on:
             fn_tools.append(WEB_TOOL)
 
         try:
-            if native_search or getattr(provider_snap, "kind", "") == "mock" or (provider_snap.base_url or "").startswith("mock://"):
-                # 原生服务端工具 / mock：单次请求，记忆已注入 system
+            if getattr(provider_snap, "kind", "") == "mock" or (provider_snap.base_url or "").startswith("mock://"):
                 stream = stream_chat(
                     provider_snap, model_snap, hist, text, atts, thinking,
                     memory_block=memory_block, web_block=web_hint,
-                    native_search=native_search, summary_block=summary_block,
+                    native_search=False, summary_block=summary_block,
                 )
             else:
                 base_msgs = build_openai_messages(hist, text, atts, "", web_hint, summary_block=summary_block)
