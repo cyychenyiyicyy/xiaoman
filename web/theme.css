@@ -1007,3 +1007,37 @@ body.today .composer,body.today #to-bottom{display:none}
 .qp-scroll{flex:1;min-height:0;overflow-y:auto;padding:var(--q3) var(--q4) var(--q4)}
 .qp-foot{flex:none;border-top:1px solid var(--line);padding:var(--q3) var(--q4)}
 .qp-foot .btn{width:100%}
+
+
+/* ── 引用题目：堆叠摘要 + 引用浮窗 ─────────────────── */
+#qchips{gap:var(--q2)}
+.qstacksum{display:flex;align-items:center;gap:var(--q3);width:100%;text-align:left;
+  padding:var(--q2) var(--q3);border-radius:var(--rc);border:1px solid var(--line);
+  background:var(--card);font-family:inherit;cursor:pointer}
+.qstacksum.msg{background:color-mix(in srgb, var(--paper) 55%, transparent);border-color:transparent}
+.qstacksum:active{background:var(--fill)}
+.qss-l{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.qss-n{font-size:var(--s5);color:var(--ink)}
+.qss-s{font-size:var(--s6);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qss-go{font-size:var(--s6);color:var(--clay);flex:none}
+
+.qattach.qmsgcard{width:100%;text-align:left;font-family:inherit;cursor:pointer;padding:10px 12px}
+.ubx .qattach.qmsgcard{background:color-mix(in srgb, var(--paper) 50%, transparent);border-color:transparent}
+.qattach.qmsgcard .stem{font-size:var(--s5);line-height:1.55}
+
+.qrefrow{display:flex;align-items:flex-start;gap:var(--q2);border-bottom:1px solid var(--line);
+  padding:var(--q2) 0}
+.qrefrow:last-child{border-bottom:0}
+.qrefmain{flex:1;min-width:0;text-align:left;background:none;border:0;font-family:inherit;
+  display:flex;flex-direction:column;gap:2px;cursor:pointer;padding:0}
+.qrefmeta{font-size:var(--s6);color:var(--ink3)}
+.qrefstem{font-size:var(--s5);color:var(--ink);line-height:1.55;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
+
+
+/* 输入框里 2–4 题走双列，少占高度 */
+.qgrid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--q2)}
+@media (max-width: 760px){ .qgrid2{grid-template-columns:1fr} }
+.ubx .qstacksum{box-sizing:border-box;width:100%}
+.qss-go{white-space:nowrap}
+.qstacksum .qss-l{min-width:0}

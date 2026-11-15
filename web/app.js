@@ -296,6 +296,7 @@
         return String(m.id).indexOf('tmp-') === 0;
       });
       state.messages = local.length ? items.map(normalizeMessage).concat(local) : items.map(normalizeMessage);
+    setTimeout(function () { typesetMath(q('#stream')); }, 60);
       state.msgState = 'ready';
     } catch (e) {
       state.msgState = 'error';
@@ -313,6 +314,7 @@
       content_md: m.content_md || '',
       reasoning_md: m.reasoning_md || '',
       images: Array.isArray(m.images) ? m.images : [],
+      questions: Array.isArray(m.questions) ? m.questions : [],
       tools: Array.isArray(m.tools) ? m.tools : [],
       sources: Array.isArray(m.sources) ? m.sources : [],
       remembered: Array.isArray(m.remembered) ? m.remembered : [],
@@ -608,9 +610,54 @@
   function renderQchips() {
     var host = q('#qchips');
     if (!host) return;
-    if (!state.pendingQuestions.length) { host.hidden = true; host.innerHTML = ''; return; }
+    var list = state.pendingQuestions || [];
+    if (!list.length) { host.hidden = true; host.innerHTML = ''; return; }
     host.hidden = false;
-    host.innerHTML = state.pendingQuestions.map(function (q, i) { return qaCardHtml(q, i, true); }).join('');
+    if (list.length >= 2 && list.length <= 4) {
+      host.innerHTML = '<div class="qgrid2">' + list.map(function (q, i) {
+        return qaCardHtml(q, i, true);
+      }).join('') + '</div>';
+      typesetMath(host);
+      return;
+    }
+    if (list.length > 4) {
+      // 多题：缩成一张堆叠卡，点开浮窗看全部 / 删除
+      host.innerHTML = '<button type="button" class="qstacksum" data-act="open-qrefs">' +
+        '<span class="qss-l"><span class="qss-n">共 ' + list.length + ' 题</span>' +
+        '<span class="qss-s">' + esc(list[0].stem || '').slice(0, 24) + '…</span></span>' +
+        '<span class="qss-go">查看 ›</span></button>';
+      return;
+    }
+    host.innerHTML = list.map(function (q, i) { return qaCardHtml(q, i, true); }).join('');
+    typesetMath(host);
+  }
+
+  function openQrefs(list, removable) {
+    setOverlay({ kind: 'qrefs', items: list || [], removable: !!removable });
+  }
+
+  function qrefsSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qrefs') return '';
+    var rows = (o.items || []).map(function (q, i) {
+      return '<div class="qrefrow">' +
+        '<button type="button" class="qrefmain" data-act="qref-open" data-i="' + i + '">' +
+          '<span class="qrefmeta">' + esc(q.subject || '') + ' · ' +
+            (q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目') + '</span>' +
+          '<span class="qrefstem">' + stemHtml(q.stem || '') + '</span>' +
+        '</button>' +
+        (o.removable
+          ? '<button type="button" class="rmd" data-act="qref-del" data-i="' + i + '" aria-label="移除">' + ic('x', 'sm') + '</button>'
+          : '') +
+      '</div>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qr-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="qr-ttl">引用的题目（' + (o.items || []).length + '）</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + (rows || '<div class="empty"><div class="t">没有题目</div></div>') + '</div>' +
+      '</div>';
   }
 
   async function loadCapturePending() {
@@ -1314,7 +1361,17 @@
     state.catalog = null;
     state.catalogState = 'loading';
     state.msgState = 'loading';
-    await forceToday();
+    var wantSubject = '';
+    if (location.hash.indexOf('#subject=') === 0) {
+      wantSubject = decodeURIComponent(location.hash.slice(9));
+    } else {
+      try { wantSubject = localStorage.getItem('xm_subject') || ''; } catch (e) {}
+    }
+    if (wantSubject && wantSubject !== '全部') {
+      try { await api('/subject', { method: 'PATCH', json: { subject: wantSubject } }); } catch (e) {}
+    } else {
+      await forceToday();
+    }
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
@@ -1550,15 +1607,18 @@
         return '<div class="thumb"><img src="' + esc(imgSrc(im.url || im.id)) + '" alt=""></div>';
       }).join('');
       var text = m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '';
-      var qs = (m.questions || []).map(function (q, i) {
-        return '<div class="qattach qpreview">' +
-          '<div class="stem clamp2">' + stemHtml(q.stem || '') + '</div>' +
-          '<div class="tags"><span class="tag">' + esc(q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目') + '</span></div>' +
-          '<div class="qfoot">' +
-            (q.id ? '<button type="button" class="qmore" data-act="open-question" data-id="' + esc(q.id) + '">查看详情 ›</button>' : '') +
-          '</div>' +
-          '</div>';
-      }).join('');
+      var mqs = m.questions || [];
+      var qs = mqs.length > 2
+        ? '<button type="button" class="qstacksum msg" data-act="open-qrefs-msg" data-key="' + esc(m._key || '') + '">' +
+            '<span class="qss-l"><span class="qss-n">共 ' + mqs.length + ' 题</span>' +
+            '<span class="qss-s">' + esc((mqs[0].stem || '').slice(0, 22)) + '…</span></span>' +
+            '<span class="qss-go">查看 ›</span></button>'
+        : mqs.map(function (q, i) {
+            return '<button type="button" class="qattach qpreview qmsgcard" data-act="open-question" data-id="' + esc(q.id || '') + '">' +
+              '<div class="stem clamp2">' + stemHtml(q.stem || '') + '</div>' +
+              '<div class="qfoot"><span class="tag">' + esc(q.type === 'choice' ? '选择题' : q.type === 'blank' ? '填空题' : '题目') + '</span></div>' +
+              '</button>';
+          }).join('');
       return '<div class="me"><div class="ubx">' +
         (qs ? '<div class="qstack">' + qs + '</div>' : '') +
         (imgs ? '<div class="ustack">' + imgs + '</div>' : '') + text + '</div></div>';
@@ -2220,6 +2280,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   }
 
   async function switchSubject(name) {
+    try { localStorage.setItem('xm_subject', name || '全部'); } catch (e) {}
     var old = (state.subjects && state.subjects.current) || '全部';
     if (name === old) { state.overlay = null; render(); return; }
     var st = q('#stream');
@@ -2389,6 +2450,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'subjects' ? subjectsSheetHtml(state.overlay)
       : kind === 'capture' ? captureSheetHtml()
       : kind === 'qpicker' ? qpickerSheetHtml()
+      : kind === 'qrefs' ? qrefsSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -3209,6 +3271,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     renderQchips();
     syncSend();
     await doSend(text, imgs.map(function (x) { return x.id; }), imgs, qs, qids);
+    setTimeout(function () { typesetMath(q('#stream')); }, 60);
   }
 
   async function doSend(text, imageIds, imgs, questions, questionIds) {
@@ -3631,6 +3694,26 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'open-picker': function () { state.overlay = null; openQuestionPicker(); },
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
     'cap-add': function () { captureAddToChat(); },
+    'open-qrefs': function () { openQrefs(state.pendingQuestions || [], true); },
+    'open-qrefs-msg': function (el) {
+      var key = el.getAttribute('data-key');
+      var m = (state.messages || []).filter(function (x) { return x._key === key; })[0];
+      if (m) openQrefs(m.questions || [], false);
+    },
+    'qref-open': function (el) {
+      var o = state.overlay;
+      if (!o || o.kind !== 'qrefs') return;
+      var q = (o.items || [])[Number(el.getAttribute('data-i'))];
+      if (q && q.id) openQuestionPanel(q.id);
+    },
+    'qref-del': function (el) {
+      var i = Number(el.getAttribute('data-i'));
+      state.pendingQuestions.splice(i, 1);
+      if (state.overlay && state.overlay.kind === 'qrefs') state.overlay.items = state.pendingQuestions.slice();
+      renderOverlay();
+      renderQchips();
+      syncSend();
+    },
     'picker-toggle': function (el) { pickerToggle(el.getAttribute('data-id')); },
     'picker-search': function () { pickerSearch(); },
     'picker-apply': function () { pickerApply(); },
@@ -3758,7 +3841,17 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     autosize();
     render();
 
-    await forceToday();
+    var wantSubject = '';
+    if (location.hash.indexOf('#subject=') === 0) {
+      wantSubject = decodeURIComponent(location.hash.slice(9));
+    } else {
+      try { wantSubject = localStorage.getItem('xm_subject') || ''; } catch (e) {}
+    }
+    if (wantSubject && wantSubject !== '全部') {
+      try { await api('/subject', { method: 'PATCH', json: { subject: wantSubject } }); } catch (e) {}
+    } else {
+      await forceToday();
+    }
     await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
@@ -3768,6 +3861,17 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
+    if (location.hash === '#refs') {
+      await switchSubject('化学');
+      openPage(null);
+      await loadMessages();
+      var rr = await api('/questions?limit=3');
+      state.pendingQuestions = (rr.items || []).map(function (q) {
+        return { id: q.id, stem: q.stem_md, type: q.qtype, subject: q.subject, options: q.options || [] };
+      });
+      render();
+      return;
+    }
     if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();
