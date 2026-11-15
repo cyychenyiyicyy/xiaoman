@@ -3505,6 +3505,16 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     var imgs = ready.map(function (x) { return { id: x.id, url: imgSrc(x.url), mime: x.mime }; });
     var qids = qs.map(function (q) { return q.id; }).filter(Boolean);
+    if (!state.convId) {
+      try {
+        var nrc = await api('/conversations', { method: 'POST', json: { subject: state.convSubject || '全部' } });
+        state.convId = nrc.id;
+        state.convTitle = (text || '新对话').slice(0, 30);
+      } catch (e) {
+        toast('新建对话失败：' + e.message);
+        return;
+      }
+    }
     ta.value = '';
     autosize();
     state.pending = [];
