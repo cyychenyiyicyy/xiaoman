@@ -715,6 +715,18 @@
     render();
   }
 
+  async function maybeAutoTitle() {
+    if (!state.convId) return;
+    try {
+      var r = await api('/conversations/' + encodeURIComponent(state.convId) + '/autotitle', { method: 'POST' });
+      if (r && r.title && r.title !== state.convTitle) {
+        state.convTitle = r.title;
+        await loadConversations();
+        render();
+      }
+    } catch (e) { /* 起名失败不影响对话 */ }
+  }
+
   function openConversations() {
     state.convId = '';
     state.convTitle = '';
@@ -815,6 +827,12 @@
   function renderConvSide() {
     var host = q('#convside');
     if (!host) return;
+    // 只有「对话」这一页有侧栏；题库/本周/记忆/设置都是独立一级页
+    if (state.view !== 'chat') {
+      host.hidden = true;
+      return;
+    }
+    host.hidden = false;
     host.innerHTML = convsSideHtml();
   }
 
@@ -1766,9 +1784,10 @@
       else bank.removeAttribute('aria-current');
     }
     if (chat) {
-      chat.classList.toggle('on', !onSettings && !onMem && !onBank);
-      if (onSettings) chat.removeAttribute('aria-current');
-      else chat.setAttribute('aria-current', 'page');
+      var chatOn = !onSettings && !onMem && !onBank && !onWeek;
+      chat.classList.toggle('on', chatOn);
+      if (chatOn) chat.setAttribute('aria-current', 'page');
+      else chat.removeAttribute('aria-current');
     }
     if (set) {
       set.classList.toggle('on', onSettings);
@@ -3632,6 +3651,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     syncSend();
     await doSend(text, imgs.map(function (x) { return x.id; }), imgs, qs, qids);
     setTimeout(function () { typesetMath(q('#stream')); }, 60);
+    setTimeout(maybeAutoTitle, 400);
   }
 
   async function doSend(text, imageIds, imgs, questions, questionIds) {

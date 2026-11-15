@@ -1062,7 +1062,7 @@ body.today .composer,body.today #to-bottom{display:none}
 
 
 /* 对话页顶栏：标题为主、科目为小标记 */
-.top .l1.chat{font-size:var(--s3);color:var(--ink);font-weight:500}
+.top .l1.chat{font-size:var(--s4);color:var(--ink);font-weight:500}
 .topsubj{font-size:var(--s6);color:var(--ink3);font-weight:400;margin-left:6px}
 
 
@@ -1093,7 +1093,7 @@ body.today .composer,body.today #to-bottom{display:none}
 .empty.sm{padding:var(--q4) var(--q3)}
 
 /* 面板去掉整页顶栏：聊天标题在 top 里 */
-.top .l1.chat{font-size:var(--s3);color:var(--ink);font-weight:500}
+.top .l1.chat{font-size:var(--s4);color:var(--ink);font-weight:500}
 .topsubj{font-size:var(--s6);color:var(--ink3);font-weight:400;margin-left:6px}
 
 @media (max-width: 900px){
@@ -1143,3 +1143,5 @@ body.noconv .top .l2{display:none}
 .wbar{background:var(--clay);border:0;opacity:.9}
 .wbar[style*="height:3px"]{background:var(--fill2);opacity:1}
 .empty .acts .btn{border:1px solid var(--line2);background:var(--card)}
+
+.convside[hidden]{display:none !important}

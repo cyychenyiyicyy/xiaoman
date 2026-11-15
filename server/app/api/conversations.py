@@ -1,6 +1,7 @@
 """对话列表（ChatGPT 式）：新建 / 列表 / 改名 / 删除。"""
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,8 +12,15 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Conversation, Message
 from ..services import spaces
+from ..seed import get_current
+from ..services.llm import complete_text
 
 router = APIRouter(tags=["conversations"])
+
+TITLE_SYS = """你在给一段学习对话起标题。要求：
+- 不超过 10 个字，中文；
+- 说出她在问什么（如「二次函数最值」「化学方程式配平」），不要用「对话」「提问」这种空词；
+- 只输出标题本身，不要引号、不要句号、不要解释。"""
 
 
 class NewIn(BaseModel):
@@ -86,3 +94,48 @@ def delete_conversation(cid: str, db: Session = Depends(get_db)):
     db.delete(conv)
     db.commit()
     return {"ok": True}
+
+@router.post("/conversations/{cid}/autotitle")
+async def autotitle(cid: str, db: Session = Depends(get_db)):
+    """用模型把这段对话概括成 10 字内的标题（每个对话只做一次）。"""
+    conv = db.get(Conversation, cid)
+    if conv is None:
+        raise HTTPException(404, "对话不存在")
+    if conv.title_auto:
+        return {"title": conv.title, "skipped": True}
+
+    rows = db.scalars(
+        select(Message).where(Message.conversation_id == cid).order_by(Message.seq.asc()).limit(8)
+    ).all()
+    if len(rows) < 2:
+        return {"title": conv.title, "skipped": True, "reason": "too_short"}
+
+    provider, model, _ = get_current(db)
+    if provider is None or model is None:
+        return {"title": conv.title, "skipped": True, "reason": "no_model"}
+
+    text = "\n".join(
+        f"{'她' if m.role == 'user' else '小满'}：{(m.content_md or '').strip()[:200]}"
+        for m in rows
+    )
+    try:
+        raw = await complete_text(provider, model, TITLE_SYS, text[:4000], max_tokens=256)
+    except Exception as exc:  # noqa: BLE001
+        return {"title": conv.title, "skipped": True, "reason": str(exc)[:80]}
+
+    title = (raw or "").strip()
+    title = re.sub(r"^(标题|题目)[:：]\s*", "", title)
+    title = re.sub(r'^[「『"\'\s]+|[」』"\'\s。．.！!？?]+$', "", title)
+    title = title.replace("\n", " ").strip()[:16].strip()
+    if not title:
+        # 模型没给出可用标题时，退回她第一句话的前 16 字
+        first = next((m.content_md or "" for m in rows if m.role == "user"), "")
+        title = (first.strip().replace("\n", " ")[:16] or conv.title)
+        conv.title, conv.title_auto = title, True
+        db.commit()
+        return {"title": title, "skipped": True, "reason": "fallback"}
+
+    conv.title = title
+    conv.title_auto = True
+    db.commit()
+    return {"title": title, "skipped": False}
