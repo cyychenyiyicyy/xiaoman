@@ -955,3 +955,35 @@ body.today .composer,body.today #to-bottom{display:none}
 .banklist .empty{grid-column:1 / -1}
 .banklist .qattach{height:100%}
 @media (max-width: 900px){ .banklist{grid-template-columns:1fr} }
+
+
+/* ── 题库：筛选 chips + 日期分组 + 紧凑卡片（照错题稿）── */
+.bankbar{display:flex;gap:var(--q2);padding:var(--q3) var(--q4) var(--q2)}
+.bankbar .fi{flex:1;height:44px;background:var(--fill);border-color:transparent}
+.bankchips{display:flex;gap:var(--q2);flex-wrap:wrap;padding:0 var(--q4) var(--q3)}
+.fchip{display:inline-flex;align-items:center;height:30px;padding:0 var(--q3);border-radius:var(--rp);
+  font-size:var(--s6);color:var(--ink2);background:var(--fill);cursor:pointer;user-select:none}
+.fchip.on{background:var(--claybg);color:var(--clay);font-weight:500}
+.bankwrap{overflow-y:auto;padding:0 var(--q4) var(--q5)}
+.dhead{font-size:var(--s6);color:var(--ink3);padding:var(--q3) 0 var(--q2);letter-spacing:.02em}
+.bankgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--q2);align-items:start}
+.bankgrid .qattach{height:auto;padding:var(--q3)}
+.clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  white-space:pre-wrap;overflow-wrap:anywhere}
+.qbank .stem{font-size:var(--s5);line-height:1.6}
+.qbank .tags{margin-top:var(--q1)}
+@media (max-width: 900px){ .bankgrid{grid-template-columns:1fr} }
+
+/* ── 从题库选（浮窗）────────────────────────────── */
+.pickbar{display:flex;gap:var(--q2);margin-bottom:var(--q2)}
+.pickbar .fi{flex:1;height:44px;background:var(--fill);border-color:transparent}
+.pickq{display:flex;gap:var(--q2);width:100%;text-align:left;border:1px solid var(--line);border-radius:var(--rc);
+  background:var(--card);padding:var(--q3);margin-bottom:var(--q2);font-family:inherit;cursor:pointer;align-items:flex-start}
+.pickq.on{border-color:var(--clayline);background:var(--claybg)}
+.chkbox{width:22px;height:22px;border-radius:6px;border:1px solid var(--line2);display:grid;place-items:center;
+  color:var(--clay);flex:none;background:var(--card)}
+.pickq.on .chkbox{border-color:var(--clay)}
+.pickb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pickstem{font-size:var(--s5);color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere}
+.pickmeta{font-size:var(--s6);color:var(--ink3)}

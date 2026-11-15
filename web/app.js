@@ -530,6 +530,8 @@
           '<span>相机</span><span class="sp"></span><span class="caparr">›</span></button>' +
         '<button type="button" class="caprow" data-act="cap-album">' + ic('image') +
           '<span>相册</span><span class="sp"></span><span class="caparr">›</span></button>' +
+        '<button type="button" class="caprow" data-act="open-picker">' + ic('book-open-text') +
+          '<span>题库</span><span class="sp"></span><span class="caparr">›</span></button>' +
         '</div>';
     } else if (o.step === 'scanning') {
       var t = o.task || {};
@@ -687,12 +689,25 @@
       : '';
     return '<button type="button" class="qattach qbank" data-act="open-question" data-id="' + esc(q.id) + '">' +
       '<div class="rowtop"><div class="tags">' + tags + '</div><span class="sp"></span>' + thumb + '</div>' +
-      '<div class="stem clamp2">' + stemHtml(q.stem_md || '') + '</div>' +
+      '<div class="stem clamp3">' + stemHtml(q.stem_md || '') + '</div>' +
       '</button>';
+  }
+
+  function bankGroupDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var now = new Date();
+    var sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    if (sameDay) return '今天';
+    var y = new Date(now.getTime() - 86400000);
+    if (d.getFullYear() === y.getFullYear() && d.getMonth() === y.getMonth() && d.getDate() === y.getDate()) return '昨天';
+    return (d.getMonth() + 1) + '/' + d.getDate();
   }
 
   function bankPageHtml() {
     var b = state.bank || { items: [], total: 0, subject: '', q: '' };
+    var count = (b.items || []).length;
     var nav = navbar('题库', (b.total || 0) + ' 题', '', '', false);
     if (b.error) {
       return nav + '<div class="settings">' +
@@ -702,11 +717,22 @@
     var subjects = ['', '语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
     var chips = subjects.map(function (s) {
       var on = (b.subject || '') === s;
-      return '<button type="button" class="tpill hit44' + (on ? ' on' : '') + '" data-act="bank-filter" data-subject="' + esc(s) + '">' +
-        (s || '全部') + '</button>';
+      return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="bank-filter" data-subject="' + esc(s) + '">' +
+        (s || '全部') + (s ? '' : ' ' + (b.total || 0)) + '</span>';
     }).join('');
 
-    var list = (b.items || []).map(bankCardHtml).join('');
+    var groups = [];
+    var byDay = {};
+    (b.items || []).forEach(function (q) {
+      var k = bankGroupDate(q.created_at);
+      if (!byDay[k]) { byDay[k] = []; groups.push(k); }
+      byDay[k].push(q);
+    });
+    var list = groups.map(function (k) {
+      return '<div class="dhead">' + esc(k || '更早') + '</div>' +
+        '<div class="bankgrid">' + byDay[k].map(bankCardHtml).join('') + '</div>';
+    }).join('');
+
     if (!list) {
       list = '<div class="empty"><div class="t">还没有题目</div><div class="m">拍一张卷子，选几道题加进来</div></div>';
     }
@@ -717,7 +743,7 @@
         '<button type="button" class="btn" data-act="bank-search">搜索</button>' +
       '</div>' +
       '<div class="bankchips">' + chips + '</div>' +
-      '<div class="settings banklist">' + list + '</div>';
+      '<div class="settings bankwrap">' + list + '</div>';
   }
 
   async function openQuestionDetail(id) {
@@ -753,8 +779,126 @@
         '</div>' +
         img +
         '<div class="btnbar full" style="margin-top:var(--q3)">' +
-          '<button type="button" class="btn" data-act="question-back-chat">在对话里打开</button>' +
+          '<button type="button" class="btn p" data-act="question-quote">引用该题</button>' +
         '</div>' +
+      '</div>';
+  }
+
+  async function quoteQuestion(q) {
+    if (!q) return;
+    var ref = {
+      id: q.id,
+      number: '',
+      stem: q.stem_md || '',
+      type: q.qtype || 'short',
+      subject: q.subject || currentSubjectName(),
+      options: q.options || []
+    };
+    if (!state.pendingQuestions.some(function (x) { return x.id === ref.id; })) {
+      state.pendingQuestions.push(ref);
+    }
+    await switchSubject(ref.subject);
+    openPage(null);
+    render();
+    toast('已引用 1 题');
+  }
+
+  /* ── 题库选择器（浮窗）：从当前学科挑题引用 ─────────── */
+
+  async function openQuestionPicker() {
+    setOverlay({ kind: 'qpicker', items: [], selected: {}, q: '', loading: true });
+    renderOverlay();
+    await loadPickerQuestions('');
+  }
+
+  async function loadPickerQuestions(kw) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qpicker') return;
+    try {
+      var params = ['limit=100'];
+      if (kw) params.push('q=' + encodeURIComponent(kw));
+      var subj = currentSubjectName();
+      if (subj && subj !== '全部') params.push('subject=' + encodeURIComponent(subj));
+      var r = await api('/questions?' + params.join('&'));
+      o.items = r.items || [];
+    } catch (e) {
+      o.items = [];
+      o.error = e.message;
+    }
+    o.loading = false;
+    renderOverlay();
+  }
+
+  function pickerSearch() {
+    var el = q('#qp-q');
+    var kw = (el && el.value || '').trim();
+    if (state.overlay && state.overlay.kind === 'qpicker') {
+      state.overlay.q = kw;
+      loadPickerQuestions(kw);
+    }
+  }
+
+  function pickerToggle(id) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qpicker') return;
+    o.selected[id] = !o.selected[id];
+    renderOverlay();
+  }
+
+  function pickerApply() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qpicker') return;
+    var n = 0;
+    o.items.forEach(function (q) {
+      if (!o.selected[q.id]) return;
+      if (state.pendingQuestions.some(function (x) { return x.id === q.id; })) return;
+      state.pendingQuestions.push({
+        id: q.id,
+        number: '',
+        stem: q.stem_md || '',
+        type: q.qtype || 'short',
+        subject: q.subject || '',
+        options: q.options || []
+      });
+      n++;
+    });
+    state.overlay = null;
+    render();
+    toast(n ? '已引用 ' + n + ' 题' : '没有选中题目');
+  }
+
+  function qpickerSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qpicker') return '';
+    var items = o.items || [];
+    var chosen = Object.keys(o.selected || {}).filter(function (k) { return o.selected[k]; }).length;
+    var rows = items.map(function (q) {
+      var on = !!o.selected[q.id];
+      return '<button type="button" class="pickq' + (on ? ' on' : '') + '" data-act="picker-toggle" data-id="' + esc(q.id) + '">' +
+        '<span class="chkbox">' + (on ? ic('check', 'sm') : '') + '</span>' +
+        '<span class="pickb">' +
+          '<span class="pickstem">' + stemHtml((q.stem_md || '').slice(0, 90)) + '</span>' +
+          '<span class="pickmeta">' + esc(q.subject || '') + ' · ' +
+            (q.qtype === 'choice' ? '选择题' : q.qtype === 'blank' ? '填空题' : '题目') + '</span>' +
+        '</span></button>';
+    }).join('');
+
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qp-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="qp-ttl">从题库选</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' +
+        '<div class="pickbar"><input type="search" id="qp-q" class="fi" placeholder="搜题干" value="' + esc(o.q || '') + '">' +
+        '<button type="button" class="btn" data-act="picker-search">搜索</button></div>' +
+        (o.loading ? '<div class="skel inmsg">' + skelRows(4) + '</div>' : '') +
+        (rows || (o.loading ? '' : '<div class="empty"><div class="t">这个学科还没有题</div></div>')) +
+      '</div>' +
+      '<div class="sheet-foot"><div class="btnbar full">' +
+        '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+        '<button type="button" class="btn p" data-act="picker-apply"' + (chosen ? '' : ' disabled') + '>' +
+        (chosen ? '引用（' + chosen + '）' : '引用') + '</button>' +
+      '</div></div>' +
       '</div>';
   }
 
@@ -1122,6 +1266,7 @@
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();
       await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));
@@ -2184,9 +2329,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'memory' ? memoryEditSheetHtml(state.overlay)
       : kind === 'subjects' ? subjectsSheetHtml(state.overlay)
       : kind === 'capture' ? captureSheetHtml()
+      : kind === 'qpicker' ? qpickerSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
+    typesetMath(host);
   }
 
   /* ── 渲染：模型管理 / provider 详情 / 表单 ─────────── */
@@ -3410,16 +3557,16 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'bank-filter': function (el) { bankFilter(el.getAttribute('data-subject') || ''); },
     'bank-search': function () { bankSearch(); },
     'bank-reload': function () { loadBank(); },
-    'question-back-chat': function () {
-      var qr = state.question;
-      if (!qr) return;
-      switchSubject(qr.subject).then(function () { openPage(null); });
-    },
+    'question-quote': function () { quoteQuestion(state.question); },
     'confirm-capture': function () { confirmCapture(); },
     'cap-camera': function () { var f = q('#cap-camera'); if (f) f.click(); },
     'cap-album': function () { var f = q('#cap-file'); if (f) f.click(); },
+    'open-picker': function () { state.overlay = null; openQuestionPicker(); },
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
     'cap-add': function () { captureAddToChat(); },
+    'picker-toggle': function (el) { pickerToggle(el.getAttribute('data-id')); },
+    'picker-search': function () { pickerSearch(); },
+    'picker-apply': function () { pickerApply(); },
     'cap-retry': function () { var o = state.overlay; if (o) { o.step = 'pick'; o.error = ''; renderOverlay(); } },
     'drop-question': function (el) { state.pendingQuestions.splice(Number(el.getAttribute('data-i')), 1); renderQchips(); syncSend(); },
     'open-capture': function () {
@@ -3553,6 +3700,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
     if (location.hash.indexOf('#question=') === 0) {
       await loadMessages();
       await openQuestionDetail(decodeURIComponent(location.hash.slice(10)));

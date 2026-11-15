@@ -4,7 +4,9 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import re as _re
 import uuid
 from datetime import datetime, timezone
 
@@ -102,6 +104,13 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
 
     groups = payload.groups or (task.groups_json or {}).get("groups") or []
     created: list[str] = []
+    skipped = 0
+
+    def _fp(subject: str, stem: str) -> str:
+        norm = _re.sub(r"\s+", "", stem or "")
+        norm = _re.sub(r"[$\\{}_^]", "", norm)
+        return hashlib.sha1(norm[:48].encode()).hexdigest()
+
     for g in groups:
         shared = (g.get("shared_stem") or "").strip()
         for q in g.get("questions") or []:
@@ -110,6 +119,11 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
                 continue
             if shared and not stem.startswith(shared):
                 stem = f"{shared}\n\n{stem}"
+            fp = _fp(task.subject, stem)
+            if db.scalar(select(Question.id).where(Question.stem_fp == fp)):
+                skipped += 1
+                continue
+
             qid = uuid.uuid4().hex
             row = Question(
                 id=qid,
@@ -124,6 +138,7 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
                 bbox=q.get("bbox") or [],
                 page_path=task.page_path,
                 stem_preview_png="",
+                stem_fp=fp,
             )
             from pathlib import Path
 
@@ -142,7 +157,7 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
     task.status = "done"
     task.question_count = len(created)
     db.commit()
-    return {"ok": True, "created": len(created), "ids": created}
+    return {"ok": True, "created": len(created), "skipped": skipped, "ids": created}
 
 
 @router.get("/questions")

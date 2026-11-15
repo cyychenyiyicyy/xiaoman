@@ -176,4 +176,5 @@ class Question(Base):
     bbox: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     page_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     stem_preview_png: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    stem_fp: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
