@@ -17,6 +17,10 @@
     bank: null,              // {items,total,subject,q,grade,difficulty,kp}
     bankSolvedTimer: 0,      // 解析轮询计时器
     kpPick: null,            // 知识点选择/筛选弹层的数据
+    map: null,               // 知识地图：{subject,module,chapter,data,loading,error,selected,q,ver}
+    mapCy: null,             // cytoscape 实例
+    mapKey: '',              // 当前图对应的 subject|module|chapter|ver
+    mapHtmlKey: '',          // 已渲染 HTML 的 key（避免弹层重开时丢图）
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -1388,7 +1392,8 @@
 
   function qKpsHtml(r, editable) {
     var chips = (r.kps || []).map(function (k) {
-      return '<span class="kpchip' + (k.primary ? ' main' : '') + '">' + esc(k.name) + '</span>';
+      return '<button type="button" class="kpchip' + (k.primary ? ' main' : '') + '" data-act="kp-open-map" data-id="' +
+        esc(k.id) + '" title="在地图里看">' + esc(k.name) + '</button>';
     }).join('');
     var act = editable
       ? '<button type="button" class="kpadd" data-act="edit-kps">' + ic((r.kps || []).length ? 'settings' : 'plus', 'sm') +
@@ -2031,6 +2036,7 @@
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#map') { await loadMessages(); openMap(); return; }
     if (location.hash === '#bankcap') {
       await loadMessages();
       openBank();
@@ -2131,6 +2137,13 @@
     var onConvs = kind === 'convs';
     var onSettings = kind === 'settings';
     var onMem = kind === 'memories';
+    var onMap = kind === 'map';
+    var map = q('#rail-map');
+    if (map) {
+      map.classList.toggle('on', onMap);
+      if (onMap) map.setAttribute('aria-current', 'page');
+      else map.removeAttribute('aria-current');
+    }
     var bank = q('#rail-bank');
     if (bank) {
       bank.classList.toggle('on', onBank);
@@ -2138,7 +2151,7 @@
       else bank.removeAttribute('aria-current');
     }
     if (chat) {
-      var chatOn = !onSettings && !onMem && !onBank && !onWeek;
+      var chatOn = !onSettings && !onMem && !onBank && !onWeek && !onMap;
       chat.classList.toggle('on', chatOn);
       if (chatOn) chat.setAttribute('aria-current', 'page');
       else chat.removeAttribute('aria-current');
@@ -3504,10 +3517,704 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     return html;
   }
 
+  /* ── 知识地图（P5）：一科一张网，按教材模块 / 章切 ───────── */
+
+  var MAP_ORPHAN = '__orphan';
+  var MAP_OVERVIEW = '__overview';
+
+  function mapState() {
+    if (!state.map) {
+      state.map = {
+        subject: '化学', module: '', chapter: '', data: null,
+        loading: true, error: '', selected: '', focus: '', q: '', ver: 0
+      };
+    }
+    return state.map;
+  }
+
+  function mapData() { return state.map && state.map.data; }
+
+  function openMap() {
+    var m = mapState();
+    var subj = (state.subjects && state.subjects.current) || '化学';
+    if (SUBJECTS.indexOf(subj) < 0) subj = '化学';
+    if (m.subject !== subj || !m.data) {
+      m.subject = subj; m.data = null; m.module = ''; m.chapter = ''; m.selected = '';
+    }
+    openPage({ kind: 'map' });
+    loadMap();
+  }
+
+  async function loadMap() {
+    var m = mapState();
+    m.loading = true; m.error = ''; m.selected = ''; m.ver++;
+    render();
+    try {
+      m.data = await api('/kp/graph?subject=' + encodeURIComponent(m.subject));
+    } catch (e) {
+      m.error = e.message;
+      m.data = null;
+    }
+    m.loading = false;
+    ensureMapScope();
+    m.ver++;
+    render();
+    if (m.selected) loadMapQuestions(m.selected);
+  }
+
+  function mapModules() {
+    var d = mapData() || {};
+    var mods = (d.modules || []).filter(function (x) { return x.name; });
+    var orphans = (d.nodes || []).filter(function (n) { return n.kind === 'point' && !n.parent; });
+    if (orphans.length) mods = mods.concat([{ name: MAP_ORPHAN, points: orphans.length, chapters: 1 }]);
+    return mods;
+  }
+
+  function mapModuleLabel(name) { return name === MAP_ORPHAN ? '其他' : name; }
+
+  var MAP_NUM = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+
+  function mapChapterRank(name) {
+    var m = /第([一二三四五六七八九十]+|[0-9]+)(章|单元|课)/.exec(String(name || ''));
+    if (!m) return 999;
+    if (/^[0-9]+$/.test(m[1])) return Number(m[1]);
+    var s = m[1], n = 0;
+    if (s.length === 1) return MAP_NUM[s] || 999;
+    if (s[0] === '十') n = 10;
+    else n = (MAP_NUM[s[0]] || 0) * 10;
+    if (s.length > 1 && s[1] !== '十') n += MAP_NUM[s[1]] || 0;
+    return n || 999;
+  }
+
+  function mapChapters() {
+    var d = mapData() || {};
+    var m = state.map;
+    if (!m) return [];
+    if (m.module === MAP_ORPHAN) {
+      var ops = (d.nodes || []).filter(function (n) { return n.kind === 'point' && !n.parent; });
+      return ops.length ? [{ id: MAP_ORPHAN, name: '其他知识点', module: '', points: ops.length }] : [];
+    }
+    var list = (d.nodes || []).filter(function (n) {
+      return n.kind === 'chapter' && n.module === m.module;
+    });
+    list.sort(function (a, b) {
+      return mapChapterRank(a.name) - mapChapterRank(b.name) || String(a.name).localeCompare(String(b.name));
+    });
+    return list;
+  }
+
+  function mapChapterById(id) {
+    var list = mapChapters();
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  function mapPointsOf(chapterId) {
+    var d = mapData() || {};
+    return (d.nodes || []).filter(function (n) {
+      if (n.kind !== 'point') return false;
+      return chapterId === MAP_ORPHAN ? !n.parent : n.parent === chapterId;
+    });
+  }
+
+  function mapPointById(id) {
+    var d = mapData() || {};
+    var list = d.nodes || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === id && list[i].kind === 'point') return list[i];
+    }
+    return null;
+  }
+
+  function mapScopeOf(point) {
+    if (!point) return null;
+    if (!point.parent) return { module: MAP_ORPHAN, chapter: MAP_ORPHAN };
+    return { module: point.module || '', chapter: point.parent };
+  }
+
+  function ensureMapScope() {
+    var m = state.map;
+    if (!m) return;
+    var mods = mapModules();
+    if (!mods.some(function (x) { return x.name === m.module; })) {
+      m.module = mods.length ? mods[0].name : '';
+      m.chapter = '';
+      m.selected = '';
+    }
+    var chs = mapChapters();
+    if (m.chapter === MAP_OVERVIEW && chs.length) return;
+    if (!chs.some(function (c) { return c.id === m.chapter; })) {
+      // 默认落在「有题的章」优先；都没题才看知识点多少（避免落在「绪言」）
+      var best = null, bestScore = -1;
+      chs.forEach(function (c) {
+        var pts = mapPointsOf(c.id);
+        var tagged = pts.filter(function (p) { return p.q_count; }).length;
+        var score = tagged * 1000 + pts.length;
+        if (score > bestScore) { best = c; bestScore = score; }
+      });
+      m.chapter = best ? best.id : (chs.length ? chs[0].id : '');
+      m.selected = '';
+    }
+  }
+
+  function mapSubtitle() {
+    var m = state.map;
+    if (!m) return '';
+    var parts = [m.subject];
+    if (m.module) parts.push(mapModuleLabel(m.module));
+    if (m.chapter === MAP_OVERVIEW) parts.push('总览');
+    else {
+      var ch = mapChapterById(m.chapter);
+      if (ch) parts.push(ch.name);
+    }
+    return parts.join(' · ');
+  }
+
+  function mapPageHtml() {
+    var m = state.map;
+    var nav = navbar('知识地图', mapSubtitle(), '', '', false);
+    if (!m) return nav;
+    if (m.loading && !m.data) {
+      return nav + '<div class="settings"><div class="skel inmsg">' + skelRows(6) + '</div></div>';
+    }
+    if (m.error) {
+      return nav + '<div class="settings">' +
+        pageErrorState('知识点没加载出来', m.error, 'map-reload', 'rail-chat', '返回对话') + '</div>';
+    }
+    var d = mapData() || {};
+    if (!(d.nodes || []).length) {
+      return nav + '<div class="settings"><div class="empty"><div class="t">这一科还没有知识点</div>' +
+        '<div class="d">先导入知识点树，再回来</div></div></div>';
+    }
+
+    var subjectChips = SUBJECTS.map(function (s) {
+      return '<span class="fchip' + (m.subject === s ? ' on' : '') + '" role="button" tabindex="0"' +
+        ' data-act="map-subject" data-subject="' + esc(s) + '">' + s + '</span>';
+    }).join('');
+    var modChips = mapModules().map(function (x) {
+      return '<span class="fchip' + (m.module === x.name ? ' on' : '') + '" role="button" tabindex="0"' +
+        ' data-act="map-module" data-module="' + esc(x.name) + '">' + esc(mapModuleLabel(x.name)) +
+        ' <span class="mapn num">' + x.points + '</span></span>';
+    }).join('');
+    var chaps = mapChapters();
+    var chapChips = '<span class="fchip' + (m.chapter === MAP_OVERVIEW ? ' on' : '') + '" role="button" tabindex="0"' +
+      ' data-act="map-chapter" data-id="' + MAP_OVERVIEW + '">总览</span>' +
+      chaps.map(function (c) {
+        return '<span class="fchip' + (m.chapter === c.id ? ' on' : '') + '" role="button" tabindex="0"' +
+          ' data-act="map-chapter" data-id="' + esc(c.id) + '">' + esc(c.name) + '</span>';
+      }).join('');
+
+    return nav +
+      '<div class="mapbars">' +
+        '<div class="bankchips mapchips">' + subjectChips + '</div>' +
+        '<div class="bankchips mapchips">' + modChips + '</div>' +
+        '<div class="maprow">' +
+          '<div class="bankchips mapchaps">' + (chapChips || '<span class="mapempty">这一册还没有章节</span>') + '</div>' +
+          '<div class="mapsearch">' +
+            '<input type="search" id="map-q" class="fi" placeholder="搜知识点" value="' + esc(m.q || '') + '">' +
+            '<button type="button" class="btn" data-act="map-search">搜索</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="mapwrap">' +
+        '<div class="mapstage">' +
+          '<div id="map-cy" class="mapcanvas" role="img" aria-label="知识点关系图"></div>' +
+          '<div class="mapzooms">' +
+            '<button type="button" class="hit" data-act="map-zoom-in" aria-label="放大">' + ic('plus') + '</button>' +
+            '<button type="button" class="hit" data-act="map-zoom-out" aria-label="缩小">' + ic('minus') + '</button>' +
+            '<button type="button" class="hit" data-act="map-zoom-fit" aria-label="适应">' + ic('scan') + '</button>' +
+          '</div>' +
+          '<div class="maplegend">' +
+            '<span><i class="dot hasq"></i>有题</span>' +
+            '<span><i class="dot"></i>未练</span>' +
+            '<span class="ln">先修</span>' +
+            '<span class="ln dash">相关</span>' +
+          '</div>' +
+        '</div>' +
+        '<aside class="mapside" id="map-side">' + mapSideInner() + '</aside>' +
+      '</div>' +
+      '<div id="map-tip" class="maptip" hidden></div>';
+  }
+
+  function mapSideInner() {
+    var m = state.map;
+    if (!m) return '';
+    if (m.chapter === MAP_OVERVIEW) {
+      var chs = mapChapters();
+      var pts = 0;
+      chs.forEach(function (c) { pts += c.points || 0; });
+      var chips = chs.map(function (c) {
+        return '<button type="button" class="mapchip" data-act="map-chapter" data-id="' + esc(c.id) + '">' +
+          esc(c.name) + ' <span class="mapn">' + (c.points || 0) + '</span></button>';
+      }).join('');
+      return '<div class="mapsidehead">' +
+          '<div class="ttl">' + esc(mapModuleLabel(m.module)) + '</div>' +
+          '<div class="sub">' + chs.length + ' 章 · ' + pts + ' 个知识点</div>' +
+        '</div>' +
+        '<div class="mapsec"><div class="slabel">章</div><div class="mapchips">' +
+          (chips || '<span class="mapempty">这一册还没有章节</span>') + '</div></div>';
+    }
+    var sel = m.selected ? mapPointById(m.selected) : null;
+    if (sel) return mapPointSideHtml(sel);
+    var ch = mapChapterById(m.chapter);
+    var pts2 = mapPointsOf(m.chapter);
+    var tagged = pts2.filter(function (p) { return p.q_count; }).length;
+    var chips2 = pts2.slice()
+      .sort(function (a, b) {
+        return (b.q_count || 0) - (a.q_count || 0) || String(a.name).localeCompare(String(b.name));
+      })
+      .map(function (p) {
+        return '<button type="button" class="mapchip' + (p.q_count ? ' on' : '') + '" data-act="map-select" data-id="' +
+          esc(p.id) + '">' + esc(p.name) + '</button>';
+      }).join('');
+    return '<div class="mapsidehead">' +
+        '<div class="ttl">' + esc(ch ? ch.name : '知识点') + '</div>' +
+        '<div class="sub">' + esc([m.module ? mapModuleLabel(m.module) : '', pts2.length + ' 个知识点',
+          tagged + ' 个有题'].filter(Boolean).join(' · ')) + '</div>' +
+      '</div>' +
+      '<div class="mapsec"><div class="slabel">知识点</div>' +
+        '<div class="mapchips">' + (chips2 || '<span class="mapempty">这一章还没有知识点</span>') + '</div>' +
+      '</div>';
+  }
+
+  function mapPointSideHtml(p) {
+    var d = mapData() || {};
+    var pre = [], next = [];
+    (d.edges || []).forEach(function (e) {
+      if (e.target === p.id) pre.push(e.source);
+      if (e.source === p.id) next.push(e.target);
+    });
+    function chip(id) {
+      var n = mapPointById(id);
+      if (!n) return '';
+      return '<button type="button" class="mapchip' + (n.q_count ? ' on' : '') + '" data-act="map-select" data-id="' +
+        esc(n.id) + '">' + esc(n.name) + '</button>';
+    }
+    var meta = [p.module, p.chapter, p.grade].filter(Boolean).join(' · ');
+    return '<div class="mapsidehead">' +
+        '<button type="button" class="mapbackchip" data-act="map-unselect">' + ic('chevron-left', 'sm') + '本章</button>' +
+        '<div class="ttl">' + esc(p.name) + '</div>' +
+        '<div class="sub">' + esc(meta) + '</div>' +
+      '</div>' +
+      '<div class="mapstats">' +
+        '<div class="ms"><div class="n num">' + Number(p.q_count || 0) + '</div><div class="l">题库题目</div></div>' +
+        '<div class="ms"><div class="n num">' + Number(pre.length + next.length) + '</div><div class="l">关联知识点</div></div>' +
+        (p.difficulty ? '<div class="ms"><div class="n num">' + Number(p.difficulty).toFixed(2) + '</div><div class="l">知识点难度</div></div>' : '') +
+      '</div>' +
+      (pre.length ? '<div class="mapsec"><div class="slabel">先修</div><div class="mapchips">' + pre.map(chip).join('') + '</div></div>' : '') +
+      (next.length ? '<div class="mapsec"><div class="slabel">后继</div><div class="mapchips">' + next.map(chip).join('') + '</div></div>' : '') +
+      '<div class="mapsec"><div class="slabel">已收录题目</div><div id="map-qs" class="mapqs">' +
+        '<div class="skel inmsg">' + skelRows(2) + '</div></div></div>' +
+      '<div class="mapacts"><button type="button" class="btn" data-act="map-bank" data-id="' + esc(p.id) + '">在题库里看</button></div>';
+  }
+
+  async function loadMapQuestions(kpid) {
+    var host = q('#map-qs');
+    if (!host) return;
+    try {
+      var r = await api('/questions?kp=' + encodeURIComponent(kpid) + '&limit=3');
+      if (!q('#map-qs') || (state.map && state.map.selected !== kpid)) return;
+      var items = r.items || [];
+      if (!items.length) { host.innerHTML = '<div class="mapempty">还没收录题目</div>'; return; }
+      host.innerHTML = items.map(function (x) {
+        return '<button type="button" class="mapq" data-act="map-open-q" data-id="' + esc(x.id) + '">' +
+          '<span class="stem">' + stemHtml((x.stem_md || '').slice(0, 64)) + '</span>' +
+          '<span class="a">' + (x.answer_md ? '答案 ' + esc(String(x.answer_md).slice(0, 24)) : '暂无答案') + '</span></button>';
+      }).join('');
+    } catch (e) {
+      if (q('#map-qs')) q('#map-qs').innerHTML = '<div class="mapempty">题目没加载出来</div>';
+    }
+  }
+
+  function mapRenderSide() {
+    var host = q('#map-side');
+    if (host) host.innerHTML = mapSideInner();
+  }
+
+  function mapElements() {
+    var d = mapData() || {};
+    var m = state.map;
+    if (m.chapter === MAP_OVERVIEW) {
+      var chs = mapChapters();
+      var ids = {};
+      chs.forEach(function (c) { ids[c.id] = true; });
+      var els = chs.map(function (c) {
+        return { data: { id: c.id, label: c.name, kind: 'chapter', n: c.points || 0 } };
+      });
+      var parentOf = {};
+      (d.nodes || []).forEach(function (n) { if (n.kind === 'point') parentOf[n.id] = n.parent; });
+      var agg = {};
+      (d.edges || []).forEach(function (e) {
+        var a = parentOf[e.source], b = parentOf[e.target];
+        if (!a || !b || a === b || !ids[a] || !ids[b]) return;
+        var k = a + '|' + b;
+        agg[k] = agg[k] || { source: a, target: b, n: 0 };
+        agg[k].n++;
+      });
+      Object.keys(agg).forEach(function (k) {
+        els.push({ data: { id: 'agg-' + k, source: agg[k].source, target: agg[k].target, kind: 'agg', n: agg[k].n } });
+      });
+      return els;
+    }
+    var pts = mapPointsOf(m.chapter);
+    var pointIds = {};
+    pts.forEach(function (p) { pointIds[p.id] = true; });
+    var out = [];
+    var ch = mapChapterById(m.chapter);
+    if (ch && m.chapter !== MAP_ORPHAN) {
+      out.push({ data: { id: ch.id, label: ch.name, kind: 'chapter' } });
+      pts.forEach(function (p) {
+        out.push({ data: { id: 'sp-' + p.id, source: ch.id, target: p.id, kind: 'part' } });
+      });
+    }
+    pts.forEach(function (p) {
+      out.push({
+        data: { id: p.id, label: p.name, kind: 'point', q: Number(p.q_count || 0) },
+        classes: p.q_count ? 'hasq' : ''
+      });
+    });
+    (d.edges || []).forEach(function (e) {
+      if (pointIds[e.source] && pointIds[e.target]) {
+        out.push({ data: { id: e.id, source: e.source, target: e.target, kind: e.type } });
+      }
+    });
+    return out;
+  }
+
+  function mapStyle() {
+    var cs = getComputedStyle(document.documentElement);
+    var v = function (n) { return cs.getPropertyValue(n).trim(); };
+    var paper = v('--paper'), card = v('--card'), line = v('--line');
+    var ink2 = v('--ink2'), ink3 = v('--ink3');
+    var clay = v('--clay'), claybg = v('--claybg'), clayline = v('--clayline');
+    return [
+      { selector: 'node[kind="chapter"]', style: {
+        shape: 'round-rectangle', width: 168, height: 34, 'background-color': card,
+        'border-width': 1.5, 'border-color': clayline, label: 'data(label)',
+        'font-size': 12, 'font-family': v('--sans'), color: clay,
+        'text-valign': 'center', 'text-halign': 'center',
+        'text-wrap': 'ellipsis', 'text-max-width': '150px', 'min-zoomed-font-size': 7
+      } },
+      { selector: 'node[kind="point"]', style: {
+        shape: 'ellipse', width: 18, height: 18, 'background-color': v('--fill'),
+        'border-width': 1.5, 'border-color': v('--line2'), label: 'data(label)',
+        'font-size': 11, 'font-family': v('--sans'), color: ink2,
+        'text-valign': 'bottom', 'text-margin-y': 3,
+        'text-wrap': 'ellipsis', 'text-max-width': '104px', 'min-zoomed-font-size': 10,
+        'text-outline-color': paper, 'text-outline-width': 2
+      } },
+      { selector: 'node[kind="point"].hasq', style: { 'background-color': claybg, 'border-color': clay } },
+      { selector: 'node:selected', style: {
+        'background-color': clay, 'border-color': clay, color: v('--ink'),
+        'text-outline-width': 0, 'text-background-color': card, 'text-background-opacity': 0.95,
+        'text-background-padding': 2, 'text-background-shape': 'round-rectangle', 'border-width': 3
+      } },
+      { selector: 'edge[kind="part"]', style: { width: 0.6, 'line-color': line, opacity: 0.5, 'curve-style': 'straight' } },
+      { selector: 'edge[kind="agg"]', style: {
+        width: 'mapData(n, 1, 8, 1.2, 3.2)',
+        'line-color': ink3, 'target-arrow-color': ink3,
+        'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, 'curve-style': 'bezier'
+      } },
+      { selector: 'edge[kind="prerequisite"]', style: {
+        width: 1.2, 'line-color': ink3, 'target-arrow-color': ink3,
+        'target-arrow-shape': 'triangle', 'arrow-scale': 0.6, 'curve-style': 'bezier'
+      } },
+      { selector: 'edge[kind="leads-to"]', style: {
+        width: 1, 'line-color': ink3, 'target-arrow-color': ink3,
+        'target-arrow-shape': 'triangle', 'arrow-scale': 0.5,
+        'curve-style': 'bezier', 'line-style': 'dashed'
+      } },
+      { selector: 'edge[kind="related"]', style: {
+        width: 1, 'line-color': v('--line2'), 'curve-style': 'bezier', 'line-style': 'dotted'
+      } }
+    ];
+  }
+
+  function mapRelax(minDist) {
+    var cy = state.mapCy;
+    if (!cy) return;
+    var nodes = cy.nodes().toArray();
+    for (var it = 0; it < 120; it++) {
+      var moved = false;
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          var a = nodes[i].position(), b = nodes[j].position();
+          var dx = b.x - a.x, dy = b.y - a.y;
+          var d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          var want = (nodes[i].data('kind') === 'chapter' || nodes[j].data('kind') === 'chapter') ? 150 : minDist;
+          if (d < want) {
+            var push = (want - d) / 2, ux = dx / d, uy = dy / d;
+            nodes[i].position({ x: a.x - ux * push, y: a.y - uy * push });
+            nodes[j].position({ x: b.x + ux * push, y: b.y + uy * push });
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
+  function mapMount() {
+    var host = q('#map-cy');
+    var m = state.map;
+    if (!host || !m || !m.data) return;
+    var key = m.subject + '|' + m.module + '|' + m.chapter + '|' + m.ver;
+    if (state.mapCy && state.mapKey === key && state.mapCy.container() === host) return;
+    if (state.mapCy) {
+      try { state.mapCy.destroy(); } catch (e) { /* noop */ }
+      state.mapCy = null;
+    }
+    var els = mapElements();
+    if (!els.length) return;
+    if (!window.cytoscape) {
+      host.innerHTML = '<div class="mapempty" style="padding:var(--q4)">图库没加载出来，刷新试试</div>';
+      return;
+    }
+    var cy = window.cytoscape({
+      container: host,
+      elements: els,
+      style: mapStyle(),
+      wheelSensitivity: 0.2,
+      minZoom: 0.15,
+      maxZoom: 3,
+      boxSelectionEnabled: false
+    });
+    state.mapCy = cy;
+    window.__cy = cy;
+    state.mapKey = key;
+    if (m.selected) {
+      var pre = cy.getElementById(m.selected);
+      if (pre && !pre.empty()) pre.select();
+    }
+    var layout;
+    if (m.chapter === MAP_OVERVIEW) {
+      var W = cy.width(), H = cy.height();
+      var ns = cy.nodes().toArray();
+      var n = Math.max(1, ns.length);
+      var Rx = Math.max(180, Math.min(W * 0.40, (n * 200) / (2 * Math.PI)));
+      var Ry = Math.max(120, Math.min(H * 0.34, Rx * 0.62));
+      ns.forEach(function (nd, i) {
+        var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+        nd.position({ x: W / 2 + Math.cos(a) * Rx, y: H / 2 + Math.sin(a) * Ry });
+      });
+      cy.fit(undefined, 48);
+      cy.resize();
+    } else {
+      layout = cy.layout({
+        name: 'cose', animate: false, randomize: true, numIter: 700,
+        nodeRepulsion: 42000, idealEdgeLength: 180, gravity: 0.08,
+        nodeOverlap: 28, componentSpacing: 80, fit: false
+      });
+      layout.one('layoutstop', function () {
+        mapRelax(112);
+        cy.fit(undefined, 40);
+        cy.resize();
+        if (m.focus) {
+          var want = m.focus;
+          m.focus = '';
+          mapCenter(want);
+        }
+      });
+      layout.run();
+    }
+    cy.on('tap', 'node', function (ev) { mapSelect(ev.target.id()); });
+    cy.on('tap', function (ev) { if (ev.target === cy) mapUnselect(); });
+    cy.on('mouseover', 'node', function (ev) { mapTipShow(ev.target); });
+    cy.on('mousemove', 'node', function (ev) { mapTipMove(ev); });
+    cy.on('mouseout', 'node', function () { mapTipHide(); });
+  }
+
+  function mapTipShow(node) {
+    var tip = q('#map-tip');
+    if (!tip || !node) return;
+    if (node.data('kind') === 'chapter') {
+      tip.innerHTML = '<div class="t">' + esc(node.data('label')) + '</div>' +
+        '<div class="m">' + (node.data('n') || 0) + ' 个知识点 · 点开看这一章</div>';
+      tip.hidden = false;
+      return;
+    }
+    var p = mapPointById(node.id());
+    if (!p) { tip.hidden = true; return; }
+    tip.innerHTML = '<div class="t">' + esc(p.name) + '</div>' +
+      '<div class="m">' + esc([p.chapter, p.q_count ? p.q_count + ' 题' : '未练'].filter(Boolean).join(' · ')) + '</div>';
+    tip.hidden = false;
+  }
+
+  function mapTipMove(ev) {
+    var tip = q('#map-tip');
+    if (!tip || tip.hidden) return;
+    var oe = ev.originalEvent || {};
+    var x = Number(oe.clientX || 0), y = Number(oe.clientY || 0);
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - 250, x + 14)) + 'px';
+    tip.style.top = Math.max(8, Math.min(window.innerHeight - 90, y + 14)) + 'px';
+  }
+
+  function mapTipHide() {
+    var tip = q('#map-tip');
+    if (tip) tip.hidden = true;
+  }
+
+  function mapSelect(id) {
+    var m = state.map;
+    if (!m || !id) return;
+    if (m.chapter === MAP_OVERVIEW) {
+      var hit = null;
+      mapChapters().some(function (c) { if (c.id === id) { hit = c; return true; } return false; });
+      if (hit) mapChapter(id);
+      return;
+    }
+    var p = mapPointById(id);
+    if (!p) return;
+    var scope = mapScopeOf(p);
+    var switched = scope && (scope.module !== m.module || scope.chapter !== m.chapter);
+    if (switched) {
+      m.module = scope.module;
+      m.chapter = scope.chapter;
+      m.selected = id;
+      m.focus = id;
+      m.ver++;
+      render();
+      return;
+    }
+    m.selected = id;
+    var cy = state.mapCy;
+    if (cy) {
+      cy.$(':selected').unselect();
+      var el = cy.getElementById(id);
+      if (el && !el.empty()) el.select();
+    }
+    mapRenderSide();
+    loadMapQuestions(id);
+    mapCenter(id);
+  }
+
+  function mapUnselect() {
+    var m = state.map;
+    if (!m) return;
+    m.selected = '';
+    if (state.mapCy) state.mapCy.$(':selected').unselect();
+    mapRenderSide();
+  }
+
+  function mapCenter(id) {
+    var cy = state.mapCy;
+    if (!cy) return;
+    var el = cy.getElementById(id);
+    if (el && !el.empty()) {
+      cy.animate({ center: { eles: el }, zoom: Math.max(cy.zoom(), 0.95) }, { duration: 240 });
+    }
+  }
+
+  function mapSubject(s) {
+    var m = mapState();
+    if (!s || m.subject === s) return;
+    m.subject = s;
+    m.data = null; m.module = ''; m.chapter = ''; m.selected = ''; m.q = '';
+    loadMap();
+  }
+
+  function mapModule(mod) {
+    var m = mapState();
+    if (m.module === mod) return;
+    var keepOverview = m.chapter === MAP_OVERVIEW;
+    m.module = mod;
+    m.chapter = keepOverview ? MAP_OVERVIEW : '';
+    m.selected = '';
+    if (!keepOverview) ensureMapScope();
+    m.ver++;
+    render();
+  }
+
+  function mapChapter(id) {
+    var m = mapState();
+    if (!id || m.chapter === id) return;
+    m.chapter = id;
+    m.selected = '';
+    m.ver++;
+    render();
+  }
+
+  function mapSearch() {
+    var m = state.map;
+    if (!m) return;
+    var el = q('#map-q');
+    var kw = (el && el.value || '').trim();
+    m.q = kw;
+    if (!kw) return;
+    var d = mapData() || {};
+    var hit = null;
+    (d.nodes || []).some(function (n) {
+      if (n.kind === 'point' && String(n.name).indexOf(kw) >= 0) { hit = n; return true; }
+      return false;
+    });
+    if (!hit) { toast('没找到「' + kw + '」'); return; }
+    mapSelect(hit.id);
+  }
+
+  function mapZoom(factor) {
+    var cy = state.mapCy;
+    if (!cy) return;
+    var level = Math.max(cy.minZoom(), Math.min(cy.maxZoom(), cy.zoom() * factor));
+    cy.zoom({ level: level, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+  }
+
+  function mapZoomFit() {
+    var cy = state.mapCy;
+    if (cy) cy.fit(undefined, 40);
+  }
+
+  async function openMapPoint(id) {
+    if (!id) return;
+    try {
+      var kp = await api('/kp/' + encodeURIComponent(id));
+      var m = mapState();
+      m.subject = kp.subject || m.subject;
+      m.data = null;
+      m.module = kp.module || (kp.parent_id ? '' : MAP_ORPHAN);
+      m.chapter = kp.parent_id || MAP_ORPHAN;
+      m.selected = ''; m.focus = kp.id; m.q = '';
+      state.qpanel = null;
+      openPage({ kind: 'map' });
+      await loadMap();
+      m.selected = kp.id;
+      m.focus = kp.id;
+      m.ver++;
+      render();
+    } catch (e) {
+      toast('打开地图失败：' + e.message);
+    }
+  }
+
+  function mapOpenBank(kpid) {
+    var p = mapPointById(kpid);
+    state.bank = {
+      items: [], total: 0, subject: '', q: '', grade: '', difficulty: 0,
+      kp: kpid, kpName: p ? p.name : ''
+    };
+    openBank();
+  }
+
   function renderPage() {
     var host = q('#view-page');
     var page = state.page;
-    if (!page) { host.innerHTML = ''; return; }
+    if (!page) {
+      if (state.mapCy) { try { state.mapCy.destroy(); } catch (e) { /* noop */ } state.mapCy = null; }
+      host.innerHTML = '';
+      return;
+    }
+    if (page.kind !== 'map' && state.mapCy) {
+      try { state.mapCy.destroy(); } catch (e) { /* noop */ }
+      state.mapCy = null;
+      state.mapKey = '';
+    }
+    // 地图页：HTML 没变就别重建（否则开个题目面板就把图和缩放弄丢了）
+    var mapKey = (state.map && page.kind === 'map')
+      ? state.map.subject + '|' + state.map.module + '|' + state.map.chapter + '|' + state.map.ver
+      : '';
+    if (page.kind === 'map' && mapKey && state.mapHtmlKey === mapKey && q('#map-cy', host)) {
+      mapRenderSide();
+      return;
+    }
     var html = '';
     if (page.kind === 'models') html = modelsPageHtml();
     else if (page.kind === 'provider') {
@@ -3526,19 +4233,25 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       html = bankPageHtml();
     } else if (page.kind === 'question') {
       html = questionPageHtml();
+    } else if (page.kind === 'map') {
+      html = mapPageHtml();
     } else if (page.kind === 'memories') {
       html = memoriesPageHtml();
     }
     host.innerHTML = html;
     typesetMath(host);
+    if (page.kind === 'map') {
+      state.mapHtmlKey = mapKey;
+      mapMount();
+    }
     if (page.kind === 'form') {
       var form = q('#provider-form', host);
       if (form) form.addEventListener('submit', onProviderSubmit);
     }
     if (state.focusPending === 'page') {
       state.focusPending = '';
-      var host = q('#view-page');
-      if (host) { host.setAttribute('tabindex', '-1'); host.focus({ preventScroll: true }); }
+      var host2 = q('#view-page');
+      if (host2) { host2.setAttribute('tabindex', '-1'); host2.focus({ preventScroll: true }); }
     }
   }
 
@@ -4419,8 +5132,22 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'open-conv': function (el) { openConversation(el.getAttribute('data-id')); },
     'conv-filter': function (el) { state.convFilter = el.getAttribute('data-subject') || ''; loadConversations(); },
     'rail-bank': function () { openBank(); },
+    'rail-map': function () { openMap(); },
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
+    'map-reload': function () { loadMap(); },
+    'map-subject': function (el) { mapSubject(el.getAttribute('data-subject') || ''); },
+    'map-module': function (el) { mapModule(el.getAttribute('data-module') || ''); },
+    'map-chapter': function (el) { mapChapter(el.getAttribute('data-id') || ''); },
+    'map-select': function (el) { mapSelect(el.getAttribute('data-id') || ''); },
+    'map-unselect': function () { mapUnselect(); },
+    'map-search': function () { mapSearch(); },
+    'map-zoom-in': function () { mapZoom(1.25); },
+    'map-zoom-out': function () { mapZoom(0.8); },
+    'map-zoom-fit': function () { mapZoomFit(); },
+    'map-bank': function (el) { mapOpenBank(el.getAttribute('data-id') || ''); },
+    'map-open-q': function (el) { openQuestionPanel(el.getAttribute('data-id') || ''); },
+    'kp-open-map': function (el) { openMapPoint(el.getAttribute('data-id') || ''); },
     'edit-question': function () { openEditQuestion(state.question); },
     'qedit-save': function () { saveEditQuestion(); },
     'open-question': function (el) {
@@ -4560,6 +5287,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     if (e.key === 'Escape' && state.overlay) {
       e.preventDefault();
       closeOverlay();
+      return;
+    }
+    if (e.key === 'Enter' && e.target && e.target.id === 'map-q') {
+      e.preventDefault();
+      mapSearch();
     }
   }
 
@@ -4584,6 +5316,14 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
     var ta = q('#ta');
     ta.addEventListener('input', function () { autosize(); syncSend(); });
+    var mapResizeTimer = 0;
+    window.addEventListener('resize', function () {
+      clearTimeout(mapResizeTimer);
+      mapResizeTimer = setTimeout(function () {
+        if (state.mapCy) { state.mapCy.resize(); state.mapCy.fit(undefined, 40); }
+      }, 180);
+    });
+
     ta.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !state.sending) {
         e.preventDefault();
@@ -4652,6 +5392,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#map') { await loadMessages(); openMap(); return; }
     if (location.hash === '#bankcap') {
       await loadMessages();
       openBank();
@@ -4697,9 +5438,3 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
   boot();
 })();
-
-
-
-
-
-

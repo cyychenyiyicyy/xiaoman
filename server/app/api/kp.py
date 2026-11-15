@@ -59,6 +59,123 @@ def kp_tree(
     return {"items": [_out(k) for k in rows], "total": total}
 
 
+@router.get("/kp/graph")
+def kp_graph(subject: str = "", db: Session = Depends(get_db)):
+    """知识地图的数据：一科一张网（章节 + 知识点 + 关系边）。
+
+    前端按 module 切：module='' 时只画章节级聚合图；选了模块再展开知识点。
+    一次给全科，切换模块不再请求。
+    """
+    subject = (subject or "").strip()
+    if not subject:
+        raise HTTPException(400, "要指定学科")
+    points = list(
+        db.scalars(
+            select(Kp).where(Kp.subject == subject, Kp.kind == "point").order_by(Kp.sort, Kp.name)
+        ).all()
+    )
+    if not points:
+        return {
+            "subject": subject,
+            "modules": [],
+            "nodes": [],
+            "edges": [],
+            "stats": {"points": 0, "chapters": 0, "edges": 0},
+        }
+
+    chapter_ids = {p.parent_id for p in points if p.parent_id}
+    chapters = list(
+        db.scalars(select(Kp).where(Kp.id.in_(chapter_ids))).all()
+    ) if chapter_ids else []
+    # 章节里没有点的也留着（树骨架），但地图上只画有孩子的，避免孤岛
+    chapter_points: dict[str, int] = {}
+    for p in points:
+        if p.parent_id:
+            chapter_points[p.parent_id] = chapter_points.get(p.parent_id, 0) + 1
+    chapters = [c for c in chapters if chapter_points.get(c.id)]
+
+    ids = {p.id for p in points}
+    edges = []
+    if ids:
+        rows = db.execute(
+            select(KpEdge).where(KpEdge.from_kp_id.in_(ids), KpEdge.to_kp_id.in_(ids))
+        ).all()
+        for (e,) in rows:
+            edges.append(
+                {
+                    "id": e.id,
+                    "source": e.from_kp_id,
+                    "target": e.to_kp_id,
+                    "type": e.type,
+                }
+            )
+
+    modules = [
+        {"name": r[0] or "", "points": int(r[1] or 0), "chapters": int(r[2] or 0)}
+        for r in db.execute(
+            select(
+                Kp.module,
+                func.count(),
+                func.count(func.distinct(Kp.parent_id)),
+            )
+            .where(Kp.subject == subject, Kp.kind == "point")
+            .group_by(Kp.module)
+        ).all()
+    ]
+
+    def _module_key(m: str) -> tuple[int, str]:
+        if not m:
+            return (3, "")
+        if m.startswith("选择性必修"):
+            return (1, m)
+        if m.startswith("必修"):
+            return (0, m)
+        return (2, m)
+
+    modules.sort(key=lambda x: _module_key(x["name"]))
+
+    nodes = [
+        {
+            "id": c.id,
+            "kind": "chapter",
+            "name": c.name,
+            "module": c.module or "",
+            "grade": c.grade or "",
+            "parent": c.parent_id,
+            "q_count": 0,
+            "points": chapter_points.get(c.id, 0),
+            "difficulty": 0,
+        }
+        for c in chapters
+    ] + [
+        {
+            "id": p.id,
+            "kind": "point",
+            "name": p.name,
+            "module": p.module or "",
+            "chapter": p.chapter or "",
+            "grade": p.grade or "",
+            "parent": p.parent_id,
+            "q_count": int(p.q_count or 0),
+            "difficulty": round(float(p.difficulty or 0), 2),
+        }
+        for p in points
+    ]
+
+    return {
+        "subject": subject,
+        "modules": modules,
+        "nodes": nodes,
+        "edges": edges,
+        "stats": {
+            "points": len(points),
+            "chapters": len(chapters),
+            "edges": len(edges),
+            "tagged": sum(1 for p in points if p.q_count),
+        },
+    }
+
+
 @router.get("/kp/search")
 def kp_search(
     q: str = Query("", min_length=0),

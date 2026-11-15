@@ -217,6 +217,18 @@ def check_api(run: Run) -> None:
                 "PASS" if isinstance(search.get("items"), list) else "FAIL",
                 f"{len(search.get('items') or [])} 条",
             )
+            graph = client.get("/api/v1/kp/graph?subject=%E5%8C%96%E5%AD%A6").json()
+            ok_graph = (
+                isinstance(graph.get("nodes"), list)
+                and isinstance(graph.get("edges"), list)
+                and isinstance(graph.get("modules"), list)
+            )
+            run.add(
+                "api.kp_graph",
+                "PASS" if ok_graph else "FAIL",
+                f"{len(graph.get('nodes') or [])} 点 / {len(graph.get('edges') or [])} 边 / "
+                f"{len(graph.get('modules') or [])} 模块",
+            )
             qs = client.get("/api/v1/questions?difficulty=3&limit=3").json()
             run.add(
                 "api.questions_filter",

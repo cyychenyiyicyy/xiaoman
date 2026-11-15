@@ -1208,3 +1208,71 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
 /* 知识点「编辑」按钮：视觉 28，热区扩到 44（AGENTS §3.2） */
 .kpadd{position:relative}
 .kpadd::after{content:"";position:absolute;inset:-8px}
+
+/* ══ 知识地图（P5）═══════════════════════════════════ */
+.mapbars{display:flex;flex-direction:column;gap:var(--q2);padding:var(--q2) var(--q4) 0;flex:none}
+.mapchips{display:flex;gap:var(--q2);flex-wrap:wrap;padding:0}
+.mapchips .mapn{color:var(--ink3);font-size:var(--s6);margin-left:2px}
+.mapchips .fchip.on .mapn{color:var(--clay)}
+.maprow{display:flex;align-items:center;gap:var(--q3);padding:0 var(--q4) var(--q2)}
+.mapchaps{display:flex;gap:var(--q2);overflow-x:auto;white-space:nowrap;flex:1;min-width:0;padding:0 var(--q4) 0 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.mapchaps::-webkit-scrollbar{display:none}
+.mapchaps .fchip{flex:none}
+.mapsearch{display:flex;gap:var(--q2);flex:none;align-items:center}
+.mapsearch .fi{height:36px;width:180px;background:var(--fill);border-color:transparent}
+.mapsearch .btn{height:36px;padding:0 var(--q3)}
+.mapwrap{flex:1;min-height:0;display:flex;padding:0 var(--q4) var(--q4)}
+.mapstage{position:relative;flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--rc) 0 0 var(--rc);background:var(--paper);overflow:hidden}
+.mapcanvas{position:absolute;inset:0}
+.mapzooms{position:absolute;right:var(--q2);bottom:var(--q2);display:flex;flex-direction:column;gap:var(--q1);z-index:2}
+.mapzooms .hit{width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--line);border-radius:var(--rb);background:var(--card);color:var(--ink2);padding:0;cursor:pointer}
+.mapzooms .hit:active{background:var(--fill)}
+.maplegend{position:absolute;left:var(--q2);bottom:var(--q2);display:flex;gap:var(--q3);align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--rp);padding:6px var(--q3);font-size:var(--s6);color:var(--ink3);z-index:2}
+.maplegend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--card);border:1px solid var(--line);margin-right:4px;vertical-align:middle}
+.maplegend .dot.hasq{background:var(--claybg);border-color:var(--clay)}
+.maplegend .ln{position:relative;padding-left:14px}
+.maplegend .ln::before{content:"";position:absolute;left:0;top:50%;width:10px;height:1px;background:var(--ink3)}
+.maplegend .ln.dash::before{background:none;border-top:1px dashed var(--ink3)}
+.mapside{width:320px;flex:none;border:1px solid var(--line);border-left:0;border-radius:0 var(--rc) var(--rc) 0;background:var(--card);overflow-y:auto;padding:var(--q3)}
+.mapsidehead{padding:var(--q1) var(--q1) var(--q3)}
+.mapsidehead .ttl{font-size:var(--s3);font-weight:500;line-height:1.4;overflow-wrap:anywhere}
+.mapsidehead .sub{font-size:var(--s6);color:var(--ink3);margin-top:2px;line-height:1.5}
+.mapbackchip{display:inline-flex;align-items:center;gap:2px;height:28px;border:0;background:none;color:var(--ink2);font-family:inherit;font-size:var(--s6);padding:0;margin-bottom:var(--q1);cursor:pointer;position:relative}
+.mapbackchip::after{content:"";position:absolute;inset:-8px}
+.mapsec{margin-top:var(--q3)}
+.mapsec .slabel{display:block;margin-bottom:var(--q2)}
+.mapchip{max-width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:var(--rp);padding:4px var(--q2);font-family:inherit;font-size:var(--s6);line-height:var(--l6);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mapchip.on{background:var(--claybg);border-color:var(--clayline);color:var(--clay)}
+.mapchip:active{background:var(--fill)}
+.mapstats{display:flex;gap:var(--q4);padding:var(--q2) var(--q1) var(--q1)}
+.mapstats .n{font-size:var(--s2);font-weight:500;color:var(--ink);line-height:1.2}
+.mapstats .l{font-size:var(--s6);color:var(--ink3)}
+.mapqs{display:flex;flex-direction:column;gap:var(--q1)}
+.mapq{display:flex;flex-direction:column;gap:2px;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:var(--q2) 0;font-family:inherit;cursor:pointer}
+.mapq .stem{font-size:var(--s5);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mapq .a{font-size:var(--s6);color:var(--ink3)}
+.mapacts{padding:var(--q3) 0 0}
+.mapacts .btn{width:100%}
+.mapempty{font-size:var(--s5);color:var(--ink3)}
+.maptip{position:fixed;z-index:70;max-width:240px;background:var(--card);border:1px solid var(--line);border-radius:var(--rb);padding:var(--q2) var(--q3);box-shadow:0 4px 16px rgba(0,0,0,.12);pointer-events:none}
+.maptip[hidden]{display:none}
+.maptip .t{font-size:var(--s5);color:var(--ink);line-height:var(--l5)}
+.maptip .m{font-size:var(--s6);color:var(--ink3)}
+@media (max-width: 900px){
+  .mapwrap{flex-direction:column}
+  .mapside{width:auto;border-left:1px solid var(--line);border-top:0;border-radius:0 0 var(--rc) var(--rc);max-height:38vh}
+  .mapstage{border-radius:var(--rc) var(--rc) 0 0}
+  .mapsearch .fi{width:120px}
+  .maprow{flex-wrap:wrap}
+}
+
+/* 题目详情里的知识点 chip：可点开地图（button 复位 + 热区） */
+.kpchip{font-family:inherit;cursor:pointer;text-align:left;position:relative}
+.kpchip::after{content:"";position:absolute;inset:-8px}
+
+/* 地图：窄屏改成「画布固定高 + 下面排知识点」，并允许整块滚动 */
+@media (max-width: 900px){
+  .mapwrap{flex-direction:column;overflow-y:auto}
+  .mapstage{flex:none;height:52vh;min-height:360px;border-radius:var(--rc) var(--rc) 0 0}
+  .mapside{max-height:none;overflow:visible;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:0 0 var(--rc) var(--rc)}
+}
