@@ -218,6 +218,7 @@ async def _relay_gateway(
     text: str,
     thinking: str,
     subject: str,
+    image_paths: list[str] | None = None,
 ) -> AsyncIterator[str]:
     """PI_GATEWAY 开着时：流由 Pi 产出，消息仍落我们的库。"""
     gateway = settings.pi_gateway.rstrip("/")
@@ -247,7 +248,12 @@ async def _relay_gateway(
             async with client.stream(
                 "POST",
                 f"{gateway}/agent/chat",
-                json={"subject": subject, "text": text, "thinking": thinking},
+                json={
+                    "subject": subject,
+                    "text": text,
+                    "thinking": thinking,
+                    "images": image_paths or [],
+                },
             ) as resp:
                 if resp.status_code >= 400:
                     raw = (await resp.aread()).decode(errors="replace")[:400]
@@ -449,7 +455,10 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         context_len=model.context_len,
     )
     return StreamingResponse(
-        _relay_gateway(db, conv, user_msg, assistant, text, thinking, conv.subject),
+        _relay_gateway(
+            db, conv, user_msg, assistant, text, thinking, conv.subject,
+            image_paths=[a.path for a in attachments],
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

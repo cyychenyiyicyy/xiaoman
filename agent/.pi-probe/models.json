@@ -1,0 +1,31 @@
+{
+  "providers": {
+    "xiaoman": {
+      "baseUrl": "https://api.deepseek.com/v1",
+      "api": "openai-completions",
+      "apiKey": "$DEEPSEEK_API_KEY",
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "name": "deepseek-flash",
+          "input": [
+            "text",
+            "image"
+          ],
+          "images": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "compat": {
+            "supportsImages": true
+          }
+        }
+      ]
+    }
+  }
+}

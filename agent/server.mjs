@@ -52,6 +52,9 @@ function writeModels() {
           {
             id: process.env.PI_MODEL || "deepseek-flash",
             name: process.env.PI_MODEL || "deepseek-flash",
+            input: ["text", "image"],
+            reasoning: true,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             contextWindow: Number(process.env.PI_CONTEXT || 128000),
             maxTokens: 4096,
             promptCache: { short: 300 },
@@ -312,9 +315,23 @@ async function handleChat(res, body) {
     if (ev.type === "agent_settled") finish();
   });
 
+  // 多模态：把附件读成 ImageContent（{type:'image', data: base64, mimeType}）
+  const images = [];
+  for (const file of body.images || []) {
+    try {
+      const data = readFileSync(file).toString("base64");
+      const ext = String(file).toLowerCase().split(".").pop();
+      const mimeType =
+        ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : ext === "gif" ? "image/gif" : "image/jpeg";
+      images.push({ type: "image", data, mimeType });
+    } catch {
+      /* 单张读不到就跳过，不让整轮失败 */
+    }
+  }
+  const promptOpts = images.length ? { images } : undefined;
   try {
-    if (session.isStreaming) await session.steer(text);
-    else await session.prompt(text);
+    if (session.isStreaming) await session.steer(text, promptOpts);
+    else await session.prompt(text, promptOpts);
   } catch (err) {
     sse(res, { type: "error", code: "pi", message: String(err).slice(0, 400) });
   }

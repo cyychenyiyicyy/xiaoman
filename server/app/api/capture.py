@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import SessionLocal, get_db
-from ..models import CaptureTask
+from sqlalchemy import select
+
+from ..models import CaptureTask, LLMProvider
 from ..services import ocr
 
 router = APIRouter(tags=["capture"])
@@ -36,7 +38,13 @@ async def run_task(task_id: str) -> None:
         task.status, task.error = "parsing", ""
         db.commit()
         try:
-            blocks = await ocr.parse_to_blocks(Path(task.page_path))
+            key = settings.ocr_api_key or settings.deepseek_api_key
+            if not key:
+                row = db.scalars(
+                    select(LLMProvider).where(LLMProvider.base_url.contains("deepseek.com"))
+                ).first()
+                key = row.api_key if row else ""
+            blocks = await ocr.parse_to_blocks(Path(task.page_path), api_key=key)
             task.blocks_json, task.status = blocks, "extracting"
             db.commit()
 

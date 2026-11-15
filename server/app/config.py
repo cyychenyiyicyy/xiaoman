@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     pi_gateway: str = "http://127.0.0.1:8791"   # Pi 网关（唯一 AI 路径）
     internal_token: str = "dev-internal-token"
     ocr_provider: str = "mock"      # mock | cloud | local
-    ocr_api_key: str = ""           # 云 OCR 的 key，配了就切 cloud
+    ocr_api_key: str = ""           # 云 OCR 的 key，留空则用 provider 的 key
+    deepseek_api_key: str = ""      # 环境变量 DEEPSEEK_API_KEY
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 
