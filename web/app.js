@@ -13,6 +13,8 @@
     subjectScroll: {},       // 每个学科记住滚动位置（docs/11 §3.1）
     review: null,            // {task, groups} 复核中的一页
     captureQueue: [],        // 待复核的 task id 队列
+    capturePending: [],      // 处理中/待复核的任务（角标用）
+    pendingQuestions: [],    // 已选好、要随下一条消息发出的题目
     view: 'chat',            // chat | page
     page: null,              // {kind:'models'} | {kind:'provider',providerId} | {kind:'form',providerId}
     overlay: null,           // {kind:'models'} | {kind:'confirm',pid,name}
@@ -384,6 +386,267 @@
     return (state.subjects && state.subjects.current) || '全部';
   }
 
+  /* ── 可复用拍题组件：图片 / 题目 两模式 ─────────────── */
+
+  function openCapture(mode) {
+    setOverlay({
+      kind: 'capture',
+      mode: mode || 'question',
+      step: 'pick',
+      taskId: null,
+      task: null,
+      groups: [],
+      selected: {},
+      startedAt: 0,
+      error: ''
+    });
+  }
+
+  function captureSetMode(mode) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'capture') return;
+    o.mode = mode;
+    renderOverlay();
+  }
+
+  async function captureFile(file) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'capture' || !file) return;
+
+    if (o.mode === 'image') {
+      // 图片模式：选完直接进（不做确认）
+      toast('上传中…');
+      var fd = new FormData();
+      fd.append('file', file);
+      try {
+        var r = await api('/uploads', { method: 'POST', form: fd });
+        state.pending.push({ tmpId: 'c' + Date.now(), id: r.id, url: r.url, mime: r.mime, uploading: false });
+        state.overlay = null;
+        render();
+        toast('已加入图片');
+      } catch (e) {
+        toast('上传失败：' + e.message);
+      }
+      return;
+    }
+
+    // 题目模式：上传 → 解析 → 选题
+    o.step = 'parsing';
+    o.startedAt = Date.now();
+    o.error = '';
+    renderOverlay();
+    var fd2 = new FormData();
+    fd2.append('file', file);
+    fd2.append('subject', currentSubjectName());
+    try {
+      var t = await api('/capture/pages', { method: 'POST', form: fd2 });
+      o.taskId = t.task_id;
+      await capturePoll(t.task_id);
+    } catch (e) {
+      o.step = 'failed';
+      o.error = e.message;
+      renderOverlay();
+    }
+  }
+
+  async function capturePoll(taskId) {
+    var o = state.overlay;
+    var deadline = Date.now() + 180000;
+    while (o && o.kind === 'capture' && o.taskId === taskId) {
+      var t;
+      try {
+        t = await api('/capture/tasks/' + encodeURIComponent(taskId));
+      } catch (e) {
+        o.step = 'failed';
+        o.error = e.message;
+        renderOverlay();
+        return;
+      }
+      o.task = t;
+      if (t.status === 'review') {
+        try {
+          var full = await api('/capture/tasks/' + encodeURIComponent(taskId) + '?full=true');
+          o.task = full;
+          o.groups = (full.groups && full.groups.groups) || [];
+          o.selected = {};
+          flatQuestions(o.groups).forEach(function (f, i) { o.selected[i] = true; });
+          o.step = 'select';
+        } catch (e) {
+          o.step = 'failed';
+          o.error = e.message;
+        }
+        renderOverlay();
+        return;
+      }
+      if (t.status === 'failed') {
+        o.step = 'failed';
+        o.error = t.error || '';
+        renderOverlay();
+        return;
+      }
+      renderOverlay();
+      if (Date.now() > deadline) {
+        o.step = 'failed';
+        o.error = '处理超过 3 分钟，可能卡住了';
+        renderOverlay();
+        return;
+      }
+      await new Promise(function (r) { setTimeout(r, 1200); });
+    }
+  }
+
+  function captureToggle(i) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'capture') return;
+    var n = Number(i);
+    o.selected[n] = !o.selected[n];
+    renderOverlay();
+  }
+
+  async function captureAddToChat() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'capture') return;
+    var flat = flatQuestions(o.groups);
+    var chosen = flat.filter(function (f, i) { return o.selected[i]; });
+    if (!chosen.length) { toast('先选至少一道题'); return; }
+
+    var groups = chosen.map(function (f) {
+      var g = o.groups[f.g];
+      return {
+        group_id: g.group_id,
+        section: g.section,
+        shared_stem: g.shared_stem,
+        shared_pages: g.shared_pages,
+        questions: [f.item]
+      };
+    });
+    try {
+      var res = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '/confirm', { method: 'POST', json: { groups: groups } });
+      chosen.forEach(function (f, k) {
+        var q = f.item;
+        state.pendingQuestions.push({
+          id: (res.ids || [])[k] || '',
+          number: q.number || String(k + 1),
+          stem: q.stem || '',
+          options: q.options || []
+        });
+      });
+      state.overlay = null;
+      await loadCapturePending();
+      render();
+      toast('加入对话 ' + chosen.length + ' 题');
+    } catch (e) {
+      toast('加入失败：' + e.message);
+    }
+  }
+
+  function captureSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'capture') return '';
+    var mode = o.mode || 'question';
+    var seg = '<div class="seg capseg">' +
+      '<button type="button" class="tpill' + (mode === 'image' ? ' on' : '') + '" data-act="cap-mode" data-mode="image">图片</button>' +
+      '<button type="button" class="tpill' + (mode === 'question' ? ' on' : '') + '" data-act="cap-mode" data-mode="question">题目</button>' +
+      '</div>';
+
+    var body = '';
+    if (o.step === 'pick') {
+      body = '<div class="cappick">' +
+        '<button type="button" class="caphit" data-act="cap-shoot">' + ic('camera', 'lg') + '<span>拍照</span></button>' +
+        '<button type="button" class="caphit" data-act="cap-pick">' + ic('book', 'lg') + '<span>从相册选</span></button>' +
+        '</div>' +
+        '<div class="revhint">' + (mode === 'question' ? '拍完会自动识别题目，可以只挑要的那些' : '选完直接作为图片发送') + '</div>';
+    } else if (o.step === 'parsing') {
+      var t = o.task || {};
+      var order = ['queued', 'parsing', 'extracting', 'review'];
+      var curIdx = Math.max(0, order.indexOf(t.status || 'queued'));
+      var chips = order.map(function (k, i) {
+        var lab = k === 'review' ? '待确认' : (REVIEW_STAGES[k] || k);
+        return '<span class="rst' + (i === curIdx ? ' on' : '') + (i < curIdx ? ' done' : '') + '">' + lab + '</span>';
+      }).join('<span class="rarrow">›</span>');
+      body = '<div class="skel inmsg capskel">' + skelRows(4) + '</div>' +
+        '<div class="revstages">' + chips + '</div>' +
+        '<div class="revstage"><span class="rsp">' + esc(REVIEW_STAGES[t.status] || '处理中') + '</span>' +
+        '<span class="rsec num">' + Math.round((Date.now() - (o.startedAt || Date.now())) / 1000) + ' 秒</span></div>';
+    } else if (o.step === 'select') {
+      var flat = flatQuestions(o.groups);
+      body = flat.map(function (f, i) {
+        var q = f.item;
+        var on = !!o.selected[i];
+        return '<button type="button" class="capq' + (on ? ' on' : '') + '" data-act="cap-toggle" data-i="' + i + '">' +
+          '<span class="chk">' + (on ? ic('check', 'sm') : '') + '</span>' +
+          '<span class="capqb"><span class="capqstem">' + esc((q.stem || '').slice(0, 120)) + '</span>' +
+          '<span class="capqmeta">' + esc(q.type || 'short') + ((q.options || []).length ? ' · ' + q.options.length + ' 个选项' : '') + '</span></span>' +
+          '</button>';
+      }).join('');
+      if (!flat.length) body = '<div class="revhint">没识别出题目，换一张试试</div>';
+    } else {
+      body = '<div class="revhint">解析失败：' + esc(o.error || '不知道原因') + '</div>' +
+        '<div class="cappick"><button type="button" class="caphit" data-act="cap-retry">' + ic('refresh-cw', 'lg') + '<span>再试一次</span></button></div>';
+    }
+
+    var foot = '';
+    if (o.step === 'select' && flatQuestions(o.groups).length) {
+      var n = Object.keys(o.selected).filter(function (k) { return o.selected[k]; }).length;
+      foot = '<div class="sheet-foot"><div class="btnbar full">' +
+        '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+        '<button type="button" class="btn p" data-act="cap-add"' + (n ? '' : ' disabled') + '>加入对话' + (n ? ' ' + n + ' 题' : '') + '</button>' +
+        '</div></div>';
+    }
+
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cap-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="cap-ttl">拍题</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' + seg + body + '</div>' + foot +
+      '<input type="file" id="cap-camera" accept="image/*" capture="environment" hidden>' +
+      '<input type="file" id="cap-file" accept="image/*" multiple hidden>' +
+      '</div>';
+  }
+
+  function renderQchips() {
+    var host = q('#qchips');
+    if (!host) return;
+    if (!state.pendingQuestions.length) { host.hidden = true; host.innerHTML = ''; return; }
+    host.hidden = false;
+    host.innerHTML = state.pendingQuestions.map(function (q, i) {
+      return '<span class="qcard">' +
+        '<span class="qn">' + esc(q.number || String(i + 1)) + '</span>' +
+        '<span class="qst">' + esc((q.stem || '').slice(0, 60)) + '</span>' +
+        '<button type="button" class="rmd" data-act="drop-question" data-i="' + i + '" aria-label="移除">' + ic('x', 'sm') + '</button>' +
+        '</span>';
+    }).join('');
+  }
+
+  async function loadCapturePending() {
+    try {
+      var r = await api('/capture/tasks?limit=50');
+      state.capturePending = (r.items || []).filter(function (t) {
+        return ['queued', 'parsing', 'extracting', 'review'].indexOf(t.status) >= 0;
+      });
+    } catch (e) {
+      state.capturePending = [];
+    }
+  }
+
+  function renderCaptureChip() {
+    var host = q('.tools');
+    if (!host) return;
+    var el = q('#cap-chip');
+    var n = (state.capturePending || []).length;
+    if (!n) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.id = 'cap-chip';
+      el.className = 'tpill ro hit44';
+      el.setAttribute('data-act', 'open-capture');
+      host.insertBefore(el, host.firstChild);
+    }
+    el.innerHTML = ic('camera', 'sm') + '<span>采集 ' + n + ' 页</span>';
+  }
+
   async function onCaptureFiles(files) {
     if (!files || !files.length) return;
     toast('上传中…');
@@ -402,22 +665,78 @@
     }
     if (!ids.length) return;
     state.captureQueue = ids;
+    await loadCapturePending();
     await openReview(ids[0]);
   }
 
+  var REVIEW_STAGES = {
+    queued: '排队中',
+    parsing: '识别文字',
+    extracting: '整理题目',
+    review: '待确认',
+    done: '已入库',
+    failed: '失败'
+  };
+
   async function openReview(taskId) {
-    try {
-      var t = await api('/capture/tasks/' + encodeURIComponent(taskId) + '?full=true');
-    } catch (e) {
-      toast('读取任务失败：' + e.message);
-      return;
-    }
+    // 立刻进复核页并显示处理进度（否则用户要对着空白等 20–30 秒）
     state.review = {
-      task: t,
-      groups: JSON.parse(JSON.stringify((t.groups && t.groups.groups) || []))
+      task: { id: taskId, status: 'queued', page_no: 1, groups: {}, error: '' },
+      groups: [],
+      loading: true,
+      startedAt: Date.now()
     };
     openPage({ kind: 'review', taskId: taskId });
+    await pollTask(taskId);
   }
+
+  async function pollTask(taskId) {
+    var deadline = Date.now() + 180000;
+    while (state.page && state.page.kind === 'review' && state.page.taskId === taskId) {
+      var t;
+      try {
+        t = await api('/capture/tasks/' + encodeURIComponent(taskId));
+      } catch (e) {
+        if (state.review) state.review.error = e.message;
+        break;
+      }
+      if (!state.review || state.review.task.id !== taskId) return;
+      state.review.task = t;
+      if (t.status === 'review' || t.status === 'done') {
+        try {
+          var full = await api('/capture/tasks/' + encodeURIComponent(taskId) + '?full=true');
+          state.review.task = full;
+          state.review.groups = JSON.parse(JSON.stringify((full.groups && full.groups.groups) || []));
+          state.review.loading = false;
+        } catch (e) {
+          state.review.error = e.message;
+        }
+        render();
+        return;
+      }
+      if (t.status === 'failed') {
+        state.review.loading = false;
+        render();
+        return;
+      }
+      render();
+      if (Date.now() > deadline) {
+        state.review.error = '处理超过 3 分钟，可能卡住了';
+        state.review.loading = false;
+        render();
+        return;
+      }
+      await new Promise(function (r) { setTimeout(r, 1200); });
+    }
+  }
+
+  // 处理中每秒刷新一次「已用 N 秒」
+  setInterval(function () {
+    if (state.review && state.review.loading && state.page && state.page.kind === 'review') {
+      var el = q('#rev-elapsed');
+      if (el) el.textContent = Math.round((Date.now() - state.review.startedAt) / 1000) + ' 秒';
+    }
+  }, 1000);
 
   function flatQuestions(groups) {
     var out = [];
@@ -432,12 +751,31 @@
     if (!r) return navbar('采集校对', '', 'rail-chat', '返回', false) +
       '<div class="settings">' + pageErrorState('没有任务', '这一页不存在或已处理', 'rail-chat', 'rail-chat', '返回对话') + '</div>';
     var t = r.task;
-    var nav = navbar('采集校对', '第 ' + t.page_no + ' 页 · ' + flatQuestions(r.groups).length + ' 题',
+    var waiting = r.loading || ['queued', 'parsing', 'extracting'].indexOf(t.status) >= 0;
+    var nav = navbar('采集校对',
+      waiting ? (REVIEW_STAGES[t.status] || '处理中') : ('第 ' + t.page_no + ' 页 · ' + flatQuestions(r.groups).length + ' 题'),
       'rail-chat', '返回', false);
 
-    if (t.status === 'failed') {
+    if (waiting) {
+      var order = ['queued', 'parsing', 'extracting', 'review'];
+      var curIdx = Math.max(0, order.indexOf(t.status));
+      var chips = order.map(function (k, i) {
+        var lab = k === 'review' ? '待确认' : REVIEW_STAGES[k];
+        return '<span class="rst' + (i === curIdx ? ' on' : '') + (i < curIdx ? ' done' : '') + '">' + lab + '</span>';
+      }).join('<span class="rarrow">›</span>');
+      return nav + '<div class="revwait">' +
+        '<div class="skel">' + skelRows(5) + '</div>' +
+        '<div class="revstages">' + chips + '</div>' +
+        '<div class="revstage"><span class="rsp">' + esc(REVIEW_STAGES[t.status] || '处理中') + '</span>' +
+        '<span class="rsec num" id="rev-elapsed">' +
+        Math.round((Date.now() - (r.startedAt || Date.now())) / 1000) + ' 秒</span></div>' +
+        '<div class="revhint">识别一页一般 15–30 秒，可以先去做别的，回来还在</div>' +
+        '</div>';
+    }
+
+    if (t.status === 'failed' || r.error) {
       return nav + '<div class="settings">' +
-        pageErrorState('解析失败', t.error || '不知道原因', 'retry-capture', 'rail-chat', '返回对话') +
+        pageErrorState('解析失败', r.error || t.error || '不知道原因', 'retry-capture', 'rail-chat', '返回对话') +
         '</div>';
     }
 
@@ -498,7 +836,9 @@
       return;
     }
     state.captureQueue = state.captureQueue.filter(function (id) { return id !== r.task.id; });
+    state.review.loading = false;
     state.review = null;
+    await loadCapturePending();
     if (state.captureQueue.length) await openReview(state.captureQueue[0]);
     else { openPage(null); await loadMessages(); render(); }
   }
@@ -685,7 +1025,7 @@
     state.catalogState = 'loading';
     state.msgState = 'loading';
     await forceToday();
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
       await loadMessages();
@@ -703,6 +1043,8 @@
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
     renderSpaces();
+    renderCaptureChip();
+    renderQchips();
     var sp = q('#spaces');
     if (sp) sp.hidden = state.view !== 'chat';
     renderTop();
@@ -788,7 +1130,7 @@
 
   function syncSend() {
     var ta = q('#ta');
-    var has = !!(ta && ta.value.trim()) || state.pending.length > 0;
+    var has = !!(ta && ta.value.trim()) || state.pending.length > 0 || state.pendingQuestions.length > 0;
     q('#btn-send').disabled = state.sending || !has;
   }
 
@@ -884,7 +1226,12 @@
         return '<div class="thumb"><img src="' + esc(imgSrc(im.url || im.id)) + '" alt=""></div>';
       }).join('');
       var text = m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '';
+      var qs = (m.questions || []).map(function (q) {
+        return '<div class="qmsg"><span class="qn">' + esc(q.number || '题') + '</span>' +
+          '<span class="qms">' + esc((q.stem || '').slice(0, 120)) + '</span></div>';
+      }).join('');
       return '<div class="me"><div class="ubx">' +
+        (qs ? '<div class="qstack">' + qs + '</div>' : '') +
         (imgs ? '<div class="ustack">' + imgs + '</div>' : '') + text + '</div></div>';
     }
     var inner = '';
@@ -1691,6 +2038,7 @@ function typesetMath(el) {
         : kind === 'sources' ? sourcesSheetHtml(state.overlay)
       : kind === 'memory' ? memoryEditSheetHtml(state.overlay)
       : kind === 'subjects' ? subjectsSheetHtml(state.overlay)
+      : kind === 'capture' ? captureSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -2487,26 +2835,30 @@ function typesetMath(el) {
     var ta = q('#ta');
     var text = (ta.value || '').trim();
     var ready = state.pending.filter(function (x) { return x.id != null; });
-    if (!text && !ready.length) return;
+    var qs = state.pendingQuestions.slice();
+    if (!text && !ready.length && !qs.length) return;
     if (state.pending.some(function (x) { return x.uploading; })) {
       toast('图片还在上传');
       return;
     }
     var imgs = ready.map(function (x) { return { id: x.id, url: imgSrc(x.url), mime: x.mime }; });
+    var qids = qs.map(function (q) { return q.id; }).filter(Boolean);
     ta.value = '';
     autosize();
     state.pending = [];
+    state.pendingQuestions = [];
     renderThumbs();
+    renderQchips();
     syncSend();
-    await doSend(text, imgs.map(function (x) { return x.id; }), imgs);
+    await doSend(text, imgs.map(function (x) { return x.id; }), imgs, qs, qids);
   }
 
-  async function doSend(text, imageIds, imgs) {
-    var payload = { text: text, image_ids: imageIds || [], thinking: thinkValue() };
+  async function doSend(text, imageIds, imgs, questions, questionIds) {
+    var payload = { text: text, image_ids: imageIds || [], question_ids: questionIds || [], thinking: thinkValue() };
     var userMsg = {
       id: 'tmp-u-' + Date.now(), _key: newKey('u'), role: 'user',
       kind: (imgs && imgs.length) ? 'image' : 'text',
-      content_md: text, reasoning_md: '', images: imgs || [], status: 'done', error: ''
+      content_md: text, reasoning_md: '', images: imgs || [], questions: questions || [], status: 'done', error: ''
     };
     var asst = {
       id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
@@ -2902,6 +3254,17 @@ function typesetMath(el) {
     'open-memories': function () { openMemories(); },
     'rail-memories': function () { openMemories(); },
     'confirm-capture': function () { confirmCapture(); },
+    'cap-mode': function (el) { captureSetMode(el.getAttribute('data-mode')); },
+    'cap-shoot': function () { var f = q('#cap-camera'); if (f) f.click(); },
+    'cap-pick': function () { var f = q('#cap-file'); if (f) f.click(); },
+    'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
+    'cap-add': function () { captureAddToChat(); },
+    'cap-retry': function () { var o = state.overlay; if (o) { o.step = 'pick'; o.error = ''; renderOverlay(); } },
+    'drop-question': function (el) { state.pendingQuestions.splice(Number(el.getAttribute('data-i')), 1); renderQchips(); syncSend(); },
+    'open-capture': function () {
+      if (state.capturePending && state.capturePending.length) openReview(state.capturePending[0].id);
+      else toast('没有待处理的采集');
+    },
     'retry-capture': function () { retryCapture(); },
     'rev-del': function (el) { deleteReviewQuestion(Number(el.getAttribute('data-gi')), Number(el.getAttribute('data-qi'))); },
     'reload-memories': function () { loadMemories().then(function () { render(); }); },
@@ -2987,8 +3350,8 @@ function typesetMath(el) {
       submitMessage();
     });
 
-    q('#btn-attach').addEventListener('click', function () { pickFile('file-attach'); });
-    q('#btn-camera').addEventListener('click', function () { pickFile('file-camera'); });
+    q('#btn-attach').addEventListener('click', function () { openCapture('image'); });
+    q('#btn-camera').addEventListener('click', function () { openCapture('question'); });
     q('#file-attach').addEventListener('change', function (e) { onFiles(e.target.files); });
     q('#file-camera').addEventListener('change', function (e) { onCaptureFiles(e.target.files); });
 
@@ -3010,11 +3373,19 @@ function typesetMath(el) {
     hydrateIcons();
     bindEvents();
     bindReviewInputs();
+    document.addEventListener('change', function (e) {
+      var id = e.target && e.target.id;
+      if (id === 'cap-camera' || id === 'cap-file') {
+        var f = e.target.files && e.target.files[0];
+        if (f) captureFile(f);
+        e.target.value = '';
+      }
+    });
     autosize();
     render();
 
     await forceToday();
-    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday()]);
+    await Promise.all([loadProviders(), loadConversation(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending()]);
     // 深链：#review=<taskId> 直接进复核页（也给验收截图用）
     if (location.hash.indexOf('#review=') === 0) {
       await loadMessages();

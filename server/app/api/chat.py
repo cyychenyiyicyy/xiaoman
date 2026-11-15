@@ -53,6 +53,7 @@ def _msg_out(m: Message) -> dict:
         "content_md": m.content_md,
         "reasoning_md": m.reasoning_md,
         "images": m.images or [],
+        "questions": m.questions or [],
         "provider_id": m.provider_id,
         "model_key": m.model_key,
         "thinking": m.thinking,
@@ -250,7 +251,7 @@ async def _relay_gateway(
                 f"{gateway}/agent/chat",
                 json={
                     "subject": subject,
-                    "text": text,
+                    "text": (question_block + text) if question_block else text,
                     "thinking": thinking,
                     "images": image_paths or [],
                 },
@@ -385,6 +386,28 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
 
     conv = _conversation(db)
 
+    from ..models import Question
+
+    question_refs: list[dict] = []
+    question_block = ""
+    for qid in (payload.question_ids or [])[:10]:
+        q = db.get(Question, qid)
+        if q is None:
+            continue
+        question_refs.append(
+            {"id": q.id, "number": "", "type": q.qtype, "stem": q.stem_md, "options": q.options or []}
+        )
+
+    if question_refs:
+        lines = []
+        for i, qr in enumerate(question_refs, 1):
+            lines.append(f"[题 {i}] {qr['stem']}")
+            for op in qr["options"]:
+                lines.append(f"  {op}")
+        question_block = (
+            "\n\n本轮她附上了这些题目（已经结构化，直接用，不要重述题面）：\n" + "\n".join(lines) + "\n"
+        )
+
     attachments: list[Attachment] = []
     image_refs: list[dict] = []
     for aid in payload.image_ids[:8]:
@@ -419,6 +442,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         kind="image" if image_refs else "text",
         content_md=text,
         images=image_refs,
+        questions=question_refs,
         provider_id=provider.id,
         model_key=model.model_key,
         thinking=thinking,

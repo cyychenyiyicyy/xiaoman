@@ -100,6 +100,7 @@ class MessageOut(BaseModel):
 class ChatIn(BaseModel):
     text: str = ""
     image_ids: list[str] = Field(default_factory=list)
+    question_ids: list[str] = Field(default_factory=list)
 
 
 

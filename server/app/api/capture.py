@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from ..models import CaptureTask, LLMProvider
 from ..seed import get_current
-from ..services import ocr
+from ..services import ocr, papercut
 
 router = APIRouter(tags=["capture"])
 
@@ -39,6 +39,17 @@ async def run_task(task_id: str) -> None:
         task.status, task.error = "parsing", ""
         db.commit()
         try:
+            # ① 配了阿里云切题就用它：题组是算法切的，比「OCR+模型猜」稳
+            if (settings.papercut_auth or "").lower() in ("appcode", "aksk"):
+                cut = await papercut.cut(Path(task.page_path), task.subject)
+                task.blocks_json = {"provider": "papercut", "groups": cut.get("groups")}
+                task.groups_json = cut
+                task.confidence = 0.92 if cut.get("groups") else 0.2
+                task.question_count = sum(len(g.get("questions") or []) for g in cut.get("groups") or [])
+                task.status = "review"
+                db.commit()
+                return
+
             key = settings.ocr_api_key or settings.deepseek_api_key
             if not key:
                 row = db.scalars(

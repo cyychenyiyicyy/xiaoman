@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     ocr_provider: str = "mock"      # mock | cloud | local
     ocr_api_key: str = ""           # 云 OCR 的 key，留空则用 provider 的 key
     deepseek_api_key: str = ""      # 环境变量 DEEPSEEK_API_KEY
+
+    # 阿里云切题（每页一张 → 结构化题目）
+    papercut_auth: str = ""         # appcode（云市场）| aksk（官方 OpenAPI）
+    papercut_appcode: str = ""      # 云市场 APPCODE
+    papercut_endpoint: str = ""     # 云市场调用地址（控制台复制）；官方默认 edututor.cn-hangzhou.aliyuncs.com/service/cutApi
+    papercut_workspace_id: str = "" # 官方 OpenAPI 的百炼业务空间 id
+    aliyun_ak_id: str = ""
+    aliyun_ak_secret: str = ""
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 

@@ -817,3 +817,49 @@ body.today .composer,body.today #to-bottom{display:none}
 .revcanvas{position:relative;display:inline-block;max-width:100%;max-height:100%}
 .revcanvas img{display:block;max-width:100%;max-height:100%}
 .revimg{display:grid;place-items:center;padding:var(--q2)}
+
+
+/* ── 采集处理中（分阶段 + 骨架条，不用转圈）──────── */
+.revwait{flex:1;display:flex;flex-direction:column;gap:var(--q4);padding:var(--q5) var(--q5) var(--q4);max-width:720px}
+.revstage{display:flex;align-items:baseline;gap:var(--q2)}
+.rsp{font-size:var(--s3);color:var(--ink)}
+.rsec{font-size:var(--s5);color:var(--ink3)}
+.revhint{font-size:var(--s6);color:var(--ink3)}
+
+
+/* 采集阶段指示（排队 › 识别文字 › 整理题目 › 待确认） */
+.revstages{display:flex;align-items:center;gap:var(--q2);flex-wrap:wrap}
+.rst{font-size:var(--s6);color:var(--ink3);padding:2px var(--q2);border-radius:var(--rp);background:var(--fill)}
+.rst.on{background:var(--claybg);color:var(--clay);font-weight:500}
+.rst.done{color:var(--sage)}
+.rarrow{color:var(--ink3);font-size:var(--s6)}
+
+
+/* ── 可复用拍题组件 ───────────────────────────────── */
+.capseg{align-self:flex-start;margin:0 0 var(--q3)}
+.cappick{display:flex;gap:var(--q3);margin:var(--q2) 0 var(--q3)}
+.caphit{flex:1;display:flex;flex-direction:column;align-items:center;gap:var(--q2);padding:var(--q4);
+  border:1px solid var(--line);border-radius:var(--rc);background:var(--card);color:var(--ink2);
+  font-family:inherit;font-size:var(--s5);cursor:pointer}
+.caphit:active{background:var(--fill)}
+.caphit .ic{color:var(--ink2);display:block}
+.capskel{padding:0;gap:var(--q2)}
+.capq{display:flex;gap:var(--q2);width:100%;text-align:left;border:1px solid var(--line);border-radius:var(--rc);
+  background:var(--card);padding:var(--q3);margin-bottom:var(--q2);font-family:inherit;cursor:pointer;align-items:flex-start}
+.capq.on{border-color:var(--clayline);background:var(--claybg)}
+.capq .chk{width:22px;height:22px;border-radius:6px;border:1px solid var(--line2);display:grid;place-items:center;
+  color:var(--clay);flex:none;background:var(--card)}
+.capq.on .chk{border-color:var(--clay)}
+.capqb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.capqstem{font-size:var(--s5);color:var(--ink)}
+.capqmeta{font-size:var(--s6);color:var(--ink3)}
+.qchips{display:flex;flex-direction:column;gap:var(--q1);padding:var(--q2) var(--q3) 0}
+.qcard{display:flex;align-items:center;gap:var(--q2);background:var(--claybg);border-radius:var(--rb);
+  padding:var(--q1) var(--q2);font-size:var(--s6);color:var(--ink2)}
+.qcard .qn{color:var(--clay);font-weight:500;flex:none}
+.qcard .qst{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qstack{display:flex;flex-direction:column;gap:var(--q1);margin-bottom:var(--q2)}
+.qmsg{display:flex;gap:var(--q2);background:var(--fill);border-radius:var(--rb);padding:var(--q1) var(--q2);
+  font-size:var(--s6);color:var(--ink2)}
+.qmsg .qn{color:var(--clay);font-weight:500;flex:none}
+.qmsg .qms{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -86,6 +86,7 @@ class Message(Base):
     content_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
     reasoning_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
     images: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    questions: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     provider_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     model_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
     thinking: Mapped[str] = mapped_column(String(8), nullable=False, default="off")
