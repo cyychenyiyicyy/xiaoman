@@ -163,8 +163,68 @@ class CaptureTask(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
 
+class Kp(Base):
+    """知识点（M3 的地基）。
+
+    来源：mmlong818/k12-knowledge-points 的高中九科（教材抽取，含课标名与别名）。
+    `kind=chapter` 是教材章节节点（树骨架），`kind=point` 才是可打标签的知识点。
+    """
+
+    __tablename__ = "kp"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="", index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    name_norm: Mapped[str] = mapped_column(String(200), nullable=False, default="", index=True)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, default="point")  # point | chapter
+    parent_id: Mapped[str | None] = mapped_column(
+        ForeignKey("kp.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    grade: Mapped[str] = mapped_column(String(10), nullable=False, default="")  # 高一 / 高二 / 高三 / ""
+    module: Mapped[str] = mapped_column(String(80), nullable=False, default="")  # 必修第一册 / 选择性必修1 …
+    chapter: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    summary_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    aliases: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    difficulty: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    kp_type: Mapped[str] = mapped_column(String(20), nullable=False, default="")  # conceptual / procedural …
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="k12-kp")
+    source_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    q_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class KpEdge(Base):
+    """知识点关系。只允许同学科（迁移里用触发器强制），跨科留 kp_cross_ref。"""
+
+    __tablename__ = "kp_edge"
+    __table_args__ = (UniqueConstraint("from_kp_id", "to_kp_id", "type", name="uq_kp_edge_triple"),)
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True, default=_id)
+    from_kp_id: Mapped[str] = mapped_column(ForeignKey("kp.id", ondelete="CASCADE"), nullable=False, index=True)
+    to_kp_id: Mapped[str] = mapped_column(ForeignKey("kp.id", ondelete="CASCADE"), nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String(16), nullable=False, default="prerequisite")
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="k12-kp")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class QuestionKp(Base):
+    """题目 ↔ 知识点：多对多加权，`is_primary` 标主考点（docs/03 §5）。"""
+
+    __tablename__ = "question_kp"
+
+    question_id: Mapped[str] = mapped_column(
+        ForeignKey("question.id", ondelete="CASCADE"), primary_key=True
+    )
+    kp_id: Mapped[str] = mapped_column(ForeignKey("kp.id", ondelete="CASCADE"), primary_key=True)
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Question(Base):
-    """题目（Anki 的 note 语义）。M1 只建这一张，kp/mistake/card 留给 M2/M3。"""
+    """题目（Anki 的 note 语义）。答案 / 解析 / 知识点 / 年级 / 难度都在这里。"""
 
     __tablename__ = "question"
 
@@ -175,6 +235,12 @@ class Question(Base):
     solution_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
     qtype: Mapped[str] = mapped_column(String(16), nullable=False, default="short")
     options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    grade: Mapped[str] = mapped_column(String(10), nullable=False, default="")  # 高一/高二/高三
+    difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 0 未评 / 1..5
+    solve_status: Mapped[str] = mapped_column(String(12), nullable=False, default="")  # ''|queued|running|done|failed|skipped
+    solve_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    solved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ai_meta: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="capture")
     source_page: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     bbox: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)

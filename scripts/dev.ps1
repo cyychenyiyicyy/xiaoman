@@ -33,6 +33,12 @@ Push-Location (Join-Path $root 'server')
 & $venv -m alembic upgrade head
 Pop-Location
 
+# 知识点树是导入的，不是迁移建的：没数据就提示一次（别每次启动都自动下 19MB）
+$kpCount = (& (Join-Path $pgBin 'psql.exe') -p 5434 -U postgres -d xiaoman_dev -tAc "select count(*) from kp where kind='point'") -replace '\s', ''
+if ($kpCount -and [int]$kpCount -eq 0) {
+  Write-Host '提示：知识点还没导入 → cd server; .venv\Scripts\python.exe -m scripts.import_kp'
+}
+
 # Pi 网关：模型 key 从库里取（不写进文件）
 $key = (& (Join-Path $pgBin 'psql.exe') -p 5434 -U postgres -d xiaoman_dev -tAc "select api_key from llm_provider where base_url like '%deepseek.com%' limit 1")
 if ($key) { $env:DEEPSEEK_API_KEY = $key.Trim() }

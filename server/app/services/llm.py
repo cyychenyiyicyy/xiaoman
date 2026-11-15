@@ -297,23 +297,36 @@ async def complete_text(
     system: str,
     user: str,
     max_tokens: int = 400,
+    image_path: str = "",
 ) -> str:
-    """非流式一次性调用，用于回合后的记忆抽取。"""
+    """非流式一次性调用：记忆抽取 / 题目解析。
+
+    `image_path` 非空时把图片按 data URL 带进 user（只有视觉模型才该传）。
+    """
     base = provider.base_url.rstrip("/")
     url = f"{base}/chat/completions"
     headers = {"Content-Type": "application/json"}
     if provider.api_key:
         headers["Authorization"] = f"Bearer {provider.api_key}"
+    content: object = user
+    if image_path:
+        with open(image_path, "rb") as fh:
+            raw = base64.b64encode(fh.read()).decode()
+        mime = "image/png" if image_path.lower().endswith(".png") else "image/jpeg"
+        content = [
+            {"type": "text", "text": user},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{raw}"}},
+        ]
     payload = {
         "model": model.model_key,
         "messages": [
             {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {"role": "user", "content": content},
         ],
         "stream": False,
         "max_tokens": max_tokens,
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
         resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()

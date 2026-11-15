@@ -33,12 +33,19 @@ EXPECTED_TABLES = {
     "message",
     "attachment",
     "app_setting",
+    "kp",
+    "kp_edge",
+    "question_kp",
 }
 
 EXPECTED_COLUMNS = {
     "llm_provider": {"id", "name", "base_url", "api_style", "api_key", "api_key_tail", "connected", "kind", "sort"},
     "llm_model": {"id", "provider_id", "model_key", "display_name", "context_len", "supports_images", "supports_thinking", "enabled"},
     "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "status", "created_at"},
+    "question": {"id", "subject", "stem_md", "answer_md", "solution_md", "grade", "difficulty", "solve_status", "solve_error", "solved_at", "ai_meta"},
+    "kp": {"id", "subject", "name", "name_norm", "kind", "parent_id", "grade", "q_count"},
+    "kp_edge": {"id", "from_kp_id", "to_kp_id", "type", "subject"},
+    "question_kp": {"question_id", "kp_id", "weight", "is_primary"},
 }
 
 
@@ -197,6 +204,25 @@ def check_api(run: Run) -> None:
                 "PASS" if len(msgs.get("items", [])) >= 2 else "FAIL",
                 f"{len(msgs.get('items', []))} 条消息",
             )
+
+            tree = client.get("/api/v1/kp/tree?limit=3").json()
+            run.add(
+                "api.kp_tree",
+                "PASS" if isinstance(tree.get("items"), list) else "FAIL",
+                f"{len(tree.get('items') or [])} 条 / total {tree.get('total')}",
+            )
+            search = client.get("/api/v1/kp/search?q=%E5%8A%9B").json()
+            run.add(
+                "api.kp_search",
+                "PASS" if isinstance(search.get("items"), list) else "FAIL",
+                f"{len(search.get('items') or [])} 条",
+            )
+            qs = client.get("/api/v1/questions?difficulty=3&limit=3").json()
+            run.add(
+                "api.questions_filter",
+                "PASS" if isinstance(qs.get("items"), list) else "FAIL",
+                f"{len(qs.get('items') or [])} 条",
+            )
     except Exception as exc:  # noqa: BLE001
         run.add("api", "FAIL", f"{type(exc).__name__}: {exc}"[:400])
     run.results[-1].ms = run.results[-1].ms or int((time.perf_counter() - started) * 1000)
@@ -270,11 +296,85 @@ def check_memory(run: Run) -> None:
     run.results[-1].ms = int((time.perf_counter() - started) * 1000)
 
 
+def check_knowledge(run: Run) -> None:
+    """知识点：导入齐 / 只同学科 / 模型名能落到树上 / 题库已打标签。"""
+    from sqlalchemy import func, select, text
+
+    from app.db import SessionLocal
+    from app.models import Kp, KpEdge, QuestionKp
+    from app.services import knowledge
+
+    started = time.perf_counter()
+    db = SessionLocal()
+    try:
+        points = int(db.scalar(select(func.count()).select_from(Kp).where(Kp.kind == "point")) or 0)
+        if points == 0:
+            run.add("kp.imported", "SKIP", "还没导入：cd server && python -m scripts.import_kp")
+        else:
+            subjects = int(
+                db.scalar(select(func.count(func.distinct(Kp.subject))).where(Kp.kind == "point")) or 0
+            )
+            run.add("kp.imported", "PASS" if subjects >= 9 else "FAIL", f"{points} 个知识点 / {subjects} 个学科")
+
+        edges = int(db.scalar(select(func.count()).select_from(KpEdge)) or 0)
+        run.add("kp.edges", "PASS" if edges > 0 else "SKIP", f"{edges} 条关系边")
+
+        cross = int(
+            db.scalar(
+                text(
+                    "select count(*) from kp_edge e "
+                    "join kp a on a.id=e.from_kp_id join kp b on b.id=e.to_kp_id "
+                    "where a.subject<>b.subject"
+                )
+            )
+            or 0
+        )
+        run.add("kp.same_subject", "PASS" if cross == 0 else "FAIL", f"跨学科边 {cross}")
+
+        # 触发器要真的拦得住：硬插一条跨学科边
+        blocked = False
+        try:
+            a = db.scalar(select(Kp).where(Kp.subject == "数学", Kp.kind == "point").limit(1))
+            b = db.scalar(select(Kp).where(Kp.subject == "物理", Kp.kind == "point").limit(1))
+            if a is not None and b is not None:
+                db.execute(
+                    text(
+                        "insert into kp_edge (id, from_kp_id, to_kp_id, type, subject, source, created_at) "
+                        "values ('verify_bad', :a, :b, 'prerequisite', '数学', 'verify', now())"
+                    ),
+                    {"a": a.id, "b": b.id},
+                )
+        except Exception:  # noqa: BLE001  期望就是被触发器拒绝
+            blocked = True
+        finally:
+            db.rollback()
+        run.add(
+            "kp.cross_blocked",
+            "PASS" if (blocked or points == 0) else "FAIL",
+            "触发器拦住了跨学科边" if blocked else ("跳过" if points == 0 else "没拦住"),
+        )
+
+        if points:
+            hit = knowledge.resolve(db, "物理", "牛顿第二定律", "")
+            ok = hit is not None and hit.subject == "物理" and hit.source != "llm"
+            run.add("kp.resolve", "PASS" if ok else "FAIL", hit.name if hit else "没匹配到")
+        else:
+            run.add("kp.resolve", "SKIP", "没有知识点数据")
+
+        tagged = int(db.scalar(select(func.count()).select_from(QuestionKp)) or 0)
+        run.add("kp.tagging", "PASS" if tagged > 0 else "SKIP", f"{tagged} 条题目↔知识点")
+    except Exception as exc:  # noqa: BLE001
+        run.add("kp", "FAIL", f"{type(exc).__name__}: {exc}"[:300])
+    finally:
+        db.close()
+    run.results[-1].ms = int((time.perf_counter() - started) * 1000)
+
+
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--only", default="schema,migration,api,catalog,memory")
+    parser.add_argument("--only", default="schema,migration,api,catalog,memory,kp")
     parser.add_argument("--selftest", action="store_true", help="注入一个假失败，验证脚本会 exit 1")
     parser.add_argument("--destructive", action="store_true")
     args = parser.parse_args()
@@ -297,6 +397,8 @@ def main() -> int:
         check_catalog(run)
     if "memory" in selected:
         check_memory(run)
+    if "kp" in selected:
+        check_knowledge(run)
     for name in ("fsrs", "export"):
         if name in selected:
             run.add(name, "SKIP", "MVP 未实现（M2 / M3 末）")

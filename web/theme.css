@@ -1145,3 +1145,66 @@ body.noconv .top .l2{display:none}
 .empty .acts .btn{border:1px solid var(--line2);background:var(--card)}
 
 .convside[hidden]{display:none !important}
+
+/* ══ 题库：解析 / 知识点 / 筛选（M1 增补）════════════════ */
+.bankbar{flex-wrap:wrap}
+.bankbar .fi{min-width:180px}
+.bankbar .btn{flex:none}
+.bankfilters{display:flex;align-items:center;gap:var(--q2);flex-wrap:wrap;padding:0 var(--q4) var(--q3)}
+.bankfilters .sp{flex:1}
+.fchip{border:1px solid transparent;font-family:inherit}
+.fchip.on{border-color:var(--clayline)}
+.fchip.clear{background:transparent;color:var(--ink3)}
+.fchip:active{background:var(--fill2)}
+.bankchips.capsub{padding:var(--q3) 0 0}
+.bankchips.capsub .fchip{height:26px;padding:0 var(--q2);font-size:var(--s6)}
+
+.qbank{display:flex;flex-direction:column;gap:var(--q1)}
+.qkps{display:flex;gap:var(--q1);flex-wrap:wrap;margin-top:var(--q1)}
+.kptag{font-size:var(--s6);line-height:var(--l6);color:var(--ink2);background:var(--fill);
+  border-radius:var(--rp);padding:2px var(--q2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qbankfoot{display:flex;align-items:center;gap:var(--q2);margin-top:var(--q2);min-height:var(--i-sm)}
+.qstate{font-size:var(--s6);color:var(--clay);flex:none}
+.qstate.fail{color:var(--ink3)}
+.qansline{font-size:var(--s6);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qansline .k{color:var(--ink3);margin-right:var(--q1)}
+
+.qsec{margin-top:var(--q4)}
+.qsec .slabel{display:inline-flex;align-items:center;gap:var(--q2);margin-bottom:var(--q2)}
+.qansbox{font-size:var(--s4);line-height:var(--l4);color:var(--ink);background:var(--fill);
+  border-radius:var(--rc);padding:var(--q3);white-space:pre-wrap;overflow-wrap:anywhere}
+.qsol{font-size:var(--s5);line-height:var(--l5);color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.qempty{font-size:var(--s5);color:var(--ink3)}
+.qkpsrow{display:flex;flex-wrap:wrap;align-items:center;gap:var(--q1) var(--q2)}
+.kpchip{display:inline-flex;align-items:center;font-size:var(--s6);line-height:var(--l6);color:var(--ink2);
+  background:var(--fill);border:1px solid transparent;border-radius:var(--rp);padding:3px var(--q2);max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpchip.main{background:var(--claybg);border-color:var(--clayline);color:var(--clay)}
+.kpadd{display:inline-flex;align-items:center;gap:var(--q1);height:28px;padding:0 var(--q2);
+  border:1px solid var(--line);border-radius:var(--rp);background:var(--card);color:var(--ink2);
+  font-family:inherit;font-size:var(--s6);cursor:pointer}
+.kpadd:active{background:var(--fill)}
+
+.kprow{display:flex;align-items:center;gap:var(--q2);width:100%;min-height:48px;padding:var(--q2) var(--q3);
+  border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);
+  font-family:inherit;text-align:left;cursor:pointer}
+.kprow:last-child{border-bottom:0}
+.kprow.on{background:var(--claybg)}
+.kprow .capchk{position:static;box-shadow:none;flex:none}
+.kpmain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.kpname{font-size:var(--s5);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpmeta{font-size:var(--s6);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpsheet .sheet-body{max-height:60vh;overflow-y:auto}
+.kpsheet .pickbar{margin-bottom:var(--q2)}
+
+.frow2{display:flex;gap:var(--q3);margin-top:var(--q2)}
+.frow2 .ffield{flex:1;display:flex;flex-direction:column;gap:var(--q1);min-width:0}
+.frow2 .slabel{display:block;margin-bottom:0}
+select.fi{height:44px;appearance:none;padding:0 var(--q3);background:var(--card);font-family:inherit}
+select.fi:focus{outline:none;border-color:var(--clayline)}
+.qacts{flex-wrap:wrap;padding-top:var(--q3)}
+@media (max-width:900px){ .frow2{flex-direction:column} }
+
+/* 知识点「编辑」按钮：视觉 28，热区扩到 44（AGENTS §3.2） */
+.kpadd{position:relative}
+.kpadd::after{content:"";position:absolute;inset:-8px}

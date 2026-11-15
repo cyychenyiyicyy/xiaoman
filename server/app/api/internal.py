@@ -2,7 +2,7 @@
 
 网关里的 Pi customTools 调这里，实现仍是本项目的既有逻辑（记忆 / DeepSeek 搜索）。
 """
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -161,8 +161,9 @@ def tool_question_search(payload: QSearchIn, db: Session = Depends(get_db)):
 
 
 @router.post("/internal/tools/question_add", dependencies=[Depends(guard)])
-def tool_question_add(payload: QAddIn, db: Session = Depends(get_db)):
+def tool_question_add(payload: QAddIn, background: BackgroundTasks, db: Session = Depends(get_db)):
     from ..models import Question
+    from ..services import solve as solve_service
 
     fp = _q_fp(payload.stem)
     existing = db.scalar(select(Question).where(Question.stem_fp == fp))
@@ -174,14 +175,20 @@ def tool_question_add(payload: QAddIn, db: Session = Depends(get_db)):
         if payload.options and not (existing.options or []):
             existing.options = payload.options
             filled = True
-        if filled:
-            db.commit()
-            db.refresh(existing)
+        # 答案有了但解析没有：后台补解析与知识点（不覆盖已有答案）
+        need_solve = not (existing.solution_md or "").strip()
+        if need_solve:
+            existing.solve_status = "queued"
+            existing.solve_error = ""
+        db.commit()
+        db.refresh(existing)
+        if need_solve:
+            background.add_task(solve_service.solve_many, [existing.id], False)
         return {
             "item": _q_out(existing),
             "already": True,
             "filled_answer": filled,
-            "hint": "题库已有这道题" + ("，答案刚补上" if filled else "；若答案仍为空，用 question_update 补"),
+            "hint": "题库已有这道题" + ("，答案刚补上" if filled else "") + "；解析会在后台补齐",
         }
 
     q = Question(
@@ -194,10 +201,12 @@ def tool_question_add(payload: QAddIn, db: Session = Depends(get_db)):
         source="chat",
         source_page=1,
         stem_fp=fp,
+        solve_status="queued",
     )
     db.add(q)
     db.commit()
     db.refresh(q)
+    background.add_task(solve_service.solve_many, [q.id], False)
     return {"item": _q_out(q), "already": False}
 
 

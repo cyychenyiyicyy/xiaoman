@@ -14,7 +14,9 @@
     review: null,            // {task, groups} 复核中的一页
     captureQueue: [],        // 待复核的 task id 队列
     capturePending: [],      // 处理中/待复核的任务（角标用）
-    bank: null,              // {items,total,subject,q}
+    bank: null,              // {items,total,subject,q,grade,difficulty,kp}
+    bankSolvedTimer: 0,      // 解析轮询计时器
+    kpPick: null,            // 知识点选择/筛选弹层的数据
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -399,9 +401,15 @@
 
   /* ── 可复用拍题组件：图片 / 题目 两模式 ─────────────── */
 
-  function openCapture() {
+  function openCapture(intent) {
+    var bank = bankState();
+    var subj = intent === 'bank'
+      ? (bank.subject || (currentSubjectName() !== '全部' ? currentSubjectName() : '数学'))
+      : currentSubjectName();
     setOverlay({
       kind: 'capture',
+      intent: intent === 'bank' ? 'bank' : 'chat',
+      subject: subj,
       step: 'pick',
       taskId: null,
       task: null,
@@ -427,7 +435,7 @@
 
     var fd = new FormData();
     fd.append('file', file);
-    fd.append('subject', currentSubjectName());
+    fd.append('subject', o.subject || currentSubjectName());
     try {
       var t = await api('/capture/pages', { method: 'POST', form: fd });
       o.taskId = t.task_id;
@@ -489,7 +497,7 @@
     renderOverlay();
   }
 
-  async function captureAddToChat() {
+  async function captureCommit() {
     var o = state.overlay;
     if (!o || o.kind !== 'capture') return;
     var flat = flatQuestions(o.groups);
@@ -508,6 +516,18 @@
     });
     try {
       var res = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '/confirm', { method: 'POST', json: { groups: groups } });
+      if (o.intent === 'bank') {
+        state.overlay = null;
+        var made = (res.ids || []).length;
+        toast(made ? '收进题库 ' + made + ' 题 · 生成解析中' : '这些题题库里已有');
+        if (state.page && state.page.kind === 'bank') {
+          await loadBank();
+          pollBankSolve();
+        } else {
+          openBank();
+        }
+        return;
+      }
       chosen.forEach(function (f, k) {
         var q = f.item;
         state.pendingQuestions.push({
@@ -530,18 +550,26 @@
   function captureSheetHtml() {
     var o = state.overlay;
     if (!o || o.kind !== 'capture') return '';
-    var title = '添加';
+    var isBank = o.intent === 'bank';
+    var title = isBank ? '收进题库' : '添加';
 
     var body = '';
     if (o.step === 'pick') {
+      var subs = isBank
+        ? '<div class="slabel">学科</div><div class="bankchips capsub">' + SUBJECTS.map(function (s) {
+            var on = (o.subject || '') === s;
+            return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="cap-subject" data-subject="' + esc(s) + '">' + s + '</span>';
+          }).join('') + '</div>'
+        : '';
       body = '<div class="capmenu">' +
         '<button type="button" class="caprow" data-act="cap-camera">' + ic('camera') +
           '<span>相机</span><span class="sp"></span><span class="caparr">›</span></button>' +
         '<button type="button" class="caprow" data-act="cap-album">' + ic('image') +
           '<span>相册</span><span class="sp"></span><span class="caparr">›</span></button>' +
-        '<button type="button" class="caprow" data-act="open-picker">' + ic('book-open-text') +
-          '<span>题库</span><span class="sp"></span><span class="caparr">›</span></button>' +
-        '</div>';
+        (isBank ? '' :
+          '<button type="button" class="caprow" data-act="open-picker">' + ic('book-open-text') +
+          '<span>题库</span><span class="sp"></span><span class="caparr">›</span></button>') +
+        '</div>' + subs;
     } else if (o.step === 'scanning') {
       var t = o.task || {};
       var stageText = t.status === 'queued' ? '排队中'
@@ -582,7 +610,7 @@
       foot = '<div class="sheet-foot"><div class="btnbar full">' +
         '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
         '<button type="button" class="btn p" data-act="cap-add"' + (n ? '' : ' disabled') + '>' +
-        (n ? '完成（' + n + ' 题）' : '完成') + '</button>' +
+        (n ? (isBank ? '收进题库（' + n + ' 题）' : '完成（' + n + ' 题）') : (isBank ? '收进题库' : '完成')) + '</button>' +
         '</div></div>';
     }
 
@@ -933,8 +961,11 @@
       id: q.id,
       subject: q.subject || '',
       qtype: q.qtype || 'short',
+      grade: q.grade || '',
+      difficulty: Number(q.difficulty || 0),
       stem: q.stem_md || '',
       answer: q.answer_md || '',
+      solution: q.solution_md || '',
       options: (q.options || []).join('\n')
     });
   }
@@ -942,6 +973,12 @@
   function qeditSheetHtml() {
     var o = state.overlay;
     if (!o || o.kind !== 'qedit') return '';
+    var gradeOpts = ['', '高一', '高二', '高三'].map(function (g) {
+      return '<option value="' + esc(g) + '"' + (o.grade === g ? ' selected' : '') + '>' + (g || '未标') + '</option>';
+    }).join('');
+    var diffOpts = [0, 1, 2, 3, 4, 5].map(function (n) {
+      return '<option value="' + n + '"' + (Number(o.difficulty) === n ? ' selected' : '') + '>' + (n ? n + ' · ' + diffLabel(n) : '未评') + '</option>';
+    }).join('');
     return '<div class="scrim" data-act="close-sheet"></div>' +
       '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qe-ttl" tabindex="-1">' +
       '<div class="grab"></div>' +
@@ -954,6 +991,12 @@
         '<textarea class="fi rta" id="qe-opts" rows="3">' + escText(o.options) + '</textarea>' +
         '<div class="slabel">答案</div>' +
         '<textarea class="fi rta" id="qe-answer" rows="2">' + escText(o.answer) + '</textarea>' +
+        '<div class="slabel">解析</div>' +
+        '<textarea class="fi rta" id="qe-solution" rows="4">' + escText(o.solution) + '</textarea>' +
+        '<div class="frow2">' +
+          '<label class="ffield"><span class="slabel">年级</span><select class="fi" id="qe-grade">' + gradeOpts + '</select></label>' +
+          '<label class="ffield"><span class="slabel">难度</span><select class="fi" id="qe-diff">' + diffOpts + '</select></label>' +
+        '</div>' +
       '</div>' +
       '<div class="sheet-foot"><div class="btnbar full">' +
         '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
@@ -967,7 +1010,10 @@
     var body = {
       stem: (q('#qe-stem') || {}).value || '',
       options: ((q('#qe-opts') || {}).value || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean),
-      answer: (q('#qe-answer') || {}).value || ''
+      answer: (q('#qe-answer') || {}).value || '',
+      solution: (q('#qe-solution') || {}).value || '',
+      grade: (q('#qe-grade') || {}).value || '',
+      difficulty: Number((q('#qe-diff') || {}).value || 0)
     };
     try {
       var r = await api('/questions/' + encodeURIComponent(o.id), { method: 'PATCH', json: body });
@@ -982,48 +1028,277 @@
     }
   }
 
+  var GRADES = ['高一', '高二', '高三'];
+  var DIFFS = { 1: '易', 2: '较易', 3: '中等', 4: '较难', 5: '难' };
+  var SUBJECTS = ['语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+
+  function diffLabel(n) { return DIFFS[Number(n)] || ''; }
+
+  function bankState() {
+    return state.bank || { items: [], total: 0, subject: '', q: '', grade: '', difficulty: 0, kp: '', kpName: '' };
+  }
+
   function openBank() {
     openPage({ kind: 'bank' });
     loadBank();
   }
 
+  function bankPatch(patch) {
+    var b = bankState();
+    state.bank = {
+      items: b.items || [], total: b.total || 0, subject: b.subject || '', q: b.q || '',
+      grade: b.grade || '', difficulty: b.difficulty || 0, kp: b.kp || '', kpName: b.kpName || '',
+      error: ''
+    };
+    Object.keys(patch || {}).forEach(function (k) { state.bank[k] = patch[k]; });
+    loadBank();
+  }
+
   async function loadBank() {
-    var b = state.bank || { items: [], total: 0, subject: '', q: '' };
+    var b = bankState();
     try {
-      var params = [];
+      var params = ['limit=100'];
       if (b.subject) params.push('subject=' + encodeURIComponent(b.subject));
       if (b.q) params.push('q=' + encodeURIComponent(b.q));
-      params.push('limit=100');
+      if (b.grade) params.push('grade=' + encodeURIComponent(b.grade));
+      if (b.difficulty) params.push('difficulty=' + Number(b.difficulty));
+      if (b.kp) params.push('kp=' + encodeURIComponent(b.kp));
       var r = await api('/questions?' + params.join('&'));
-      state.bank = { items: r.items || [], total: r.total || 0, subject: b.subject, q: b.q };
+      state.bank = {
+        items: r.items || [], total: r.total || 0, subject: b.subject, q: b.q,
+        grade: b.grade, difficulty: b.difficulty, kp: b.kp, kpName: b.kpName
+      };
     } catch (e) {
-      state.bank = { items: [], total: 0, subject: b.subject, q: b.q, error: e.message };
+      state.bank = {
+        items: [], total: 0, subject: b.subject, q: b.q, grade: b.grade,
+        difficulty: b.difficulty, kp: b.kp, kpName: b.kpName, error: e.message
+      };
     }
     render();
+    pollBankSolve();
   }
 
   function bankFilter(subject) {
-    var b = state.bank || {};
-    state.bank = { items: b.items || [], total: b.total || 0, subject: subject, q: b.q || '' };
-    loadBank();
+    bankPatch({ subject: subject });
   }
 
   function bankSearch() {
     var el = q('#bank-q');
-    var b = state.bank || {};
-    state.bank = { items: b.items || [], total: b.total || 0, subject: b.subject || '', q: (el && el.value || '').trim() };
-    loadBank();
+    bankPatch({ q: (el && el.value || '').trim() });
+  }
+
+  function bankOpenFilter(field) {
+    setOverlay({ kind: 'bankfilter', field: field });
+  }
+
+  function bankFilterPick(value) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'bankfilter') return;
+    if (o.field === 'grade') bankPatch({ grade: value || '' });
+    else bankPatch({ difficulty: Number(value) || 0 });
+    closeOverlay();
+  }
+
+  function bankReset() {
+    bankPatch({ subject: '', grade: '', difficulty: 0, kp: '', kpName: '', q: '' });
+  }
+
+  function bankHasPendingSolve() {
+    var items = (state.bank && state.bank.items) || [];
+    return items.some(function (x) { return x.solve_status === 'queued' || x.solve_status === 'running'; });
+  }
+
+  function pollBankSolve() {
+    clearTimeout(state.bankSolvedTimer);
+    if (!bankHasPendingSolve()) return;
+    state.bankSolvedTimer = setTimeout(function () {
+      if (state.page && state.page.kind === 'bank') loadBank();
+    }, 2600);
+  }
+
+  function bankSolveMissing() {
+    api('/questions/solve-missing?limit=20', { method: 'POST' })
+      .then(function (r) {
+        toast('补解析 ' + (r.queued || 0) + ' 题');
+        loadBank();
+      })
+      .catch(function (e) { toast('补解析失败：' + e.message); });
+  }
+
+  /* ── 知识点选择 / 筛选 ───────────────────────────── */
+
+  function openKpSheet(mode, opts) {
+    opts = opts || {};
+    var o = {
+      kind: 'kpsel',
+      mode: mode,                 // filter | edit
+      subject: opts.subject || '',
+      qid: opts.qid || '',
+      q: '',
+      items: [],
+      loading: true,
+      selected: opts.selected || {},
+      pinned: opts.pinned || []
+    };
+    setOverlay(o);
+    loadKpSheet('');
+  }
+
+  async function loadKpSheet(kw) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'kpsel') return;
+    o.loading = true;
+    renderOverlay();
+    try {
+      var params = ['limit=60'];
+      if (kw) params.push('q=' + encodeURIComponent(kw));
+      if (o.subject && o.subject !== '全部') params.push('subject=' + encodeURIComponent(o.subject));
+      var r = await api('/kp/search?' + params.join('&'));
+      o.items = r.items || [];
+    } catch (e) {
+      o.items = [];
+      o.error = e.message;
+    }
+    // 已选中的知识点不在搜索结果里时置顶（否则编辑时看不到自己选了啥）
+    var have = {};
+    (o.items || []).forEach(function (k) { have[k.id] = true; });
+    (o.pinned || []).slice().reverse().forEach(function (k) {
+      if (k && k.id && o.selected[k.id] && !have[k.id]) {
+        o.items.unshift({ id: k.id, name: k.name, grade: k.grade || '', chapter: k.chapter || '' });
+        have[k.id] = true;
+      }
+    });
+    o.loading = false;
+    if (state.overlay === o) renderOverlay();
+  }
+
+  function kpSheetSearch() {
+    var el = q('#kp-q');
+    var o = state.overlay;
+    if (!o || o.kind !== 'kpsel') return;
+    o.q = (el && el.value || '').trim();
+    loadKpSheet(o.q);
+  }
+
+  async function kpSheetToggle(id) {
+    var o = state.overlay;
+    if (!o || o.kind !== 'kpsel' || !id) return;
+    if (o.mode === 'filter') {
+      var name = '';
+      (o.items || []).forEach(function (k) { if (k.id === id) name = k.name; });
+      closeOverlay();
+      bankPatch({ kp: id, kpName: name });
+      return;
+    }
+    var next = Object.assign({}, o.selected || {});
+    if (next[id]) delete next[id];
+    else next[id] = true;
+    o.selected = next;
+    try {
+      var r = await api('/questions/' + encodeURIComponent(o.qid), {
+        method: 'PATCH',
+        json: { kps: Object.keys(next) }
+      });
+      if (state.question && state.question.id === o.qid) state.question = r;
+      if (state.qpanel && state.qpanel.id === o.qid) state.qpanel.data = r;
+      if (state.overlay === o) renderOverlay();
+      render();
+    } catch (e) {
+      toast('保存失败：' + e.message);
+    }
+  }
+
+  function bankFilterSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'bankfilter') return '';
+    var b = bankState();
+    var field = o.field;
+    var options = field === 'grade'
+      ? [{ v: '', t: '全部' }].concat(GRADES.map(function (g) { return { v: g, t: g }; }))
+      : [{ v: 0, t: '全部' }].concat([1, 2, 3, 4, 5].map(function (n) { return { v: n, t: diffLabel(n) }; }));
+    var cur = field === 'grade' ? (b.grade || '') : (Number(b.difficulty) || 0);
+    var rows = options.map(function (op) {
+      var on = String(op.v) === String(cur);
+      return '<button type="button" class="caprow' + (on ? ' on' : '') + '" data-act="bank-filter-pick" data-v="' + esc(String(op.v)) + '">' +
+        '<span>' + esc(op.t) + '</span><span class="sp"></span>' +
+        (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="bf-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="bf-ttl">' + (field === 'grade' ? '年级' : '难度') + '</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="capmenu">' + rows + '</div></div>' +
+      '</div>';
+  }
+
+  function kpSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'kpsel') return '';
+    var rows = (o.items || []).map(function (k) {
+      var on = !!(o.selected || {})[k.id];
+      return '<button type="button" class="kprow' + (on ? ' on' : '') + '" data-act="kp-toggle" data-id="' + esc(k.id) + '">' +
+        '<span class="kpmain"><span class="kpname">' + esc(k.name) + '</span>' +
+        '<span class="kpmeta">' + esc(k.grade || '') + (k.chapter ? ' · ' + esc(k.chapter) : '') + '</span></span>' +
+        (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') +
+        '</button>';
+    }).join('');
+    var empty = o.loading ? '<div class="skel inmsg">' + skelRows(4) + '</div>'
+      : (rows ? '' : '<div class="empty"><div class="t">没找到知识点</div><div class="d">换个词，或直接选不限制</div></div>');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet kpsheet" role="dialog" aria-modal="true" aria-labelledby="kp-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="kp-ttl">知识点</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' +
+        '<div class="pickbar"><input type="search" id="kp-q" class="fi" placeholder="搜知识点" value="' + esc(o.q || '') + '">' +
+        '<button type="button" class="btn" data-act="kp-search">搜索</button></div>' +
+        (o.mode === 'filter'
+          ? '<button type="button" class="kprow' + (bankState().kp ? '' : ' on') + '" data-act="kp-clear"><span class="kpmain"><span class="kpname">不限制</span></span>' +
+            (bankState().kp ? '' : '<span class="capchk">' + ic('check', 'sm') + '</span>') + '</button>'
+          : '') +
+        empty + rows +
+      '</div></div>';
+  }
+
+  async function pollQuestionSolve(qid) {
+    for (var i = 0; i < 40; i++) {
+      await new Promise(function (r) { setTimeout(r, 2500); });
+      if (!state.question || state.question.id !== qid) return;
+      if (state.question.solve_status !== 'queued' && state.question.solve_status !== 'running') return;
+      try {
+        var r = await api('/questions/' + encodeURIComponent(qid));
+        if (!state.question || state.question.id !== qid) return;
+        state.question = r;
+        render();
+      } catch (e) { return; }
+    }
   }
 
   function bankCardHtml(q, i) {
     var tags = '<span class="tag">' + esc(q.subject || '全部') + '</span>' +
-      '<span class="tag">' + esc(q.qtype === 'choice' ? '选择题' : q.qtype === 'blank' ? '填空题' : '题目') + '</span>';
+      (q.grade ? '<span class="tag">' + esc(q.grade) + '</span>' : '') +
+      (q.difficulty ? '<span class="tag">' + esc(diffLabel(q.difficulty)) + '</span>' : '');
     var thumb = q.image_url
       ? '<img class="qthumb" src="' + esc(q.image_url) + '" alt="">'
       : '';
+    var kps = (q.kps || []).slice(0, 2).map(function (k) {
+      return '<span class="kptag">' + esc(k.name) + '</span>';
+    }).join('');
+    if ((q.kps || []).length > 2) kps += '<span class="kptag">+' + ((q.kps || []).length - 2) + '</span>';
+    var pending = q.solve_status === 'queued' || q.solve_status === 'running';
+    var foot = pending
+      ? '<span class="qstate">解析中…</span>'
+      : (q.solve_status === 'failed'
+        ? '<span class="qstate fail">解析失败</span>'
+        : (q.answer_md
+          ? '<span class="qansline"><span class="k">答案</span>' + esc(String(q.answer_md).replace(/\s+/g, ' ').slice(0, 36)) + '</span>'
+          : '<span class="qstate">待补解析</span>'));
     return '<button type="button" class="qattach qbank" data-act="open-question" data-id="' + esc(q.id) + '">' +
       '<div class="rowtop"><div class="tags">' + tags + '</div><span class="sp"></span>' + thumb + '</div>' +
       '<div class="stem clamp3">' + stemHtml(q.stem_md || '') + '</div>' +
+      (kps ? '<div class="qkps">' + kps + '</div>' : '') +
+      '<div class="qbankfoot">' + foot + '</div>' +
       '</button>';
   }
 
@@ -1040,20 +1315,35 @@
   }
 
   function bankPageHtml() {
-    var b = state.bank || { items: [], total: 0, subject: '', q: '' };
-    var count = (b.items || []).length;
+    var b = bankState();
     var nav = navbar('题库', (b.total || 0) + ' 题', '', '', false);
     if (b.error) {
       return nav + '<div class="settings">' +
         pageErrorState('加载失败', b.error, 'bank-reload', 'rail-chat', '返回对话') + '</div>';
     }
 
-    var subjects = ['', '语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+    var subjects = [''].concat(SUBJECTS);
     var chips = subjects.map(function (s) {
       var on = (b.subject || '') === s;
       return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="bank-filter" data-subject="' + esc(s) + '">' +
         (s || '全部') + (s ? '' : ' ' + (b.total || 0)) + '</span>';
     }).join('');
+
+    var anyFilter = !!(b.grade || b.difficulty || b.kp);
+    var missing = (b.items || []).filter(function (x) {
+      return !(x.solution_md || '').trim() && x.solve_status !== 'queued' && x.solve_status !== 'running';
+    }).length;
+    var filters = '<div class="bankfilters">' +
+      '<button type="button" class="fchip' + (b.grade ? ' on' : '') + '" data-act="bank-open-filter" data-field="grade">' +
+        (b.grade || '年级') + '</button>' +
+      '<button type="button" class="fchip' + (b.difficulty ? ' on' : '') + '" data-act="bank-open-filter" data-field="difficulty">' +
+        (b.difficulty ? diffLabel(b.difficulty) : '难度') + '</button>' +
+      '<button type="button" class="fchip' + (b.kp ? ' on' : '') + '" data-act="open-kp-filter">' +
+        (b.kpName || '知识点') + '</button>' +
+      (anyFilter ? '<button type="button" class="fchip clear" data-act="bank-reset">重置</button>' : '') +
+      '<span class="sp"></span>' +
+      (missing ? '<button type="button" class="fchip" data-act="bank-solve-missing">补解析 ' + missing + '</button>' : '') +
+      '</div>';
 
     var groups = [];
     var byDay = {};
@@ -1068,16 +1358,61 @@
     }).join('');
 
     if (!list) {
-      list = '<div class="empty"><div class="t">还没有题目</div><div class="m">拍一张卷子，选几道题加进来</div></div>';
+      list = '<div class="empty"><div class="t">' + (anyFilter || b.subject || b.q ? '没有符合条件的题' : '还没有题目') + '</div>' +
+        '<div class="d">' + (anyFilter || b.subject || b.q ? '换个筛选，或重新拍一张' : '拍一张卷子，选几道题收进来') + '</div>' +
+        '<div class="btnbar"><button type="button" class="btn" data-act="bank-capture">' + ic('camera') + '拍题</button></div></div>';
     }
 
     return nav +
       '<div class="bankbar">' +
         '<input type="search" id="bank-q" class="fi" placeholder="搜题干" value="' + esc(b.q || '') + '">' +
         '<button type="button" class="btn" data-act="bank-search">搜索</button>' +
+        '<button type="button" class="btn p" data-act="bank-capture">' + ic('plus') + '拍题</button>' +
       '</div>' +
       '<div class="bankchips">' + chips + '</div>' +
+      filters +
       '<div class="settings bankwrap">' + list + '</div>';
+  }
+
+  function qTypeLabel(t) {
+    return t === 'choice' ? '选择题' : t === 'blank' ? '填空题' : t === 'essay' ? '解答题' : t === 'reading' ? '阅读题' : '题目';
+  }
+
+  function qMetaTags(r) {
+    var out = '<span class="tag">' + esc(qTypeLabel(r.qtype)) + '</span>' +
+      '<span class="tag">' + esc(r.subject || '全部') + '</span>';
+    if (r.grade) out += '<span class="tag">' + esc(r.grade) + '</span>';
+    if (r.difficulty) out += '<span class="tag">' + esc(diffLabel(r.difficulty)) + '</span>';
+    return out;
+  }
+
+  function qKpsHtml(r, editable) {
+    var chips = (r.kps || []).map(function (k) {
+      return '<span class="kpchip' + (k.primary ? ' main' : '') + '">' + esc(k.name) + '</span>';
+    }).join('');
+    var act = editable
+      ? '<button type="button" class="kpadd" data-act="edit-kps">' + ic((r.kps || []).length ? 'settings' : 'plus', 'sm') +
+        ((r.kps || []).length ? '编辑' : '添加') + '</button>'
+      : '';
+    return '<div class="qsec"><div class="slabel">知识点</div><div class="qkpsrow">' +
+      (chips || '<span class="qempty">还没打标签</span>') + act + '</div></div>';
+  }
+
+  function qSolveBlock(r) {
+    var pending = r.solve_status === 'queued' || r.solve_status === 'running';
+    var status = pending
+      ? '<span class="qstate">生成中…</span>'
+      : (r.solve_status === 'failed' ? '<span class="qstate fail">上次失败</span>' : '');
+    var ans = (r.answer_md || '').trim();
+    var sol = (r.solution_md || '').trim();
+    return '<div class="qsec"><div class="slabel">答案' + status + '</div>' +
+      (ans ? '<div class="qansbox">' + stemHtml(ans) + '</div>'
+        : '<div class="qempty">' + (pending ? '生成中' : '暂无') + '</div>') +
+      '</div>' +
+      '<div class="qsec"><div class="slabel">解析</div>' +
+      (sol ? '<div class="qsol">' + stemHtml(sol) + '</div>'
+        : '<div class="qempty">' + (pending ? '生成中' : '暂无') + '</div>') +
+      '</div>';
   }
 
   async function openQuestionDetail(id) {
@@ -1089,35 +1424,50 @@
     }
     state.question = r;
     openPage({ kind: 'question', id: id });
+    if (r.solve_status === 'queued' || r.solve_status === 'running') pollQuestionSolve(id);
   }
 
   function questionPageHtml() {
     var r = state.question;
     if (!r) return navbar('题目详情', '', 'rail-bank', '返回', false);
-    var nav = navbar('题目详情', r.subject || '', 'rail-bank', '返回', false);
+    var sub = [r.subject, r.grade].filter(Boolean).join(' · ');
+    var nav = navbar('题目详情', sub, 'rail-bank', '返回', false);
     var opts = (r.options || []).map(function (o) {
       return '<div class="qopt">' + stemHtml(o) + '</div>';
     }).join('');
     var img = r.image_url
       ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">'
       : '';
-    var answer = '<div class="pbody"><div class="slabel">答案</div>' +
-      (r.answer_md ? escText(r.answer_md) : '<span class="noanswer">暂无</span>') + '</div>';
     return nav +
       '<div class="settings qdetail">' +
         '<div class="qattach detail">' +
-          '<div class="tags"><span class="tag">' + esc(r.qtype === 'choice' ? '选择题' : r.qtype === 'blank' ? '填空题' : '题目') + '</span>' +
-          '<span class="tag">' + esc(r.subject || '全部') + '</span></div>' +
+          '<div class="tags">' + qMetaTags(r) + '</div>' +
           '<div class="stem">' + stemHtml(r.stem_md || '') + '</div>' +
           (opts ? '<div class="qopts">' + opts + '</div>' : '') +
-          answer +
         '</div>' +
+        qKpsHtml(r, true) +
+        qSolveBlock(r) +
         img +
-        '<div class="btnbar full" style="margin-top:var(--q3)">' +
+        '<div class="btnbar full qacts">' +
           '<button type="button" class="btn" data-act="edit-question">编辑</button>' +
+          '<button type="button" class="btn" data-act="regen-solve">重新生成解析</button>' +
           '<button type="button" class="btn p" data-act="question-quote">引用该题</button>' +
         '</div>' +
       '</div>';
+  }
+
+  async function regenSolve() {
+    var r = state.question;
+    if (!r) return;
+    try {
+      await api('/questions/' + encodeURIComponent(r.id) + '/solve?overwrite=true', { method: 'POST' });
+      r.solve_status = 'queued';
+      render();
+      pollQuestionSolve(r.id);
+      toast('正在重新生成');
+    } catch (e) {
+      toast('生成失败：' + e.message);
+    }
   }
 
   async function openQuestionPanel(id) {
@@ -1139,8 +1489,6 @@
       return '<div class="qopt">' + stemHtml(o) + '</div>';
     }).join('');
     var img = r.image_url ? '<img class="qfull" src="' + esc(r.image_url) + '" alt="题目原图">' : '';
-    var answer = '<div class="pbody"><div class="slabel">答案</div>' +
-      (r.answer_md ? escText(r.answer_md) : '<span class="noanswer">暂无</span>') + '</div>';
     return '<div class="qpanel-scrim" data-act="close-qpanel"></div>' +
       '<div class="qpanel-body" role="dialog" aria-modal="false" aria-label="题目">' +
         '<div class="qp-head">' +
@@ -1149,13 +1497,12 @@
         '</div>' +
         '<div class="qp-scroll">' +
           '<div class="qattach detail">' +
-            '<div class="tags"><span class="tag">' +
-              esc(r.qtype === 'choice' ? '选择题' : r.qtype === 'blank' ? '填空题' : '题目') +
-            '</span><span class="tag">' + esc(r.subject || '全部') + '</span></div>' +
+            '<div class="tags">' + qMetaTags(r) + '</div>' +
             '<div class="stem">' + stemHtml(r.stem_md || '') + '</div>' +
             (opts ? '<div class="qopts">' + opts + '</div>' : '') +
-            answer +
           '</div>' +
+          qKpsHtml(r, false) +
+          qSolveBlock(r) +
           img +
         '</div>' +
         '<div class="qp-foot"><button type="button" class="btn p" data-act="qpanel-quote">引用该题</button></div>' +
@@ -1684,6 +2031,13 @@
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#bankcap') {
+      await loadMessages();
+      openBank();
+      openCapture('bank');
+      render();
+      return;
+    }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
     if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {
@@ -2816,6 +3170,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'qrefs' ? qrefsSheetHtml()
       : kind === 'newchat' ? newChatSheetHtml()
       : kind === 'qedit' ? qeditSheetHtml()
+      : kind === 'bankfilter' ? bankFilterSheetHtml()
+      : kind === 'kpsel' ? kpSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -4079,13 +4435,46 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'bank-filter': function (el) { bankFilter(el.getAttribute('data-subject') || ''); },
     'bank-search': function () { bankSearch(); },
     'bank-reload': function () { loadBank(); },
+    'bank-capture': function () { openCapture('bank'); },
+    'bank-open-filter': function (el) { bankOpenFilter(el.getAttribute('data-field') || 'grade'); },
+    'bank-filter-pick': function (el) { bankFilterPick(el.getAttribute('data-v')); },
+    'bank-reset': function () { bankReset(); },
+    'bank-solve-missing': function () { bankSolveMissing(); },
+    'open-kp-filter': function () {
+      var b = bankState();
+      var sel = {};
+      if (b.kp) sel[b.kp] = true;
+      openKpSheet('filter', { subject: b.subject || currentSubjectName(), selected: sel });
+    },
+    'kp-search': function () { kpSheetSearch(); },
+    'kp-toggle': function (el) { kpSheetToggle(el.getAttribute('data-id')); },
+    'kp-clear': function () { closeOverlay(); bankPatch({ kp: '', kpName: '' }); },
+    'edit-kps': function () {
+      var r = state.question;
+      if (!r) return;
+      var sel = {};
+      (r.kps || []).forEach(function (k) { sel[k.id] = true; });
+      openKpSheet('edit', {
+        subject: r.subject,
+        qid: r.id,
+        selected: sel,
+        pinned: (r.kps || []).slice()
+      });
+    },
+    'regen-solve': function () { regenSolve(); },
     'question-quote': function () { quoteQuestion(state.question); },
     'confirm-capture': function () { confirmCapture(); },
     'cap-camera': function () { var f = q('#cap-camera'); if (f) f.click(); },
     'cap-album': function () { var f = q('#cap-file'); if (f) f.click(); },
     'open-picker': function () { state.overlay = null; openQuestionPicker(); },
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
-    'cap-add': function () { captureAddToChat(); },
+    'cap-subject': function (el) {
+      var o = state.overlay;
+      if (!o || o.kind !== 'capture') return;
+      o.subject = el.getAttribute('data-subject') || '';
+      renderOverlay();
+    },
+    'cap-add': function () { captureCommit(); },
     'open-qrefs': function () { openQrefs(state.pendingQuestions || [], true); },
     'qsrc-open': function (el) {
       var id = el.getAttribute('data-id');
@@ -4263,6 +4652,13 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       return;
     }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
+    if (location.hash === '#bankcap') {
+      await loadMessages();
+      openBank();
+      openCapture('bank');
+      render();
+      return;
+    }
     if (location.hash === '#pick') { await loadMessages(); await openQuestionPicker(); return; }
     if (location.hash.indexOf('#qpanel=') === 0) { await loadMessages(); await openQuestionPanel(decodeURIComponent(location.hash.slice(8))); return; }
     if (location.hash.indexOf('#question=') === 0) {

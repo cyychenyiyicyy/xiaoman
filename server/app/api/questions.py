@@ -1,24 +1,36 @@
-"""题目（M1 的最小实现）：先建 question 一张表，kp/mistake/card 留给 M2/M3。
+"""题目：题库列表 / 详情 / 编辑 / 解析生成（M1 + 知识点关联）。
 
-字段与 docs/03 §5 对齐，M1 起就写 stem_preview_png 与 source_page，避免 M2 回填。
+字段与 docs/03 §5 对齐：答案、解析、知识点、年级、难度都在 question 上，
+M1 起就写 stem_preview_png 与 source_page，避免 M2 回填。
 """
 from __future__ import annotations
 
 import hashlib
-import json
 import re as _re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import CaptureTask, Question
+from ..models import CaptureTask, Kp, Question, QuestionKp
+from ..services import knowledge, solve
 
 router = APIRouter(tags=["questions"])
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _fp(subject: str, stem: str) -> str:
+    """题干指纹：去空白与 LaTeX 符号后取前 48 字，用于跨页去重。"""
+    norm = _re.sub(r"\s+", "", stem or "")
+    norm = _re.sub(r"[$\\{}_^]", "", norm)
+    return hashlib.sha1(norm[:48].encode()).hexdigest()
 
 
 def _crop_question(page_path: str, bbox: list, out_path) -> str:
@@ -47,26 +59,11 @@ def _crop_question(page_path: str, bbox: list, out_path) -> str:
         return ""
 
 
-class QuestionOut(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: str
-    subject: str
-    stem_md: str
-    answer_md: str
-    solution_md: str
-    qtype: str
-    options: list = []
-    source: str
-    source_page: int
-    created_at: datetime | None = None
-
-
 class ConfirmIn(BaseModel):
     groups: list = []
 
 
-def _out(q: Question) -> dict:
+def _out(q: Question, kps: list[dict] | None = None) -> dict:
     return {
         "id": q.id,
         "subject": q.subject,
@@ -76,6 +73,12 @@ def _out(q: Question) -> dict:
         "solution_md": q.solution_md,
         "qtype": q.qtype,
         "options": q.options or [],
+        "grade": q.grade or "",
+        "difficulty": int(q.difficulty or 0),
+        "solve_status": q.solve_status or "",
+        "solve_error": q.solve_error or "",
+        "solved": bool((q.answer_md or "").strip() and (q.solution_md or "").strip()),
+        "kps": kps if kps is not None else [],
         "source": q.source,
         "source_page": q.source_page,
         "created_at": q.created_at.isoformat() if q.created_at else None,
@@ -94,8 +97,13 @@ def save_draft(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
 
 
 @router.post("/capture/tasks/{task_id}/confirm")
-def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
-    """确认入库：把（可能被人工改过的）题组写成 question；确认前不污染知识图谱。"""
+def confirm(
+    task_id: str,
+    payload: ConfirmIn,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """确认入库：把（可能被人工改过的）题组写成 question；随后后台生成答案 / 解析 / 知识点。"""
     task = db.get(CaptureTask, task_id)
     if task is None:
         raise HTTPException(404, "任务不存在")
@@ -105,11 +113,6 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
     groups = payload.groups or (task.groups_json or {}).get("groups") or []
     created: list[str] = []
     skipped = 0
-
-    def _fp(subject: str, stem: str) -> str:
-        norm = _re.sub(r"\s+", "", stem or "")
-        norm = _re.sub(r"[$\\{}_^]", "", norm)
-        return hashlib.sha1(norm[:48].encode()).hexdigest()
 
     for g in groups:
         shared = (g.get("shared_stem") or "").strip()
@@ -139,6 +142,7 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
                 page_path=task.page_path,
                 stem_preview_png="",
                 stem_fp=fp,
+                solve_status="queued",
             )
             from pathlib import Path
 
@@ -157,28 +161,66 @@ def confirm(task_id: str, payload: ConfirmIn, db: Session = Depends(get_db)):
     task.status = "done"
     task.question_count = len(created)
     db.commit()
-    return {"ok": True, "created": len(created), "skipped": skipped, "ids": created}
+
+    if created:
+        background.add_task(solve.solve_many, created, True)
+    return {"ok": True, "created": len(created), "skipped": skipped, "ids": created, "solving": len(created)}
 
 
 @router.get("/questions")
 def list_questions(
     subject: str = "",
+    grade: str = "",
+    difficulty: int = 0,
+    kp: str = "",
     q: str = "",
+    has_answer: str = "",
     limit: int = 50,
     before: str | None = None,
     db: Session = Depends(get_db),
 ):
-    stmt = select(Question).order_by(Question.created_at.desc()).limit(max(1, min(limit, 200)))
+    where = []
     if subject:
-        stmt = stmt.where(Question.subject == subject)
+        where.append(Question.subject == subject)
+    if grade:
+        where.append(Question.grade == grade)
+    if difficulty:
+        where.append(Question.difficulty == int(difficulty))
+    if has_answer == "1":
+        where.append(Question.answer_md != "")
+    elif has_answer == "0":
+        where.append(Question.answer_md == "")
     if q:
-        stmt = stmt.where(Question.stem_md.ilike(f"%{q}%"))
+        where.append(Question.stem_md.ilike(f"%{q}%"))
+    if kp:
+        row = db.get(Kp, kp)
+        if row is not None and row.kind == "chapter":
+            # 选章节 = 选它下面所有知识点
+            child_ids = [k for k in db.scalars(select(Kp.id).where(Kp.parent_id == kp)).all()]
+            where.append(
+                Question.id.in_(
+                    select(QuestionKp.question_id).where(QuestionKp.kp_id.in_(child_ids or [""]))
+                )
+            )
+        else:
+            where.append(
+                Question.id.in_(select(QuestionKp.question_id).where(QuestionKp.kp_id == kp))
+            )
     if before:
         anchor = db.get(Question, before)
         if anchor is not None:
-            stmt = stmt.where(Question.created_at < anchor.created_at)
+            where.append(Question.created_at < anchor.created_at)
+
+    stmt = (
+        select(Question)
+        .where(*where)
+        .order_by(Question.created_at.desc())
+        .limit(max(1, min(limit, 200)))
+    )
     rows = list(db.scalars(stmt).all())
-    return {"items": [_out(q) for q in rows], "total": int(db.scalar(select(func.count()).select_from(Question)) or 0)}
+    kmap = knowledge.kps_map(db, [r.id for r in rows])
+    total = int(db.scalar(select(func.count()).select_from(Question).where(*where)) or 0)
+    return {"items": [_out(q, kmap.get(q.id)) for q in rows], "total": total}
 
 
 @router.get("/questions/{qid}")
@@ -186,7 +228,8 @@ def get_question(qid: str, db: Session = Depends(get_db)):
     q = db.get(Question, qid)
     if q is None:
         raise HTTPException(404, "题目不存在")
-    return _out(q)
+    return _out(q, knowledge.question_kps(db, q.id))
+
 
 @router.get("/questions/{qid}/image")
 def question_image(qid: str, db: Session = Depends(get_db)):
@@ -204,9 +247,13 @@ def question_image(qid: str, db: Session = Depends(get_db)):
 class EditIn(BaseModel):
     stem: str | None = None
     answer: str | None = None
+    solution: str | None = None
     options: list[str] | None = None
     subject: str | None = None
     qtype: str | None = None
+    grade: str | None = None
+    difficulty: int | None = None
+    kps: list[str] | None = None
 
 
 @router.patch("/questions/{qid}")
@@ -216,14 +263,69 @@ def edit_question(qid: str, payload: EditIn, db: Session = Depends(get_db)):
         raise HTTPException(404, "题目不存在")
     if payload.stem is not None:
         q.stem_md = payload.stem.strip()
-        from .questions import _fp  # noqa: F401  (指纹在确认入库时算)
+        q.stem_fp = _fp(q.subject, q.stem_md)
     if payload.answer is not None:
         q.answer_md = payload.answer.strip()
+    if payload.solution is not None:
+        q.solution_md = payload.solution.strip()
     if payload.options is not None:
         q.options = payload.options
     if payload.subject is not None:
         q.subject = payload.subject[:20]
     if payload.qtype is not None:
         q.qtype = payload.qtype[:16]
+    if payload.grade is not None:
+        q.grade = payload.grade.strip()[:10] if payload.grade.strip() in ("高一", "高二", "高三") else ""
+    if payload.difficulty is not None:
+        q.difficulty = max(0, min(5, int(payload.difficulty)))
+    if payload.kps is not None:
+        knowledge.set_question_kps(db, q, payload.kps)
     db.commit()
-    return _out(q)
+    db.refresh(q)
+    return _out(q, knowledge.question_kps(db, q.id))
+
+
+@router.post("/questions/{qid}/solve")
+def solve_question(
+    qid: str,
+    background: BackgroundTasks,
+    overwrite: bool = True,
+    db: Session = Depends(get_db),
+):
+    """重新生成答案 / 解析 / 知识点（后台跑，前端轮询 solve_status）。"""
+    q = db.get(Question, qid)
+    if q is None:
+        raise HTTPException(404, "题目不存在")
+    q.solve_status = "queued"
+    q.solve_error = ""
+    db.commit()
+    background.add_task(solve.solve_many, [q.id], overwrite)
+    return {"ok": True, "status": "queued"}
+
+
+@router.post("/questions/solve-missing")
+def solve_missing(
+    background: BackgroundTasks,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    """给还没解析的题补解析（题库页的「补解析」）。"""
+    rows = list(
+        db.scalars(
+            select(Question)
+            .where(
+                (Question.solution_md == "")
+                | (Question.solve_status.in_(["", "failed", "skipped"]))
+            )
+            .order_by(Question.created_at.desc())
+            .limit(max(1, min(limit, 50)))
+        ).all()
+    )
+    ids = [r.id for r in rows]
+    for r in rows:
+        r.solve_status = "queued"
+        r.solve_error = ""
+    db.commit()
+    if ids:
+        background.add_task(solve.solve_many, ids, False)
+    return {"queued": len(ids)}
