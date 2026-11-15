@@ -1111,3 +1111,35 @@ body.today .composer,body.today #to-bottom{display:none}
 /* 无对话时隐藏顶部科目胶囊 */
 body.noconv .top .l2{display:none}
 .csbrand{font-size:var(--s5);font-weight:500}
+
+
+/* ── 侧栏「新对话」：细描边胶囊（不是大色块）─────── */
+.csnew{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 var(--q3);
+  border:1px solid var(--line2);border-radius:var(--rb);background:var(--card);
+  color:var(--ink2);font-family:inherit;font-size:var(--s6);cursor:pointer}
+.csnew:hover{background:var(--fill);color:var(--ink)}
+.csnew .ic{display:block}
+
+/* ── 本周 ─────────────────────────────────────── */
+.weekwrap{padding:var(--q4);display:flex;flex-direction:column;gap:var(--q4);overflow-y:auto}
+.wsum{display:flex;gap:var(--q5)}
+.wstat{display:flex;flex-direction:column;gap:2px}
+.wstat .n{font-size:var(--s2);color:var(--ink);font-weight:500;line-height:1.1}
+.wstat .l{font-size:var(--s6);color:var(--ink3)}
+.wchart{display:flex;align-items:flex-end;gap:var(--q3);height:110px;
+  padding-bottom:var(--q3);border-bottom:1px solid var(--line)}
+.wcol{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:var(--q1);height:100%}
+.wbar{width:100%;max-width:36px;border-radius:4px 4px 0 0;background:var(--claybg);border:1px solid var(--clayline)}
+.wlb{font-size:var(--s6);color:var(--ink3)}
+.wsubs{display:flex;flex-direction:column;gap:var(--q2)}
+.wrow{display:flex;align-items:center;gap:var(--q3)}
+.wn{width:56px;font-size:var(--s5);color:var(--ink2);flex:none}
+.wtrack{flex:1;height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
+.wtrack i{display:block;height:100%;background:var(--clay)}
+.wv{width:40px;text-align:right;font-size:var(--s6);color:var(--ink3)}
+
+
+/* 柱状图：实心柱，0 值淡灰 */
+.wbar{background:var(--clay);border:0;opacity:.9}
+.wbar[style*="height:3px"]{background:var(--fill2);opacity:1}
+.empty .acts .btn{border:1px solid var(--line2);background:var(--card)}

@@ -199,3 +199,31 @@ def question_image(qid: str, db: Session = Depends(get_db)):
     if q is None or not q.stem_preview_png or not Path(q.stem_preview_png).exists():
         raise HTTPException(404, "没有题目图")
     return FileResponse(q.stem_preview_png)
+
+
+class EditIn(BaseModel):
+    stem: str | None = None
+    answer: str | None = None
+    options: list[str] | None = None
+    subject: str | None = None
+    qtype: str | None = None
+
+
+@router.patch("/questions/{qid}")
+def edit_question(qid: str, payload: EditIn, db: Session = Depends(get_db)):
+    q = db.get(Question, qid)
+    if q is None:
+        raise HTTPException(404, "题目不存在")
+    if payload.stem is not None:
+        q.stem_md = payload.stem.strip()
+        from .questions import _fp  # noqa: F401  (指纹在确认入库时算)
+    if payload.answer is not None:
+        q.answer_md = payload.answer.strip()
+    if payload.options is not None:
+        q.options = payload.options
+    if payload.subject is not None:
+        q.subject = payload.subject[:20]
+    if payload.qtype is not None:
+        q.qtype = payload.qtype[:16]
+    db.commit()
+    return _out(q)

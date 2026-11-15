@@ -21,6 +21,8 @@
     convSubject: '全部',
     convTitle: '',
     convFilter: '',          // 列表按学科筛选
+    week: null,              // 本周统计
+    editQuestion: null,      // 正在编辑的题目
     qpanel: null,            // {id, data} 右侧题目面板
     pendingQuestions: [],    // 已选好、要随下一条消息发出的题目
     view: 'chat',            // chat | page
@@ -805,7 +807,7 @@
     }
 
     return '<div class="cshead"><div class="csbrand">对话</div>' +
-        '<button type="button" class="btn sm p" data-act="new-conv">新对话</button></div>' +
+        '<button type="button" class="csnew" data-act="new-conv">' + ic('plus', 'sm') + '<span>新对话</span></button></div>' +
       '<div class="csfilter">' + chips + '</div>' +
       '<div class="cslist">' + rows + '</div>';
   }
@@ -862,6 +864,104 @@
     openPage(null);
     await loadMessages();
     render();
+  }
+
+  /* ── 本周（近 7 天）──────────────────────────────── */
+
+  async function openWeek() {
+    openPage({ kind: 'week' });
+    try { state.week = await api('/stats/week'); } catch (e) { state.week = null; }
+    render();
+  }
+
+  function weekPageHtml() {
+    var w = state.week;
+    var nav = navbar('本周', '近 7 天', '', '', false);
+    if (!w) {
+      return nav + '<div class="settings">' + pageErrorState('加载失败', '拿不到统计', 'week-reload', 'rail-chat', '回对话') + '</div>';
+    }
+    var max = Math.max.apply(null, w.days.map(function (d) { return d.count; }).concat([1]));
+    var bars = w.days.map(function (d) {
+      var h = Math.round((d.count / max) * 72);
+      return '<div class="wcol"><div class="wbar" style="height:' + Math.max(3, h) + 'px"></div>' +
+        '<div class="wlb">' + esc(d.date.slice(5)) + '</div></div>';
+    }).join('');
+
+    var subs = (w.subjects || []).map(function (x) {
+      var pct = w.total ? Math.round((x.count / w.total) * 100) : 0;
+      return '<div class="wrow"><span class="wn">' + esc(x.subject) + '</span>' +
+        '<span class="wtrack"><i style="width:' + pct + '%"></i></span>' +
+        '<span class="wv">' + numWrap(x.count) + '</span></div>';
+    }).join('');
+
+    return nav +
+      '<div class="settings weekwrap">' +
+        '<div class="wsum">' +
+          '<div class="wstat"><div class="n num">' + numWrap(w.total) + '</div><div class="l">消息</div></div>' +
+          '<div class="wstat"><div class="n num">' + numWrap(w.active_days) + '</div><div class="l">活跃天</div></div>' +
+          '<div class="wstat"><div class="n num">' + numWrap(w.streak) + '</div><div class="l">连续</div></div>' +
+        '</div>' +
+        '<div class="wchart">' + bars + '</div>' +
+        (subs ? '<div class="wsubs">' + subs + '</div>' : '<div class="empty sm"><div class="t">这周还没开始</div><div class="m">随便问一题就算</div></div>') +
+      '</div>';
+  }
+
+  /* ── 题目编辑（题库）────────────────────────────── */
+
+  function openEditQuestion(q) {
+    if (!q) return;
+    setOverlay({
+      kind: 'qedit',
+      id: q.id,
+      subject: q.subject || '',
+      qtype: q.qtype || 'short',
+      stem: q.stem_md || '',
+      answer: q.answer_md || '',
+      options: (q.options || []).join('\n')
+    });
+  }
+
+  function qeditSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qedit') return '';
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="qe-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="qe-ttl">编辑题目</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body">' +
+        '<div class="slabel">题干</div>' +
+        '<textarea class="fi rta" id="qe-stem" rows="4">' + escText(o.stem) + '</textarea>' +
+        '<div class="slabel">选项（一行一个）</div>' +
+        '<textarea class="fi rta" id="qe-opts" rows="3">' + escText(o.options) + '</textarea>' +
+        '<div class="slabel">答案</div>' +
+        '<textarea class="fi rta" id="qe-answer" rows="2">' + escText(o.answer) + '</textarea>' +
+      '</div>' +
+      '<div class="sheet-foot"><div class="btnbar full">' +
+        '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+        '<button type="button" class="btn p" data-act="qedit-save">保存</button>' +
+      '</div></div></div>';
+  }
+
+  async function saveEditQuestion() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'qedit') return;
+    var body = {
+      stem: (q('#qe-stem') || {}).value || '',
+      options: ((q('#qe-opts') || {}).value || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean),
+      answer: (q('#qe-answer') || {}).value || ''
+    };
+    try {
+      var r = await api('/questions/' + encodeURIComponent(o.id), { method: 'PATCH', json: body });
+      state.overlay = null;
+      if (state.question && state.question.id === o.id) state.question = r;
+      if (state.qpanel && state.qpanel.id === o.id) state.qpanel.data = r;
+      await loadBank();
+      render();
+      toast('已保存');
+    } catch (e) {
+      toast('保存失败：' + e.message);
+    }
   }
 
   function openBank() {
@@ -996,6 +1096,7 @@
         '</div>' +
         img +
         '<div class="btnbar full" style="margin-top:var(--q3)">' +
+          '<button type="button" class="btn" data-act="edit-question">编辑</button>' +
           '<button type="button" class="btn p" data-act="question-quote">引用该题</button>' +
         '</div>' +
       '</div>';
@@ -1630,6 +1731,7 @@
     var back = q('#top-back');
     var inChat = state.view === 'chat' && !!state.convId;
     if (back) back.hidden = true;
+    document.body.classList.toggle('noconv', !inChat);
     var pill = q('#top-subj');
     if (brand) {
       brand.classList.toggle('chat', inChat);
@@ -1651,6 +1753,9 @@
     var mem = q('#rail-memories');
     var kind = state.view === 'page' && state.page ? state.page.kind : '';
     var onBank = kind === 'bank' || kind === 'question';
+    var onWeek = kind === 'week';
+    var wk = q('#rail-week');
+    if (wk) { wk.classList.toggle('on', onWeek); if (onWeek) wk.setAttribute('aria-current', 'page'); else wk.removeAttribute('aria-current'); }
     var onConvs = kind === 'convs';
     var onSettings = kind === 'settings';
     var onMem = kind === 'memories';
@@ -2691,6 +2796,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'qpicker' ? qpickerSheetHtml()
       : kind === 'qrefs' ? qrefsSheetHtml()
       : kind === 'newchat' ? newChatSheetHtml()
+      : kind === 'qedit' ? qeditSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
@@ -3039,6 +3145,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       html = reviewPageHtml();
     } else if (page.kind === 'convs') {
       html = convsPageHtml();
+    } else if (page.kind === 'week') {
+      html = weekPageHtml();
     } else if (page.kind === 'bank') {
       html = bankPageHtml();
     } else if (page.kind === 'question') {
@@ -3935,6 +4043,10 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'open-conv': function (el) { openConversation(el.getAttribute('data-id')); },
     'conv-filter': function (el) { state.convFilter = el.getAttribute('data-subject') || ''; loadConversations(); },
     'rail-bank': function () { openBank(); },
+    'rail-week': function () { openWeek(); },
+    'week-reload': function () { openWeek(); },
+    'edit-question': function () { openEditQuestion(state.question); },
+    'qedit-save': function () { saveEditQuestion(); },
     'open-question': function (el) {
       var id = el.getAttribute('data-id');
       if (!state.page) openQuestionPanel(id);
