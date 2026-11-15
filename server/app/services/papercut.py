@@ -22,6 +22,7 @@ import hashlib
 import uuid
 import hmac
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -95,6 +96,79 @@ def _img_size(path: Path) -> tuple[int, int]:
             seg_len = int.from_bytes(raw[i + 2 : i + 4], "big")
             i += 2 + seg_len
     return (0, 0)
+
+
+def _poly_xy_bbox(pos_list: list, w: int, h: int) -> list[int]:
+    """[{x,y},...] 像素多边形 → 归一化 [x1,y1,x2,y2]（0–1000）。"""
+    xs = [p.get("x", 0) for p in pos_list if isinstance(p, dict)]
+    ys = [p.get("y", 0) for p in pos_list if isinstance(p, dict)]
+    if not xs or not ys:
+        return []
+    x1, x2, y1, y2 = min(xs), max(xs), min(ys), max(ys)
+    if not w or not h:
+        return [int(x1), int(y1), int(x2), int(y2)]
+    return [int(x1 * 1000 / w), int(y1 * 1000 / h), int(x2 * 1000 / w), int(y2 * 1000 / h)]
+
+
+def _split_options(text: str) -> tuple[str, list[str]]:
+    """把「题干 + A. … B. …」拆成题干与选项。"""
+    marks = list(re.finditer(r"(?<![A-Za-z0-9])([A-D])[.．、]\s*", text))
+    if len(marks) < 2:
+        return text.strip(), []
+    stem = text[: marks[0].start()].strip()
+    options = []
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        options.append(text[m.start() : end].strip())
+    return stem, options
+
+
+def _market_groups(data: dict) -> dict:
+    """云市场扫描版切题的响应：page_list[].subject_list[]（每项已是切好的题）。"""
+    groups: list[dict] = []
+    warnings: list[str] = []
+    for page in data.get("page_list") or []:
+        w = int(page.get("width") or page.get("orgWidth") or 0)
+        h = int(page.get("height") or page.get("orgHeight") or 0)
+        pno = int(page.get("page_id") or 0) + 1
+        for sub in page.get("subject_list") or []:
+            text = (sub.get("text") or "").strip()
+            if not text:
+                continue
+            pos = None
+            for c in sub.get("content_list_info") or []:
+                if c.get("pos"):
+                    pos = c["pos"]
+                    break
+            bbox = _poly_xy_bbox(pos or [], w, h)
+            stem, options = _split_options(text)
+            qtype = "choice" if options else ("blank" if ("____" in text or "＿" in text) else "short")
+            groups.append(
+                {
+                    "group_id": f"G{len(groups) + 1}",
+                    "section": "",
+                    "shared_stem": "",
+                    "shared_pages": [pno],
+                    "questions": [
+                        {
+                            "number": str(len(groups) + 1),
+                            "type": qtype,
+                            "score": None,
+                            "stem": stem,
+                            "options": options,
+                            "answer": "",
+                            "source_page": pno,
+                            "bbox": bbox,
+                            "continues_previous": bool(sub.get("is_multipage")),
+                        }
+                    ],
+                }
+            )
+    if not groups:
+        warnings.append("没切出题目")
+    elif len(groups) == 1:
+        warnings.append("只切出 1 题：可能整页被当成一题，或切题失败，建议核对原图后重拍")
+    return {"groups": groups, "warnings": warnings, "source": "papercut"}
 
 
 def normalize(questions: list, size: tuple[int, int]) -> dict:
@@ -215,7 +289,7 @@ async def _call_appcode(image_path: Path, subject: str) -> dict:
         "imgList": [base64.b64encode(raw).decode()],
         "paperType": "question",
         "templateType": TEMPLATE.get(subject, "default"),
-        "image_correction": True,
+        "image_correction": bool(settings.papercut_correct),
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
         resp = await client.post(
@@ -247,7 +321,10 @@ async def cut(image_path: Path, subject: str = "全部") -> dict:
             body = {}
     if not isinstance(body, dict):
         body = data if isinstance(data, dict) else {}
-    questions = body.get("questions") or []
-    result = normalize(questions, _img_size(image_path))
+    if body.get("page_list"):
+        result = _market_groups(body)
+    else:
+        questions = body.get("questions") or []
+        result = normalize(questions, _img_size(image_path))
     result["warnings"] = result["warnings"][:10]
     return result

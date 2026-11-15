@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     papercut_openapi_endpoint: str = ""  # 默认 edututor.cn-hangzhou.aliyuncs.com
     oss_bucket: str = ""               # 公网图床（官方切题要求 image 是 URL）
     oss_endpoint: str = ""             # 如 https://oss-cn-hangzhou.aliyuncs.com
+    papercut_correct: bool = False     # 开矫正后坐标在矫正图上，复核框会偏；默认关
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 
