@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     papercut_workspace_id: str = "" # 官方 OpenAPI 的百炼业务空间 id
     aliyun_ak_id: str = ""
     aliyun_ak_secret: str = ""
+    papercut_openapi_endpoint: str = ""  # 默认 edututor.cn-hangzhou.aliyuncs.com
+    oss_bucket: str = ""               # 公网图床（官方切题要求 image 是 URL）
+    oss_endpoint: str = ""             # 如 https://oss-cn-hangzhou.aliyuncs.com
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 

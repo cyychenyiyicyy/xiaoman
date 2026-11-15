@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import uuid
 import hmac
 import json
 from datetime import datetime, timezone
@@ -141,24 +142,66 @@ def normalize(questions: list, size: tuple[int, int]) -> dict:
     return {"groups": groups, "warnings": warnings, "source": "papercut"}
 
 
-# ── 官方 OpenAPI（AK/SK）──────────────────────────────
-def _sign(secret: str, canonical: str) -> str:
-    return base64.b64encode(hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).digest()).decode()
+# ── 官方 OpenAPI（AK/SK，公测期每天免费 1000 次）────────
+
+def _oss_url(image_path: Path) -> str:
+    """把本地图传到 OSS 并签一个临时公网 URL（官方接口要求 image 是 URL）。"""
+    try:
+        import oss2
+    except ImportError as exc:  # pragma: no cover
+        raise PapercutError("没装 oss2：pip install oss2") from exc
+
+    ak_id, ak_secret = settings.aliyun_ak_id, settings.aliyun_ak_secret
+    bucket_name, endpoint = settings.oss_bucket, settings.oss_endpoint
+    if not (bucket_name and endpoint):
+        raise PapercutError("官方切题要先把图传到 OSS：配 OSS_BUCKET / OSS_ENDPOINT（同一个 AK 即可）")
+
+    auth = oss2.Auth(ak_id, ak_secret)
+    bucket = oss2.Bucket(auth, endpoint, bucket_name)
+    key = f"xiaoman/cut/{uuid.uuid4().hex}{image_path.suffix or '.png'}"
+    bucket.put_object(key, image_path.read_bytes())
+    return bucket.sign_url("GET", key, 3600)
 
 
 async def _call_openapi(image_path: Path, subject: str) -> dict:
+    """官方 CutQuestions：AK/SK 签名，返回 data 是 JSON 字符串。"""
     ak_id = settings.aliyun_ak_id
     ak_secret = settings.aliyun_ak_secret
     workspace = settings.papercut_workspace_id
-    endpoint = settings.papercut_endpoint or "https://edututor.cn-hangzhou.aliyuncs.com/service/cutApi"
     if not (ak_id and ak_secret and workspace):
-        raise PapercutError("官方切题需要 ALIYUN_AK_ID / ALIYUN_AK_SECRET / PAPERCUT_WORKSPACE_ID")
+        raise PapercutError(
+            "官方切题需要 ALIYUN_AK_ID / ALIYUN_AK_SECRET / PAPERCUT_WORKSPACE_ID"
+            "（AccessKey 与百炼业务空间 id，见 docs/25）"
+        )
 
-    # 官方接口要求 image 是 URL；本地文件先转 data URL 不行，这里支持传公网 URL（M1.2 接对象存储后启用）
-    raise PapercutError(
-        "官方 CutQuestions 的 image 参数要求公网 URL。方案：先把原图存到对象存储（或服务器静态目录）再调用；"
-        "若你打算用云市场版（支持 base64），把 PAPERCUT_AUTH 设成 appcode。"
+    try:
+        from alibabacloud_edututor20250707.client import Client
+        from alibabacloud_edututor20250707 import models as m
+        from alibabacloud_tea_openapi import models as open_api_models
+    except ImportError as exc:  # pragma: no cover
+        raise PapercutError("没装官方 SDK：pip install alibabacloud-edututor20250707") from exc
+
+    url = _oss_url(image_path)
+    cfg = open_api_models.Config(access_key_id=ak_id, access_key_secret=ak_secret)
+    cfg.endpoint = settings.papercut_openapi_endpoint or "edututor.cn-hangzhou.aliyuncs.com"
+    client = Client(cfg)
+    req = m.CutQuestionsRequest(
+        image=url,
+        parameters=m.CutQuestionsRequestParameters(struct=True, extract_images=True),
+        workspace_id=workspace,
     )
+    resp = client.cut_questions(req)
+    body = resp.body
+    if not body or not body.success:
+        raise PapercutError(f"切题失败：{(body.message if body else '空响应')}")
+
+    data = body.data
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError as exc:
+            raise PapercutError("切题返回的 data 不是 JSON") from exc
+    return data if isinstance(data, dict) else {}
 
 
 # ── 云市场（APPCODE，支持 base64）────────────────────
