@@ -370,7 +370,7 @@
     var empty = active.length ? '' :
       '<div class="empty">' + ic('sun') + '<div class="t">今天还没开始</div>' +
       '<button type="button" class="btn" data-act="switch-subject" data-subject="物理">从物理开始</button></div>';
-    return '<div class="col"><div class="today">' +
+    return '<div class="col"><div class="today-page">' +
       '<div class="theader"><div class="tgreet">' + esc(lead) + '</div></div>' +
       (cards ? '<div class="tlist">' + cards + '</div>' : empty) +
       '</div></div>';

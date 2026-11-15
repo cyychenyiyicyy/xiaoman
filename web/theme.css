@@ -776,7 +776,7 @@ button.it:active{background:var(--fill)}
 /* ──「今天」概览（首页，不是聊天）──────────────────── */
 body.today .composer,body.today #to-bottom{display:none}
 .spaces[hidden]{display:none}
-.today{padding:var(--q5) 0 var(--q4)}
+.today-page{padding:var(--q5) 0 var(--q4)}
 .theader{margin:0 0 var(--q4)}
 .tgreet{font-size:var(--s3);line-height:var(--l3);color:var(--ink);max-width:560px}
 .tlist{display:flex;flex-direction:column;gap:var(--q2)}
