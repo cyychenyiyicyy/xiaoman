@@ -11,6 +11,7 @@ from ..db import SessionLocal, get_db
 from sqlalchemy import select
 
 from ..models import CaptureTask, LLMProvider
+from ..seed import get_current
 from ..services import ocr
 
 router = APIRouter(tags=["capture"])
@@ -48,7 +49,8 @@ async def run_task(task_id: str) -> None:
             task.blocks_json, task.status = blocks, "extracting"
             db.commit()
 
-            groups = await ocr.extract_groups(blocks)
+            provider, model, _ = get_current(db)
+            groups = await ocr.extract_groups(blocks, provider, model)
             task.groups_json = groups
             task.confidence = ocr.confidence_of(groups)
             task.status = "review"
