@@ -251,7 +251,7 @@ async def _relay_gateway(
                 f"{gateway}/agent/chat",
                 json={
                     "subject": subject,
-                    "text": (question_block + text) if question_block else text,
+                    "text": text,
                     "thinking": thinking,
                     "images": image_paths or [],
                 },
@@ -480,7 +480,9 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     )
     return StreamingResponse(
         _relay_gateway(
-            db, conv, user_msg, assistant, text, thinking, conv.subject,
+            db, conv, user_msg, assistant,
+            (question_block + text) if question_block else text,
+            thinking, conv.subject,
             image_paths=[a.path for a in attachments],
         ),
         media_type="text/event-stream",
