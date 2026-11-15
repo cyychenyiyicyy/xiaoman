@@ -39,10 +39,12 @@
 
   <aside class="qpanel" id="qpanel" hidden aria-label="题目面板"></aside>
 
+  <aside class="convside" id="convside" aria-label="对话列表"></aside>
+
   <main class="pane" id="pane">
     <section class="view" id="view-chat">
       <header class="top">
-        <button type="button" class="hit back topback" id="top-back" data-act="back-convs" aria-label="返回对话列表"><svg class="ic" aria-hidden="true"><use data-i="chevron-left"/></svg></button>
+        <button type="button" class="hit back topback" id="top-back" hidden data-act="toggle-side" aria-label="对话列表"><svg class="ic" aria-hidden="true"><use data-i="chevron-left"/></svg></button>
         <div class="l1" id="top-brand">小满</div>
         <div class="l2">
           <button type="button" class="subj" id="top-subj" data-act="open-subjects" aria-haspopup="dialog">

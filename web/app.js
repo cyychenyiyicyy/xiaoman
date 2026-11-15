@@ -714,7 +714,10 @@
   }
 
   function openConversations() {
-    openPage({ kind: 'convs' });
+    state.convId = '';
+    state.convTitle = '';
+    state.messages = [];
+    openPage(null);
     loadConversations();
   }
 
@@ -759,7 +762,7 @@
     if (!rows) {
       rows = '<div class="empty"><div class="t">还没有对话</div>' +
         '<div class="m">新建一个，选好科目就开始</div>' +
-        '<div class="acts"><button type="button" class="btn p" data-act="new-conv">新对话</button></div></div>';
+        '<div class="acts"><button type="button" class="btn" data-act="new-conv">新对话</button></div></div>';
     }
 
     return nav +
@@ -769,6 +772,48 @@
       '</div>' +
       '<div class="bankchips">' + chips + '</div>' +
       '<div class="settings convwrap">' + rows + '</div>';
+  }
+
+  function convsSideHtml() {
+    var list = state.conversations || [];
+    var subjects = ['', '语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理'];
+    var chips = subjects.map(function (x) {
+      var on = (state.convFilter || '') === x;
+      return '<span class="fchip sm' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="conv-filter" data-subject="' + esc(x) + '">' +
+        (x || '全部') + '</span>';
+    }).join('');
+
+    var groups = [], byDay = {};
+    list.forEach(function (c) {
+      var k = convGroupDate(c.updated_at);
+      if (!byDay[k]) { byDay[k] = []; groups.push(k); }
+      byDay[k].push(c);
+    });
+    var rows = groups.map(function (k) {
+      return '<div class="csday">' + esc(k || '更早') + '</div>' +
+        byDay[k].map(function (c) {
+          var on = c.id === state.convId;
+          return '<button type="button" class="convrow' + (on ? ' on' : '') + '" data-act="open-conv" data-id="' + esc(c.id) + '">' +
+            '<span class="convttl">' + esc(c.title || '新对话') + '</span>' +
+            '<span class="convprev">' + esc(c.subject || '全部') + (c.preview ? ' · ' + esc(c.preview) : '') + '</span>' +
+            '</button>';
+        }).join('');
+    }).join('');
+
+    if (!rows) {
+      rows = '<div class="empty sm"><div class="t">还没有对话</div><div class="m">新建一个，选好科目就开始</div></div>';
+    }
+
+    return '<div class="cshead"><div class="csbrand">对话</div>' +
+        '<button type="button" class="btn sm p" data-act="new-conv">新对话</button></div>' +
+      '<div class="csfilter">' + chips + '</div>' +
+      '<div class="cslist">' + rows + '</div>';
+  }
+
+  function renderConvSide() {
+    var host = q('#convside');
+    if (!host) return;
+    host.innerHTML = convsSideHtml();
   }
 
   function openNewChatSheet() {
@@ -1557,6 +1602,7 @@
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
     renderSpaces();
+    renderConvSide();
     renderQchips();
     renderQpanel();
     var sp = q('#spaces');
@@ -1583,7 +1629,7 @@
     var sub = q('#top-subject');
     var back = q('#top-back');
     var inChat = state.view === 'chat' && !!state.convId;
-    if (back) back.hidden = !inChat || (state.page && state.page.kind === 'convs');
+    if (back) back.hidden = true;
     var pill = q('#top-subj');
     if (brand) {
       brand.classList.toggle('chat', inChat);
@@ -1714,6 +1760,13 @@
 
   function renderStream(force) {
     var el = q('#stream');
+    if (!state.convId) {
+      document.body.classList.remove('today');
+      el.innerHTML = '<div class="empty"><div class="t">还没有选中对话</div>' +
+        '<div class="m">从左边选一个，或者新建一个</div>' +
+        '<div class="acts"><button type="button" class="btn" data-act="new-conv">新对话</button></div></div>';
+      return;
+    }
     if (isToday()) {
       document.body.classList.add('today');
       el.innerHTML = todayHtml();
@@ -3842,7 +3895,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     },
     'connect-catalog': function (el) { openPage({ kind: 'form', catalogId: el.getAttribute('data-cid') }); },
     'reload-catalog': function () { reloadCatalog(); },
-    'rail-chat': function () { openPage(null); },
+    'rail-chat': function () { openConversations(); },
     'rail-settings': function () { openSettings(); },
     'back-settings': function () { openPage({ kind: 'settings' }); render(); },
     'reload-settings': function () { openSettings(); },
