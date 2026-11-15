@@ -1,7 +1,8 @@
-// 小满 · Pi 网关（P0）
-// 职责：把 Pi 的会话/循环/流式包成我们的 SSE，不写任何 AI 逻辑。
-// 每个学科 = 一个 Pi session 文件；不常驻内存，每次请求 SessionManager.open() 恢复。
-import { createAgentSession, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
+// 小满 · Pi 网关
+// 职责：Pi 的会话/循环/流式 → 我们的 SSE；工具回打 FastAPI。
+// 每个学科 = 一个 Pi session 文件；不常驻内存，每请求 SessionManager.open() 恢复。
+import { createAgentSession, DefaultResourceLoader, defineTool, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -13,28 +14,47 @@ const SESS_DIR = resolve(HERE, ".pi-sessions");
 const INDEX = resolve(SESS_DIR, "index.json");
 const PORT = Number(process.env.PI_PORT || 8791);
 const CWD = HERE;
+const FASTAPI = process.env.PI_FASTAPI || "http://127.0.0.1:8787/api/v1";
+const TOKEN = process.env.PI_INTERNAL_TOKEN || "dev-internal-token";
 
 mkdirSync(AGENT_DIR, { recursive: true });
 mkdirSync(SESS_DIR, { recursive: true });
 
 const SUBJECTS = ["全部", "语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"];
 
-// ── 模型配置：一个 OpenAI 兼容 provider（P4 会改成 FastAPI 生成）──
+function xiaomanPrompt(subject) {
+  const d = new Date();
+  const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
+  return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
+
+今天是 ${today}。当前学科空间：${subject || "全部"}。
+
+说话方式：
+- 短。一条回复一般不超过 4 行；要展开时先给结论，再给细节。
+- 像老师，不像客服。禁止「您好，请问有什么可以帮您」这类腔调。
+- 不评判人，把错归到机制上：「这里漏的是摩擦力」，不说「你又粗心」。
+- 不确定就说不确定；库里没有的不要编。公式用行内 LaTeX（$...$）。
+- 中文回答。
+
+你可以用的工具只有：memory_search / memory_add / memory_update / memory_delete（你自己长期记住的关于她的事）和 web_search（联网搜索，时效问题用）。
+不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
+她问「记住…」时，用 memory_add 记下来再简短确认。`;
+}
+
 function writeModels() {
-  const baseUrl = process.env.PI_BASE_URL || "https://api.deepseek.com/v1";
-  const modelId = process.env.PI_MODEL || "deepseek-flash";
   const cfg = {
     providers: {
       xiaoman: {
-        baseUrl,
+        baseUrl: process.env.PI_BASE_URL || "https://api.deepseek.com/v1",
         api: "openai-completions",
         apiKey: "$DEEPSEEK_API_KEY",
         models: [
           {
-            id: modelId,
-            name: modelId,
+            id: process.env.PI_MODEL || "deepseek-flash",
+            name: process.env.PI_MODEL || "deepseek-flash",
             contextWindow: Number(process.env.PI_CONTEXT || 128000),
             maxTokens: 4096,
+            promptCache: { short: 300 },
           },
         ],
       },
@@ -43,7 +63,6 @@ function writeModels() {
   writeFileSync(resolve(AGENT_DIR, "models.json"), JSON.stringify(cfg, null, 2));
 }
 
-// ── 学科 → session 文件 ────────────────────────────────
 function readIndex() {
   try {
     return JSON.parse(readFileSync(INDEX, "utf8"));
@@ -51,34 +70,108 @@ function readIndex() {
     return {};
   }
 }
-function writeIndex(idx) {
-  writeFileSync(INDEX, JSON.stringify(idx, null, 2));
-}
-
-function sessionFor(subject, create = false) {
-  const idx = readIndex();
-  const saved = idx[subject];
-  if (saved && existsSync(saved)) return { sm: SessionManager.open(saved, SESS_DIR, CWD), created: false };
-  if (!create) return null;
-  return { sm: SessionManager.create(CWD, SESS_DIR), created: true };
-}
-
 function saveSessionFile(subject, sm) {
   const file = sm.getSessionFile();
   if (!file) return;
   const idx = readIndex();
   idx[subject] = file;
-  writeIndex(idx);
+  writeFileSync(INDEX, JSON.stringify(idx, null, 2));
 }
 
-// ── 事件映射：Pi → 我们的 SSE 形状（界面不认识 Pi）──────
-function sse(res, obj) {
-  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+// ── 回打 FastAPI ─────────────────────────────────────
+async function callTool(path, body) {
+  const resp = await fetch(`${FASTAPI}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-internal-token": TOKEN },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error(`${path} → HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function cardsText(result, limit = 2000) {
+  return JSON.stringify(result).slice(0, limit);
+}
+
+// 每个请求一份收集器：工具来源 / 新记忆
+function makeTools(collect) {
+  const wrap = (name, label, description, parameters, run) =>
+    defineTool({
+      name,
+      label,
+      description,
+      parameters,
+      async execute(_id, params) {
+        const result = await run(params);
+        if (Array.isArray(result.sources)) {
+          for (const s of result.sources) {
+            collect.sources.push(s);
+            collect.emit({ type: "source", item: s });
+          }
+        }
+        if (result.item) {
+          collect.remembered.push(result.item);
+          collect.emit({ type: "memory", items: [result.item] });
+        }
+        return { content: [{ type: "text", text: cardsText(result) }], details: result };
+      },
+    });
+
+  return [
+    wrap(
+      "memory_search",
+      "检索记忆",
+      "检索你长期记住的关于她的事（薄弱点、偏好、习惯、目标）。问到她的情况或需要个性化建议时先调它。",
+      Type.Object({ query: Type.String({ description: "检索关键词，用她的话即可" }) }),
+      (p) => callTool("/internal/tools/memory_search", { query: p.query })
+    ),
+    wrap(
+      "memory_add",
+      "记住",
+      "记住一件关于她的事。她说「记住…」，或出现稳定的学习事实/偏好时调用。text ≤ 40 字。",
+      Type.Object({
+        text: Type.String({ description: "一句话，主语用「她」" }),
+        kind: Type.Union([Type.Literal("fact"), Type.Literal("pref")], { description: "fact=事实，pref=偏好" }),
+        subject: Type.Optional(Type.String({ description: "学科，可空" })),
+      }),
+      (p) => callTool("/internal/tools/memory_add", { text: p.text, kind: p.kind || "fact", subject: p.subject || "" })
+    ),
+    wrap(
+      "memory_update",
+      "修正记忆",
+      "修正一条已有记忆（先用 memory_search 拿 id）。",
+      Type.Object({
+        id: Type.String(),
+        text: Type.Optional(Type.String()),
+        kind: Type.Optional(Type.Union([Type.Literal("fact"), Type.Literal("pref")])),
+        subject: Type.Optional(Type.String()),
+      }),
+      (p) => callTool("/internal/tools/memory_update", p)
+    ),
+    wrap(
+      "memory_delete",
+      "忘掉",
+      "删掉一条记忆（归档、可恢复）。用户说「忘掉这条」时用，先用 memory_search 拿 id。",
+      Type.Object({ id: Type.String() }),
+      (p) => callTool("/internal/tools/memory_delete", { id: p.id })
+    ),
+    wrap(
+      "web_search",
+      "联网搜索",
+      "联网搜索。涉及新闻、价格、赛事、最新数据这类时效问题时调用。",
+      Type.Object({ query: Type.String({ description: "搜索词" }) }),
+      (p) => callTool("/internal/tools/web_search", { query: p.query })
+    ),
+  ];
 }
 
 const THINK = { off: "off", low: "low", med: "medium", high: "high" };
 
-async function handleChat(req, res, body) {
+function sse(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
+async function handleChat(res, body) {
   const subject = SUBJECTS.includes(body.subject) ? body.subject : "全部";
   const text = String(body.text || "").trim();
   if (!text) {
@@ -92,25 +185,16 @@ async function handleChat(req, res, body) {
     authPath: resolve(AGENT_DIR, "auth.json"),
     modelsPath: resolve(AGENT_DIR, "models.json"),
   });
-  const modelId = process.env.PI_MODEL || "deepseek-flash";
-  const model = runtime.getModel("xiaoman", modelId);
+  const model = runtime.getModel("xiaoman", process.env.PI_MODEL || "deepseek-flash");
   if (!model) {
     res.writeHead(500, { "content-type": "application/json" });
     res.end(JSON.stringify({ detail: "model not found" }));
     return;
   }
 
-  const found = sessionFor(subject, true);
-  const { session } = await createAgentSession({
-    cwd: CWD,
-    agentDir: AGENT_DIR,
-    modelRuntime: runtime,
-    model,
-    thinkingLevel: THINK[body.thinking] || "off",
-    sessionManager: found.sm,
-    tools: [],
-    noTools: "all",
-  });
+  const idx = readIndex();
+  const saved = idx[subject];
+  const sm = saved && existsSync(saved) ? SessionManager.open(saved, SESS_DIR, CWD) : SessionManager.create(CWD, SESS_DIR);
 
   res.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
@@ -119,45 +203,122 @@ async function handleChat(req, res, body) {
     "x-accel-buffering": "no",
   });
 
-  sse(res, { type: "meta", subject, model: modelId, thinking: body.thinking || "off" });
+  const collect = { sources: [], remembered: [], parts: [], emit: (o) => sse(res, o) };
+  const tools = makeTools(collect);
+
+  const loader = new DefaultResourceLoader({
+    cwd: CWD,
+    agentDir: AGENT_DIR,
+    systemPromptOverride: () => xiaomanPrompt(subject),
+    appendSystemPromptOverride: () => [],
+  });
+  await loader.reload();
+
+  const { session } = await createAgentSession({
+    cwd: CWD,
+    agentDir: AGENT_DIR,
+    modelRuntime: runtime,
+    model,
+    thinkingLevel: THINK[body.thinking] || "off",
+    sessionManager: sm,
+    resourceLoader: loader,
+    customTools: tools,
+    tools: tools.map((t) => t.name),
+  });
+
+  try { session.sessionName = subject; } catch {}
+  sse(res, { type: "meta", subject, model: model.name, thinking: body.thinking || "off" });
 
   let finished = false;
-  const done = () => {
+  const finish = () => {
     if (finished) return;
     finished = true;
-    saveSessionFile(subject, found.sm);
-    sse(res, { type: "done" });
+    saveSessionFile(subject, sm);
+    // usage / 成本（Pi 的 message.usage：input/output/cacheRead/cacheWrite/cost）
+    let usage = { prompt_tokens: 0, completion_tokens: 0, cache_hit: 0, cache_miss: 0, cost: 0 };
+    try {
+      const msgs = session.messages || [];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const u = msgs[i]?.usage;
+        if (u && (u.output || u.input || u.cacheRead)) {
+          usage = {
+            prompt_tokens: (u.input || 0) + (u.cacheRead || 0),
+            completion_tokens: u.output || 0,
+            cache_hit: u.cacheRead || 0,
+            cache_miss: u.input || 0,
+            cost: u.cost?.total ?? (u.cost || 0),
+          };
+          break;
+        }
+      }
+    } catch {}
+    sse(res, {
+      type: "done",
+      usage,
+      sources: collect.sources,
+      tools: collect.parts.filter((p) => p.type === "tool").map((p) => p.name),
+      remembered: collect.remembered,
+      parts: collect.parts,
+    });
     res.end();
     session.dispose?.();
   };
 
+  let reasonPart = null;
+  let textPart = null;
   session.subscribe((ev) => {
     const ame = ev.assistantMessageEvent;
     if (ev.type === "message_update" && ame) {
-      if (ame.type === "thinking_delta" && ame.delta) sse(res, { type: "reasoning", delta: ame.delta });
-      else if (ame.type === "text_delta" && ame.delta) sse(res, { type: "text", delta: ame.delta });
+      if (ame.type === "thinking_delta" && ame.delta) {
+        if (!reasonPart) {
+          reasonPart = { type: "reasoning", text: "", ms: 0, _t0: Date.now() };
+          collect.parts.push(reasonPart);
+        }
+        reasonPart.text += ame.delta;
+        sse(res, { type: "reasoning", delta: ame.delta });
+        return;
+      }
+      if (ame.type === "text_delta" && ame.delta) {
+        if (!textPart) {
+          textPart = { type: "text", text: "" };
+          collect.parts.push(textPart);
+        }
+        textPart.text += ame.delta;
+        sse(res, { type: "text", delta: ame.delta });
+        return;
+      }
+      if (ame.type === "thinking_end" && reasonPart && !reasonPart.ms) {
+        reasonPart.ms = Date.now() - reasonPart._t0;
+        delete reasonPart._t0;
+      }
       return;
     }
     if (ev.type === "tool_execution_start") {
-      sse(res, { type: "tool", name: ev.toolName, state: "start" });
+      collect.parts.push({ type: "tool", name: ev.toolName, queries: ev.args?.query ? [String(ev.args.query)] : [], count: 0 });
+      sse(res, { type: "tool", name: ev.toolName, state: "start", queries: ev.args?.query ? [String(ev.args.query)] : [] });
       return;
     }
     if (ev.type === "tool_execution_end") {
-      sse(res, { type: "tool", name: ev.toolName, state: "end" });
+      for (let i = collect.parts.length - 1; i >= 0; i--) {
+        if (collect.parts[i].type === "tool" && collect.parts[i].name === ev.toolName) {
+          collect.parts[i].count = 1;
+          break;
+        }
+      }
+      sse(res, { type: "tool", name: ev.toolName, state: "end", count: 1 });
       return;
     }
-    if (ev.type === "agent_end" || ev.type === "agent_settled") done();
+    // 官方建议：agent_settled 才代表 Pi 不会再自动继续（agent_end 之后可能有重试/排队）
+    if (ev.type === "agent_settled") finish();
   });
 
   try {
-    await session.prompt(text);
+    if (session.isStreaming) await session.steer(text);
+    else await session.prompt(text);
   } catch (err) {
     sse(res, { type: "error", code: "pi", message: String(err).slice(0, 400) });
-    done();
-    return;
   }
-  // 兜底：prompt 返回后若事件已结束
-  setTimeout(done, 30000);
+  finish();
 }
 
 const server = createServer(async (req, res) => {
@@ -177,13 +338,11 @@ const server = createServer(async (req, res) => {
       res.writeHead(400).end();
       return;
     }
-    await handleChat(req, res, body);
+    await handleChat(res, body);
     return;
   }
   res.writeHead(404, { "content-type": "application/json" });
   res.end(JSON.stringify({ detail: "not found" }));
 });
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`pi gateway on http://127.0.0.1:${PORT}`);
-});
+server.listen(PORT, "127.0.0.1", () => console.log(`pi gateway on http://127.0.0.1:${PORT}`));

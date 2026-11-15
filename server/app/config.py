@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     # 上下文与生成
     history_limit: int = 20
     history_token_budget: int = 110000
-    pi_gateway: str = ""          # 例如 http://127.0.0.1:8791；留空则走直连
+    pi_gateway: str = "http://127.0.0.1:8791"   # Pi 网关（唯一 AI 路径）
+    internal_token: str = "dev-internal-token"
     message_char_cap: int = 8000
     default_max_tokens: int = 4096
 

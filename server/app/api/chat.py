@@ -233,6 +233,13 @@ async def _relay_gateway(
     )
     text_parts: list[str] = []
     reason_parts: list[str] = []
+    sources: list[dict] = []
+    tools: list[str] = []
+    usage: dict = {}
+    remembered: list[dict] = []
+    parts: list[dict] = []
+    cur_reason: dict | None = None
+    cur_text: dict | None = None
     error = None
     t0 = time.monotonic()
     try:
@@ -256,22 +263,73 @@ async def _relay_gateway(
                             continue
                         kind = ev.get("type")
                         if kind == "text":
+                            if cur_text is None:
+                                cur_text = {"type": "text", "text": ""}
+                                parts.append(cur_text)
+                                yield _sse({"type": "part", "kind": "text"})
+                            cur_text["text"] += ev.get("delta", "")
                             text_parts.append(ev.get("delta", ""))
                             yield _sse({"type": "text", "delta": ev.get("delta", "")})
                         elif kind == "reasoning":
+                            if cur_reason is None:
+                                cur_reason = {"type": "reasoning", "text": "", "ms": 0}
+                                parts.append(cur_reason)
+                                yield _sse({"type": "part", "kind": "reasoning"})
+                            cur_reason["text"] += ev.get("delta", "")
                             reason_parts.append(ev.get("delta", ""))
                             yield _sse({"type": "reasoning", "delta": ev.get("delta", "")})
-                        elif kind in ("tool", "source"):
-                            yield _sse(ev)
+                        elif kind == "tool":
+                            if ev.get("state") == "start":
+                                cur_reason = None
+                                tools.append(ev.get("name") or "tool")
+                                parts.append(
+                                    {
+                                        "type": "tool",
+                                        "name": ev.get("name") or "tool",
+                                        "queries": ev.get("queries") or [],
+                                        "count": 0,
+                                    }
+                                )
+                                yield _sse({"type": "part", "kind": "tool",
+                                            "queries": ev.get("queries") or []})
+                            else:
+                                for p2 in reversed(parts):
+                                    if p2.get("type") == "tool" and p2.get("count", 0) == 0:
+                                        p2["count"] = max(1, int(ev.get("count") or 1))
+                                        break
+                            yield _sse({"type": "tool", **{k: v for k, v in ev.items() if k != "type"}})
+                        elif kind == "source":
+                            item = ev.get("item") or {}
+                            key = item.get("url") or item.get("id")
+                            if key and not any((x.get("url") or x.get("id")) == key for x in sources):
+                                sources.append(item)
+                            yield _sse({"type": "source", "item": item})
+                        elif kind == "memory":
+                            for it in ev.get("items") or []:
+                                remembered.append(it)
+                            yield _sse({"type": "memory", "items": ev.get("items") or []})
                         elif kind == "error":
                             error = {"code": ev.get("code", "pi"), "message": ev.get("message", "")}
                             yield _sse({"type": "error", **error})
                         elif kind == "done":
+                            if isinstance(ev.get("usage"), dict):
+                                usage = ev["usage"]
+                            for it in ev.get("remembered") or []:
+                                if not any(x.get("id") == it.get("id") for x in remembered):
+                                    remembered.append(it)
+                            if ev.get("sources"):
+                                for item in ev["sources"]:
+                                    key = item.get("url") or item.get("id")
+                                    if key and not any((x.get("url") or x.get("id")) == key for x in sources):
+                                        sources.append(item)
                             break
     except Exception as exc:  # noqa: BLE001
         error = {"code": "gateway", "message": str(exc)[:300]}
         yield _sse({"type": "error", **error})
 
+    think_ms = int((time.monotonic() - t0) * 1000) if reason_parts else 0
+    if cur_reason is not None and not cur_reason.get("ms"):
+        cur_reason["ms"] = think_ms
     with SessionLocal() as s2:
         row = s2.get(Message, assistant.id)
         if row is not None:
@@ -279,15 +337,34 @@ async def _relay_gateway(
             row.reasoning_md = "".join(reason_parts)
             row.status = "error" if error else "done"
             row.error = error["message"] if error else ""
-            row.thinking_ms = int((time.monotonic() - t0) * 1000) if reason_parts else 0
-            row.parts = (
-                ([{"type": "reasoning", "text": "".join(reason_parts), "ms": row.thinking_ms}] if reason_parts else [])
-                + [{"type": "text", "text": "".join(text_parts)}]
-            )
+            row.thinking_ms = think_ms
+            row.parts = parts
+            row.sources = sources
+            row.tools = tools
+            row.remembered = remembered
+            if usage:
+                row.prompt_tokens = int(usage.get("prompt_tokens") or 0)
+                row.completion_tokens = int(usage.get("completion_tokens") or 0)
+                row.cache_hit_tokens = int(usage.get("cache_hit") or 0)
+                row.cache_miss_tokens = int(usage.get("cache_miss") or 0)
+            s2.commit()
+        conv2 = s2.get(Conversation, conv.id)
+        if conv2 is not None:
+            conv2.updated_at = datetime.now(timezone.utc)
             s2.commit()
     if error is None:
-        yield _sse({"type": "done", "message_id": assistant.id, "usage": {}, "thinking_ms": 0,
-                    "sources": [], "tools": [], "parts": []})
+        yield _sse(
+            {
+                "type": "done",
+                "message_id": assistant.id,
+                "usage": usage or {},
+                "thinking_ms": think_ms,
+                "sources": sources,
+                "tools": tools,
+                "remembered": remembered,
+                "parts": parts,
+            }
+        )
 
 
 @router.post("/chat")
@@ -371,14 +448,11 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         supports_thinking=model.supports_thinking,
         context_len=model.context_len,
     )
-    if settings.pi_gateway:
-        return StreamingResponse(
-            _relay_gateway(db, conv, user_msg, assistant, text, thinking, conv.subject),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
-
-    provider_id, model_ref, assistant_id = provider.id, model.model_key, assistant.id
+    return StreamingResponse(
+        _relay_gateway(db, conv, user_msg, assistant, text, thinking, conv.subject),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
     user_id = user_msg.id
     conv_id = conv.id
     atts = attachments
