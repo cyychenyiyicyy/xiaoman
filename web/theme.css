@@ -1398,3 +1398,73 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
   .previewpane{position:fixed;inset:0;width:100%;min-width:0;z-index:60;border-left:0}
   .pvhead{height:52px;padding-top:env(safe-area-inset-top)}
 }
+
+/* ══ 消息技能小胶囊（放在用户气泡内部）══════════════ */
+.ubx{max-width:82%}
+.utextwrap{display:inline-block;background:var(--fill);padding:9px var(--q3);border-radius:16px 16px 4px 16px;
+  font-size:var(--s4);line-height:1.6;max-width:100%;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+.me .utextwrap .utext{display:inline;background:none;padding:0;border-radius:0;font-size:inherit;line-height:inherit;
+  white-space:inherit;max-width:none}
+.me .utextwrap .skilltag{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 7px;margin-right:6px;
+  border-radius:999px;background:var(--claybg);border:1px solid var(--clayline);color:var(--clay);
+  font-size:var(--s6);vertical-align:1px;white-space:nowrap}
+.me .utextwrap .edittag{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 7px;margin-right:6px;
+  border-radius:999px;background:var(--card);border:1px solid var(--line2);color:var(--ink2);
+  font-size:var(--s6);vertical-align:1px;white-space:nowrap}
+
+/* 输入框里的「基于资料」 */
+.editchip{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 4px 0 8px;border-radius:999px;
+  background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-size:var(--s6);max-width:100%}
+.editchip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.editchip button{width:18px;height:18px;display:grid;place-items:center;border:0;background:none;color:var(--ink3);cursor:pointer;padding:0}
+
+/* 技能行更轻 */
+.skillused{margin:0 0 var(--q1);letter-spacing:0}
+
+/* 资料库搜索 + 缩略图 + 更多 */
+.libsearch{display:flex;align-items:center;gap:var(--q2);margin:0 0 var(--q2)}
+.libsearch .fi{flex:1}
+.libtools{display:flex;align-items:center;gap:var(--q2);margin:0 0 var(--q3)}
+.libcard{position:relative}
+.libcard .lthumb{width:52px;height:52px;border-radius:var(--rb);object-fit:cover;background:var(--fill);flex:none}
+.libcard .lik{width:52px;height:52px}
+.libmore{position:absolute;top:8px;right:8px;width:32px;height:32px;display:grid;place-items:center;border:0;
+  border-radius:999px;background:transparent;color:var(--ink3);cursor:pointer}
+.libmore:active{background:var(--fill)}
+.artifactcard .athumb{width:44px;height:44px;border-radius:var(--rb);object-fit:cover;flex:none;background:var(--fill)}
+.artifactcard:hover{border-color:var(--line2)}
+
+/* 资料操作弹层 */
+.artlist{display:flex;flex-direction:column;gap:var(--q1)}
+.artlist .caprow{min-height:48px}
+
+/* PDF 预览兜底 */
+.pvfallback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--q2);
+  width:100%;height:100%;color:var(--ink3);font-size:var(--s5);text-align:center;padding:var(--q5)}
+.pvfallback a{color:var(--clay)}
+
+/* 工具折叠条更轻的悬停 */
+.tgroup:hover{border-color:var(--line2)}
+
+/* 视觉打磨：输入框、产物卡、资料卡、工具条 */
+.cbox{border-radius:18px;transition:border-color .16s ease, box-shadow .16s ease}
+.cbox:focus-within{box-shadow:0 0 0 3px var(--claybg)}
+.artifactcard{padding:14px;border-radius:14px;transition:border-color .16s ease}
+.artifactcard:hover{border-color:var(--clayline)}
+.artifactcard .athumb{width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none;background:var(--fill)}
+.artifactcard .abtn{height:32px;padding:0 12px;background:var(--claybg);border-color:var(--clayline)}
+.artifactcard .abtn.ghost{background:transparent;border-color:var(--line);color:var(--ink2)}
+.libgrid{gap:12px}
+.libcard{border-radius:14px;padding:12px;transition:border-color .16s ease}
+.libcard:hover{border-color:var(--clayline)}
+.libmore{opacity:.45}
+.libcard:hover .libmore{opacity:1}
+.tgroup{background:var(--card)}
+.tgroup[open]{background:var(--paper)}
+.previewpane{box-shadow:-1px 0 0 var(--line)}
+.pvhead{background:var(--card)}
+
+.libcard .ltag{display:inline-flex;align-items:center;height:16px;padding:0 5px;margin-left:5px;border-radius:999px;
+  background:var(--claybg);color:var(--clay);font-size:var(--s6);vertical-align:1px}
+
+button.pvact{border:0;background:none;font-family:inherit;cursor:pointer}

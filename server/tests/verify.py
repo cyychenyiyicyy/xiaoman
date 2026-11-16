@@ -45,11 +45,11 @@ EXPECTED_TABLES = {
 EXPECTED_COLUMNS = {
     "llm_provider": {"id", "name", "base_url", "api_style", "api_key", "api_key_tail", "connected", "kind", "sort"},
     "llm_model": {"id", "provider_id", "model_key", "display_name", "context_len", "supports_images", "supports_thinking", "enabled"},
-    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "deposits", "skill", "status", "created_at"},
+    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "deposits", "skill", "artifact_id", "status", "created_at"},
     "quiz": {"id", "conversation_id", "stem_md", "options", "answer", "status", "chosen", "correct", "source"},
     "deposit": {"id", "message_id", "kind", "status", "question_ids", "kp_ids", "meta"},
     "kp_evidence": {"id", "kp_id", "kind", "weight", "source"},
-    "artifact": {"id", "conversation_id", "kind", "title", "path", "mime", "bytes"},
+    "artifact": {"id", "conversation_id", "kind", "title", "path", "mime", "bytes", "source_md", "skill", "parent_id"},
     "question": {"id", "subject", "stem_md", "answer_md", "solution_md", "grade", "difficulty", "status", "error_type", "next_due_at", "asked_count", "streak", "solve_status", "solve_error", "solved_at", "ai_meta"},
     "kp": {"id", "subject", "name", "name_norm", "kind", "parent_id", "grade", "q_count"},
     "kp_edge": {"id", "from_kp_id", "to_kp_id", "type", "subject"},
@@ -249,6 +249,12 @@ def check_api(run: Run) -> None:
                 "api.artifacts",
                 "PASS" if isinstance(arts, dict) and "items" in arts and "total" in arts else "FAIL",
                 f"total={arts.get('total')}" if isinstance(arts, dict) else "bad",
+            )
+            arts_q = client.get("/api/v1/artifacts?q=离子").json()
+            run.add(
+                "api.artifacts_search",
+                "PASS" if isinstance(arts_q, dict) and "items" in arts_q else "FAIL",
+                f"hits={arts_q.get('total')}" if isinstance(arts_q, dict) else "bad",
             )
             nudge = client.post("/api/v1/nudges/check").json()
             run.add(

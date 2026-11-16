@@ -302,6 +302,8 @@ class ArtifactIn(BaseModel):
     title: str = ""
     markdown: str
     kps: list[str] = []
+    skill: str = ""
+    parent_id: str = ""
 
 
 def _make_artifact(kind: str, payload: ArtifactIn, db: Session) -> dict:
@@ -329,6 +331,9 @@ def _make_artifact(kind: str, payload: ArtifactIn, db: Session) -> dict:
             markdown=payload.markdown,
             subject=payload.subject or conv.subject or "",
             kp_ids=kp_ids,
+            source_md=payload.markdown,
+            skill=payload.skill,
+            parent_id=payload.parent_id or None,
         )
     except Exception as exc:  # noqa: BLE001
         db.rollback()
@@ -362,6 +367,8 @@ class FlashcardsIn(BaseModel):
     title: str = ""
     cards: list[dict] = []
     kps: list[str] = []
+    skill: str = ""
+    parent_id: str = ""
 
 
 @router.post("/internal/tools/make_flashcards", dependencies=[Depends(guard)])
@@ -375,6 +382,16 @@ def tool_make_flashcards(payload: FlashcardsIn, db: Session = Depends(get_db)):
         return {"ok": False, "error": "对话不存在"}
     if not payload.cards:
         return {"ok": False, "error": "没有卡片"}
+    import json
+    from pathlib import Path
+
+    from ..services import knowledge
+
+    kp_ids = []
+    for name in (payload.kps or [])[:6]:
+        kp = knowledge.resolve(db, payload.subject or conv.subject or "全部", name, "")
+        if kp is not None and kp.id not in kp_ids:
+            kp_ids.append(kp.id)
     doc = cards.build_flashcards_document(payload.title or "记忆闪卡", payload.cards, payload.subject or "")
     try:
         art = artifact_service.save_artifact(
@@ -384,9 +401,18 @@ def tool_make_flashcards(payload: FlashcardsIn, db: Session = Depends(get_db)):
             kind="flashcards",
             title=payload.title or "记忆闪卡",
             subject=payload.subject or conv.subject or "",
-            kp_ids=[],
+            kp_ids=kp_ids,
             document=doc,
+            source_md=json.dumps(payload.cards, ensure_ascii=False),
+            skill=payload.skill,
+            parent_id=payload.parent_id or None,
         )
+        p = Path(art.path)
+        if p.exists():
+            p.write_text(p.read_text(encoding="utf-8").replace("__AID__", art.id), encoding="utf-8")
+            art.bytes = p.stat().st_size
+            db.commit()
+            db.refresh(art)
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         return {"ok": False, "error": str(exc)[:240]}

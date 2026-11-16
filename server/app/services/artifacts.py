@@ -301,6 +301,9 @@ def save_artifact(
     subject: str = "",
     kp_ids: list | None = None,
     document: str | None = None,
+    source_md: str = "",
+    skill: str = "",
+    parent_id: str | None = None,
 ) -> Artifact:
     kind = kind if kind in ("html", "pdf", "png", "flashcards") else "html"
     title = (title or "知识点讲解").strip()[:120]
@@ -331,6 +334,9 @@ def save_artifact(
             mime=mime,
             bytes=path.stat().st_size,
             kp_ids=kp_ids or [],
+            source_md=source_md or "",
+            skill=(skill or "")[:32],
+            parent_id=parent_id,
         )
         db.add(artifact)
         db.commit()
@@ -352,6 +358,9 @@ def save_artifact(
         mime="application/pdf" if kind == "pdf" else "image/png",
         bytes=0,
         kp_ids=kp_ids or [],
+        source_md=source_md or "",
+        skill=(skill or "")[:32],
+        parent_id=parent_id,
     )
     db.add(artifact)
     db.commit()
@@ -387,6 +396,8 @@ def payload(a: Artifact) -> dict:
         "url": f"/api/v1/artifacts/{a.id}",
         "mime": a.mime,
         "bytes": int(a.bytes or 0),
+        "skill": a.skill or "",
+        "parent_id": a.parent_id or "",
     }
 
 

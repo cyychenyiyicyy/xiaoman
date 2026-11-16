@@ -20,7 +20,7 @@ import httpx
 
 from ..config import settings
 from ..db import SessionLocal, get_db
-from ..models import Attachment, Conversation, Message, Memory
+from ..models import Artifact, Attachment, Conversation, Message, Memory
 from ..schemas import ChatIn
 from ..seed import get_current, get_memory_cfg, get_search_cfg
 from ..services import artifacts as artifact_service
@@ -69,6 +69,7 @@ def _msg_out(m: Message) -> dict:
         "parts": m.parts or [],
         "deposits": m.deposits or [],
         "skill": m.skill or "",
+        "artifact_id": m.artifact_id or "",
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -246,6 +247,7 @@ async def _relay_gateway(
     subject: str,
     image_paths: list[str] | None = None,
     question_sources: list[dict] | None = None,
+    artifact_context: str = "",
 ) -> AsyncIterator[str]:
     """PI_GATEWAY 开着时：流由 Pi 产出，消息仍落我们的库。"""
     gateway = settings.pi_gateway.rstrip("/")
@@ -287,6 +289,8 @@ async def _relay_gateway(
                     "conversation_id": conv.id,
                     "assistant_message_id": assistant.id,
                     "skill": user_msg.skill or "",
+                    "artifact_id": user_msg.artifact_id or "",
+                    "artifact_context": artifact_context,
                 },
             ) as resp:
                 if resp.status_code >= 400:
@@ -503,6 +507,17 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
     summary_block, hist_rows = compact_service.history(db, conv)
     history = hist_rows
 
+    art = db.get(Artifact, payload.artifact_id) if payload.artifact_id else None
+    if art is not None and art.conversation_id != conv.id:
+        art = None
+    artifact_context = ""
+    if art is not None:
+        artifact_context = (
+            f"标题：{art.title}\n类型：{art.kind}\n技能：{art.skill or ''}\n原稿：\n"
+            f"{(art.source_md or '')[:8000]}"
+        )
+    effective_skill = (payload.skill or (art.skill if art is not None else "") or "")[:32]
+
     user_msg = Message(
         conversation_id=conv.id,
         role="user",
@@ -514,7 +529,8 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         model_key=model.model_key,
         thinking=thinking,
         status="done",
-        skill=(payload.skill or "")[:32],
+        skill=effective_skill,
+        artifact_id=(art.id if art is not None else None),
     )
     db.add(user_msg)
     db.flush()
@@ -528,7 +544,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         model_key=model.model_key,
         thinking=thinking,
         status="streaming",
-        skill=(payload.skill or "")[:32],
+        skill=effective_skill,
         sources=web_sources,
         tools=["web_search"] if web_sources else [],
     )
@@ -564,6 +580,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 }
                 for qr in question_refs
             ],
+            artifact_context=artifact_context,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

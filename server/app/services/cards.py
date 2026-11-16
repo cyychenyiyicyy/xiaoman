@@ -66,6 +66,18 @@ CARD_TEMPLATE = """<!doctype html>
           throwOnError:false, strict:false
         }});
       }}
+      function fit() {{
+        var a = document.querySelector("article");
+        if (!a) return;
+        var fs = 27;
+        a.style.fontSize = fs + "px";
+        while (a.scrollHeight > a.clientHeight + 1 && fs > 17) {{
+          fs -= 1;
+          a.style.fontSize = fs + "px";
+        }}
+      }}
+      setTimeout(fit, 250);
+      setTimeout(fit, 900);
     }});
   </script>
 </body>
@@ -118,6 +130,11 @@ FLASHCARD_TEMPLATE = """<!doctype html>
   .t{{font-size:19px;line-height:1.6;color:var(--ink);overflow-wrap:anywhere}}
   .back .t{{font-size:16px;color:var(--ink2)}}
   .idx{{margin-top:auto;font-size:11px;color:var(--ink3)}}
+  .rate{{display:flex;gap:8px;margin-top:auto;padding-top:12px}}
+  .rate button{{font-family:inherit;font-size:12px;height:30px;padding:0 12px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line);background:var(--card);color:var(--ink2)}}
+  .rate button.ok{{border-color:var(--clay);color:var(--clay);background:var(--claybg)}}
+  .rated{{font-size:11px;color:var(--ink3);margin-top:auto;padding-top:12px}}
   @media (max-width:720px){{.grid{{grid-template-columns:1fr}} body{{padding:28px 18px 48px}} h1{{font-size:24px}}}}
 </style>
 </head>
@@ -136,12 +153,32 @@ FLASHCARD_TEMPLATE = """<!doctype html>
     b.setAttribute("aria-label", "第 " + (i + 1) + " 张，点击翻面");
     b.innerHTML = '<div class="fci">' +
       '<div class="face"><span class="k">正面</span><span class="t"></span><span class="idx">' + (i + 1) + ' / ' + cards.length + '</span></div>' +
-      '<div class="face back"><span class="k">背面</span><span class="t"></span><span class="idx">点一下翻回去</span></div>' +
+      '<div class="face back"><span class="k">背面</span><span class="t"></span>' +
+      '<div class="rate"><button type="button" data-k="1">记住了</button><button type="button" data-k="0">没记住</button></div></div>' +
       '</div>';
     const ts = b.querySelectorAll(".t");
     ts[0].textContent = c.front || "";
     ts[1].textContent = c.back || "";
     b.addEventListener("click", function () {{ b.classList.toggle("flip"); }});
+    b.querySelectorAll(".rate button").forEach(function (btn) {{
+      btn.addEventListener("click", function (ev) {{
+        ev.stopPropagation();
+        if (btn.disabled) return;
+        b.querySelectorAll(".rate button").forEach(function (x) {{ x.disabled = true; }});
+        var known = btn.getAttribute("data-k") === "1";
+        fetch("/api/v1/artifacts/__AID__/card-review", {{
+          method: "POST",
+          headers: {{ "content-type": "application/json" }},
+          body: JSON.stringify({{ index: i, known: known }})
+        }}).then(function (r) {{ return r.json(); }}).then(function (res) {{
+          var box = b.querySelector(".rate");
+          if (box) box.outerHTML = '<div class="rated">' + (res && res.ok ? "已记录，下次再见" : "记录失败") + "</div>";
+        }}).catch(function () {{
+          var box = b.querySelector(".rate");
+          if (box) box.outerHTML = '<div class="rated">记录失败，稍后再试</div>';
+        }});
+      }});
+    }});
     grid.appendChild(b);
   }});
 </script>

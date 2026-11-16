@@ -50,7 +50,7 @@ function loadSkills(only) {
   return out.length ? "\n\n" + out.join("\n\n") : "";
 }
 
-function xiaomanPrompt(subject, activeSkills, skill) {
+function xiaomanPrompt(subject, activeSkills, skill, artifactContext) {
   const d = new Date();
   const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
   return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
@@ -69,6 +69,9 @@ function xiaomanPrompt(subject, activeSkills, skill) {
 她问「记住…」时，用 memory_add 记下来再简短确认。
 当前启用了讲题流程时，按下面技能里的步骤做。` +
     (skill ? `\n\n## 当前技能：${skill.name}\n${skill.prompt || ""}` : "") +
+    (artifactContext
+      ? `\n\n## 正在修改的资料\n她要基于这份资料修改。保留原有结构与知识点，只改她要求的部分；必须重新调用生成工具交付新版本。\n${artifactContext}`
+      : "") +
     loadSkills(activeSkills);
 }
 
@@ -361,6 +364,8 @@ function flashcardTool() {
         title: params.title || "",
         cards: params.cards || [],
         kps: params.kps || [],
+        skill: currentCtx.skill || "",
+        parent_id: currentCtx.artifact_id || "",
       };
       const result = await callTool("/internal/tools/make_flashcards", body);
       return { content: [{ type: "text", text: cardsText(result) }], details: result };
@@ -387,6 +392,8 @@ function artifactTool(name, label, description, extra) {
         title: params.title || "",
         markdown: params.markdown || "",
         kps: params.kps || [],
+        skill: currentCtx.skill || "",
+        parent_id: currentCtx.artifact_id || "",
       };
       const paths = {
         make_pdf: "/internal/tools/make_pdf",
@@ -458,13 +465,13 @@ async function handleChat(res, body) {
   const skill = findSkill(body.skill || "");
   currentSkillTools = (skill && skill.tools) || [];
   const caps = planCapabilities(body, body.text || "", skill);
-  currentCtx = { conversation_id: body.conversation_id || "", message_id: body.assistant_message_id || "", subject };
+  currentCtx = { conversation_id: body.conversation_id || "", message_id: body.assistant_message_id || "", subject, skill: body.skill || "", artifact_id: body.artifact_id || "" };
   const tools = makeTools(collect, caps, currentCtx, skill);
 
   const loader = new DefaultResourceLoader({
     cwd: CWD,
     agentDir: AGENT_DIR,
-    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills, skill),
+    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills, skill, body.artifact_context || ""),
     appendSystemPromptOverride: () => [],
   });
   await loader.reload();

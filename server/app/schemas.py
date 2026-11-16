@@ -104,6 +104,7 @@ class ChatIn(BaseModel):
     conversation_id: str = ""
     subject: str = ""
     skill: str = ""
+    artifact_id: str = ""
 
 
 

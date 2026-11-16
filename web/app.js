@@ -26,7 +26,8 @@
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
     preview: null,           // 右侧预览的产物
-    lib: { items: [], total: 0, kind: '', error: '' }, // 资料库
+    editArtifact: null,      // 正在基于哪份资料继续改
+    lib: { items: [], total: 0, kind: '', q: '', error: '' }, // 资料库
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -340,6 +341,7 @@
       parts: Array.isArray(m.parts) ? m.parts : [],
       deposits: Array.isArray(m.deposits) ? m.deposits : [],
       skill: m.skill || '',
+      artifact_id: m.artifact_id || '',
       thinking_ms: m.thinking_ms || 0,
       provider_id: m.provider_id,
       model_key: m.model_key,
@@ -2598,15 +2600,25 @@
     var host = q('#skillchips');
     if (!host) return;
     var s = skillById(state.skill);
-    if (!s) {
+    var edit = state.editArtifact;
+    if (!s && !edit) {
       host.hidden = true;
       host.innerHTML = '';
       return;
     }
     host.hidden = false;
-    host.innerHTML = '<span class="skillchip">' + ic(s.icon || 'sparkles', 'sm') +
-      '<span class="scn">' + esc(s.name) + '</span>' +
-      '<button type="button" class="scx" data-act="clear-skill" aria-label="移除技能">' + ic('x', 'sm') + '</button></span>';
+    var html = '';
+    if (edit) {
+      html += '<span class="editchip">' + ic('book', 'sm') +
+        '<span>基于：' + esc(edit.title || '资料') + '</span>' +
+        '<button type="button" data-act="clear-edit" aria-label="取消基于资料">' + ic('x', 'sm') + '</button></span>';
+    }
+    if (s) {
+      html += '<span class="skillchip">' + ic(s.icon || 'sparkles', 'sm') +
+        '<span class="scn">' + esc(s.name) + '</span>' +
+        '<button type="button" class="scx" data-act="clear-skill" aria-label="移除技能">' + ic('x', 'sm') + '</button></span>';
+    }
+    host.innerHTML = html;
   }
 
   function openSkillSheet() {
@@ -2670,8 +2682,10 @@
         var a = p.artifact;
         var km = artKindMeta(a.kind);
         var dl = a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
-        return '<div class="artifactcard">' +
-          '<span class="aic">' + ic(km[1]) + '</span>' +
+        var thumb = a.kind === 'png'
+          ? '<img class="athumb" src="' + esc(a.url) + '" alt="">'
+          : '<span class="aic">' + ic(km[1]) + '</span>';
+        return '<div class="artifactcard">' + thumb +
           '<span class="amain"><span class="atitle">' + esc(a.title || '产物') + '</span>' +
           '<span class="ameta">' + esc(km[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</span></span>' +
           '<button type="button" class="abtn" data-act="artifact-open" data-id="' + esc(a.id) + '">预览</button>' +
@@ -2691,7 +2705,7 @@
   /* ── 资料库 ───────────────────────────────────────── */
 
   function libState() {
-    return state.lib || { items: [], total: 0, kind: '', error: '' };
+    return state.lib || { items: [], total: 0, kind: '', q: '', error: '' };
   }
 
   function openLibrary() {
@@ -2702,17 +2716,27 @@
   async function loadLibrary() {
     var b = libState();
     try {
-      var url = '/artifacts?limit=120' + (b.kind ? '&kind=' + encodeURIComponent(b.kind) : '');
+      var url = '/artifacts?limit=120' +
+        (b.kind ? '&kind=' + encodeURIComponent(b.kind) : '') +
+        (b.q ? '&q=' + encodeURIComponent(b.q) : '');
       var r = await api(url);
-      state.lib = { items: r.items || [], total: r.total || 0, kind: b.kind, error: '' };
+      state.lib = { items: r.items || [], total: r.total || 0, kind: b.kind, q: b.q, error: '' };
     } catch (e) {
-      state.lib = { items: [], total: 0, kind: b.kind, error: e.message };
+      state.lib = { items: [], total: 0, kind: b.kind, q: b.q, error: e.message };
     }
     render();
   }
 
   function libKind(kind) {
-    state.lib = { items: [], total: 0, kind: kind || '', error: '' };
+    var b = libState();
+    state.lib = { items: [], total: 0, kind: kind || '', q: b.q || '', error: '' };
+    loadLibrary();
+  }
+
+  function libSearch() {
+    var el = q('#lib-q');
+    var b = libState();
+    state.lib = { items: [], total: 0, kind: b.kind || '', q: (el && el.value || '').trim(), error: '' };
     loadLibrary();
   }
 
@@ -2722,11 +2746,17 @@
     if (a.subject) meta.push(a.subject);
     meta.push(bankGroupDate(a.created_at) || '');
     meta.push(fmtBytes(a.bytes));
-    return '<button type="button" class="libcard" data-act="artifact-open" data-id="' + esc(a.id) + '">' +
-      '<span class="lik">' + ic(k[1]) + '</span>' +
-      '<span class="lmain"><span class="lt">' + esc(a.title || '资料') + '</span>' +
+    var thumb = a.kind === 'png'
+      ? '<img class="lthumb" src="' + esc(a.url) + '" alt="">'
+      : '<span class="lik">' + ic(k[1]) + '</span>';
+    return '<div class="libcard" role="button" tabindex="0" data-act="artifact-open" data-id="' + esc(a.id) + '">' +
+      thumb +
+      '<span class="lmain"><span class="lt">' + esc(a.title || '资料') +
+      (a.parent_id ? '<span class="ltag">改</span>' : '') + '</span>' +
       '<span class="lm">' + esc(meta.filter(Boolean).join(' · ')) + '</span></span>' +
-      '<span class="lgo">预览' + ic('chevron-right', 'sm') + '</span></button>';
+      '<span class="lgo">预览' + ic('chevron-right', 'sm') + '</span>' +
+      '<button type="button" class="libmore" data-act="artifact-menu" data-id="' + esc(a.id) + '" aria-label="更多操作">' +
+      ic('more-horizontal', 'sm') + '</button></div>';
   }
 
   function libraryPageHtml() {
@@ -2756,11 +2786,15 @@
         '<div class="libgrid">' + byDay[d].map(libCardHtml).join('') + '</div>';
     }).join('');
     if (!list) {
-      list = '<div class="empty"><div class="t">还没有资料</div>' +
-        '<div class="d">在对话里选一个技能，让她做一份网页、PDF 或卡片</div>' +
+      list = '<div class="empty"><div class="t">' + (b.q ? '没有匹配的资料' : '还没有资料') + '</div>' +
+        '<div class="d">' + (b.q ? '换个关键词，或者换个类型' : '在对话里选一个技能，让她做一份网页、PDF 或卡片') + '</div>' +
         '<div class="btnbar"><button type="button" class="btn p" data-act="rail-chat">去对话</button></div></div>';
     }
     return nav +
+      '<div class="libsearch">' +
+        '<input id="lib-q" class="fi" type="search" placeholder="搜标题、正文、知识点" value="' + esc(b.q || '') + '">' +
+        '<button type="button" class="btn" data-act="lib-search">搜索</button>' +
+      '</div>' +
       '<div class="bankchips libchips">' + chips + '</div>' +
       '<div class="settings bankwrap">' + list + '</div>';
   }
@@ -2805,6 +2839,116 @@
     renderPreview();
   }
 
+  function artifactDl(a) {
+    return a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+  }
+
+  function openArtifactMenu(id) {
+    var a = findArtifact(id);
+    if (!a) { toast('找不到这份资料'); return; }
+    setOverlay({ kind: 'artmenu', id: a.id, title: a.title || '资料' });
+  }
+
+  function artMenuSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'artmenu') return '';
+    var a = findArtifact(o.id);
+    var dl = a ? artifactDl(a) : '';
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="am-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="am-ttl">' + esc(o.title || '资料') + '</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="artlist">' +
+        '<button type="button" class="caprow" data-act="artifact-continue" data-id="' + esc(o.id) + '">' +
+          '<span class="rowmain">' + ic('sparkles', 'sm') + '继续改</span></button>' +
+        '<button type="button" class="caprow" data-act="artifact-rename-open" data-id="' + esc(o.id) + '">' +
+          '<span class="rowmain">' + ic('settings', 'sm') + '重命名</span></button>' +
+        (dl ? '<a class="caprow" href="' + esc(dl) + '"><span class="rowmain">' + ic('book-open-text', 'sm') + '下载</span></a>' : '') +
+        '<button type="button" class="caprow" data-act="artifact-delete" data-id="' + esc(o.id) + '">' +
+          '<span class="rowmain danger">' + ic('x', 'sm') + '删除</span></button>' +
+      '</div></div></div>';
+  }
+
+  function artifactRenameSheetHtml() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'artrename') return '';
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ar-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="ar-ttl">重命名</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="slabel">标题</div>' +
+      '<input class="fi" id="art-title" maxlength="120" value="' + esc(o.value || '') + '">' +
+      '</div><div class="sheet-foot"><div class="btnbar full">' +
+      '<button type="button" class="btn" data-act="close-sheet">取消</button>' +
+      '<button type="button" class="btn p" data-act="artifact-rename-save" data-id="' + esc(o.id) + '">保存</button>' +
+      '</div></div></div>';
+  }
+
+  function openArtifactRename(id) {
+    var a = findArtifact(id);
+    if (!a) return;
+    setOverlay({ kind: 'artrename', id: a.id, value: a.title || '' });
+  }
+
+  async function renameArtifact() {
+    var o = state.overlay;
+    if (!o || o.kind !== 'artrename') return;
+    var title = ((q('#art-title') || {}).value || '').trim();
+    if (!title) { toast('标题不能为空'); return; }
+    try {
+      var r = await api('/artifacts/' + encodeURIComponent(o.id), { method: 'PATCH', json: { title: title } });
+      if (state.preview && state.preview.id === o.id) state.preview = r;
+      closeOverlay();
+      await loadLibrary();
+      renderPreview();
+      toast('已改名');
+    } catch (e) {
+      toast('改名失败：' + e.message);
+    }
+  }
+
+  async function deleteArtifact(id) {
+    var a = findArtifact(id);
+    if (!a) return;
+    if (!window.confirm('删除「' + (a.title || '这份资料') + '」？文件会一起删掉。')) return;
+    try {
+      await api('/artifacts/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (state.preview && state.preview.id === id) { state.preview = null; renderPreview(); }
+      closeOverlay();
+      await loadLibrary();
+      toast('已删除');
+    } catch (e) {
+      toast('删除失败：' + e.message);
+    }
+  }
+
+  async function continueArtifact(id) {
+    var a = findArtifact(id);
+    if (!a) return;
+    state.editArtifact = a;
+    if (a.skill) state.skill = a.skill;
+    else if (a.kind === 'png') state.skill = 'card';
+    else if (a.kind === 'flashcards') state.skill = 'flashcards';
+    else if (a.kind === 'pdf') state.skill = 'pdf';
+    else state.skill = 'webpage';
+    closeOverlay();
+    closePreview();
+    if (a.conversation_id) await openConversation(a.conversation_id);
+    else openPage(null);
+    renderSkillPill();
+    renderSkillChips();
+    var ta = q('#ta');
+    if (ta) { autosize(); syncSend(); ta.focus(); }
+    toast('说你想怎么改');
+  }
+
+  function clearEditContext() {
+    state.editArtifact = null;
+    renderSkillChips();
+  }
+
   function renderPreview() {
     var host = q('#previewpane');
     if (!host) return;
@@ -2817,14 +2961,21 @@
     }
     var k = artKindMeta(a.kind);
     var dl = a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
-    var body = a.kind === 'png'
-      ? '<img class="pvimg" src="' + esc(a.url) + '" alt="' + esc(a.title || '知识卡片') + '">'
-      : '<iframe class="pvframe" src="' + esc(a.url) + '" title="' + esc(a.title || '资料') + '" loading="lazy"></iframe>';
+    var body;
+    if (a.kind === 'png') {
+      body = '<img class="pvimg" src="' + esc(a.url) + '" alt="' + esc(a.title || '知识卡片') + '">';
+    } else if (a.kind === 'pdf') {
+      body = '<object class="pvframe" data="' + esc(a.url) + '" type="application/pdf">' +
+        '<div class="pvfallback">浏览器不能直接预览 PDF<br><a href="' + esc(a.url) + '" target="_blank" rel="noopener">新窗口打开</a></div></object>';
+    } else {
+      body = '<iframe class="pvframe" src="' + esc(a.url) + '" title="' + esc(a.title || '资料') + '" loading="lazy"></iframe>';
+    }
     host.hidden = false;
     document.body.classList.add('preview-open');
     host.innerHTML = '<div class="pvhead"><div class="pvt">' + esc(a.title || '资料') + '</div>' +
-      '<div class="pvmeta">' + esc(k[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</div>' +
+      '<div class="pvmeta">' + (a.parent_title ? '改自 ' + esc(a.parent_title) + ' · ' : '') + esc(k[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</div>' +
       '<div class="sp"></div>' +
+      '<button type="button" class="pvact" data-act="artifact-continue" data-id="' + esc(a.id) + '">继续改</button>' +
       '<a class="pvact" href="' + esc(a.url) + '" target="_blank" rel="noopener">新窗口</a>' +
       '<a class="pvact" href="' + esc(dl) + '">下载</a>' +
       '<button type="button" class="pvx" data-act="close-preview" aria-label="关闭预览">' + ic('x') + '</button></div>' +
@@ -2838,7 +2989,8 @@
       }).join('');
       var sk = m.skill ? skillById(m.skill) : null;
       var sktag = sk ? '<span class="skilltag">' + ic(sk.icon || 'sparkles', 'sm') + esc(sk.name) + '</span>' : '';
-      var textBody = (sktag || '') + (m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '');
+      var etag = m.artifact_id ? '<span class="edittag">' + ic('book', 'sm') + '基于资料</span>' : '';
+      var textBody = (etag || '') + (sktag || '') + (m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '');
       var text = textBody ? '<div class="utextwrap">' + textBody + '</div>' : '';
       var mqs = m.questions || [];
       var qs = mqs.length > 2
@@ -3730,6 +3882,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'bankfilter' ? bankFilterSheetHtml()
       : kind === 'theme' ? themeSheetHtml()
       : kind === 'skills' ? skillSheetHtml()
+      : kind === 'artmenu' ? artMenuSheetHtml()
+      : kind === 'artrename' ? artifactRenameSheetHtml()
       : kind === 'kpsel' ? kpSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
@@ -5348,13 +5502,14 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     var payload = {
       text: text, image_ids: imageIds || [], question_ids: questionIds || [],
       thinking: thinkValue(), conversation_id: state.convId || '', subject: state.convSubject || '全部',
-      skill: state.skill || ''
+      skill: state.skill || '',
+      artifact_id: state.editArtifact ? state.editArtifact.id : ''
     };
     var userMsg = {
       id: 'tmp-u-' + Date.now(), _key: newKey('u'), role: 'user',
       kind: (imgs && imgs.length) ? 'image' : 'text',
       content_md: text, reasoning_md: '', images: imgs || [], questions: questions || [], status: 'done', error: '',
-      skill: state.skill || ''
+      skill: state.skill || '', artifact_id: state.editArtifact ? state.editArtifact.id : ''
     };
     var asst = {
       id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
@@ -5362,6 +5517,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       _payload: payload, _userMsg: userMsg
     };
     state.messages.push(userMsg, asst);
+    if (state.editArtifact) { state.editArtifact = null; renderSkillChips(); }
     state.sending = true;
     state.stick = true;
     renderStream();
@@ -5764,6 +5920,13 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-library': function () { openLibrary(); },
     'library-reload': function () { loadLibrary(); },
     'library-kind': function (el) { libKind(el.getAttribute('data-kind') || ''); },
+    'lib-search': function () { libSearch(); },
+    'artifact-menu': function (el) { openArtifactMenu(el.getAttribute('data-id') || ''); },
+    'artifact-continue': function (el) { continueArtifact(el.getAttribute('data-id') || ''); },
+    'artifact-rename-open': function (el) { openArtifactRename(el.getAttribute('data-id') || ''); },
+    'artifact-rename-save': function () { renameArtifact(); },
+    'artifact-delete': function (el) { deleteArtifact(el.getAttribute('data-id') || ''); },
+    'clear-edit': function () { clearEditContext(); },
     'artifact-open': function (el) { openArtifactById(el.getAttribute('data-id') || ''); },
     'close-preview': function () { closePreview(); },
     'rail-map': function () { openMap(); },
@@ -5935,6 +6098,10 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     if (e.key === 'Enter' && e.target && e.target.id === 'map-q') {
       e.preventDefault();
       mapSearch();
+    }
+    if (e.key === 'Enter' && e.target && e.target.id === 'lib-q') {
+      e.preventDefault();
+      libSearch();
     }
   }
 

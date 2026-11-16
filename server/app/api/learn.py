@@ -17,12 +17,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Artifact, Conversation, Message, Quiz
+from ..models import Artifact, Conversation, Kp, KpEvidence, Message, Quiz
 from ..services import artifacts as artifact_service
 from ..services import deposit as deposit_service
 from ..services import nudge as nudge_service
 from ..services import quiz as quiz_service
 from ..services import skills as skills_service
+
+import uuid as _uuid
+from datetime import datetime, timezone
 
 router = APIRouter(tags=["learn"])
 
@@ -112,11 +115,12 @@ def list_skills():
 def list_artifacts(
     kind: str = "",
     subject: str = "",
+    q: str = "",
     limit: int = 80,
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
-    """资料库：所有生成过的网页 / PDF / 卡片。"""
+    """资料库：所有生成过的网页 / PDF / 卡片；q 搜标题、正文与知识点。"""
     where = []
     if kind in ("html", "pdf", "png", "flashcards"):
         where.append(Artifact.kind == kind)
@@ -127,18 +131,102 @@ def list_artifacts(
             select(Artifact)
             .where(*where)
             .order_by(Artifact.created_at.desc())
-            .offset(max(0, offset))
-            .limit(max(1, min(limit, 200)))
+            .limit(300)
         ).all()
     )
-    total = int(db.scalar(select(func.count()).select_from(Artifact).where(*where)) or 0)
+    if q:
+        needle = q.strip().lower()
+        kps = {k.id: k.name for k in db.scalars(select(Kp)).all()}
+        hits = []
+        for a in rows:
+            hay = " ".join(
+                [a.title or "", a.subject or "", (a.source_md or "")[:6000]]
+                + [kps.get(i, "") for i in (a.kp_ids or [])]
+            ).lower()
+            if needle in hay:
+                hits.append(a)
+        rows = hits
+    total = len(rows) if q else int(db.scalar(select(func.count()).select_from(Artifact).where(*where)) or 0)
+    start = max(0, offset)
+    page = rows[start:start + max(1, min(limit, 200))]
+    parent_ids = {a.parent_id for a in page if a.parent_id}
+    parents = {}
+    if parent_ids:
+        parents = {
+            p.id: p.title
+            for p in db.scalars(select(Artifact).where(Artifact.id.in_(parent_ids))).all()
+        }
     items = []
-    for a in rows:
+    for a in page:
         item = artifact_service.payload(a)
         item["created_at"] = a.created_at.isoformat() if a.created_at else None
         item["conversation_id"] = a.conversation_id
+        item["parent_title"] = parents.get(a.parent_id, "") if a.parent_id else ""
         items.append(item)
     return {"items": items, "total": total}
+
+
+class RenameIn(BaseModel):
+    title: str = ""
+    subject: str | None = None
+
+
+@router.patch("/artifacts/{aid}")
+def rename_artifact(aid: str, payload: RenameIn, db: Session = Depends(get_db)):
+    a = db.get(Artifact, aid)
+    if a is None:
+        raise HTTPException(404, "产物不存在")
+    title = payload.title.strip()
+    if title:
+        a.title = title[:120]
+    if payload.subject is not None:
+        a.subject = payload.subject.strip()[:20]
+    db.commit()
+    db.refresh(a)
+    item = artifact_service.payload(a)
+    item["created_at"] = a.created_at.isoformat() if a.created_at else None
+    return item
+
+
+@router.delete("/artifacts/{aid}")
+def delete_artifact(aid: str, db: Session = Depends(get_db)):
+    a = db.get(Artifact, aid)
+    if a is None:
+        raise HTTPException(404, "产物不存在")
+    for p in (Path(a.path), artifact_service.source_path(aid)):
+        try:
+            p.unlink(missing_ok=True)
+        except OSError:
+            pass
+    db.delete(a)
+    db.commit()
+    return {"ok": True}
+
+
+class CardReviewIn(BaseModel):
+    index: int = 0
+    known: bool = False
+
+
+@router.post("/artifacts/{aid}/card-review")
+def review_card(aid: str, payload: CardReviewIn, db: Session = Depends(get_db)):
+    """闪卡自评：把「记住 / 没记住」写进知识点证据，接上掌握度。"""
+    a = db.get(Artifact, aid)
+    if a is None or a.kind != "flashcards":
+        raise HTTPException(404, "闪卡不存在")
+    for kp_id in a.kp_ids or []:
+        db.add(
+            KpEvidence(
+                id=_uuid.uuid4().hex,
+                kp_id=kp_id,
+                kind="flashcard_right" if payload.known else "flashcard_wrong",
+                weight=0.4 if payload.known else 0.85,
+                source=a.id,
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+    db.commit()
+    return {"ok": True, "known": payload.known, "kps": len(a.kp_ids or [])}
 
 
 @router.get("/artifacts/{aid}/source")
