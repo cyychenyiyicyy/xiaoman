@@ -2656,6 +2656,11 @@
     quiz_create: ['出题检测', 'circle-dot'],
     make_webpage: ['生成讲解网页', 'globe'],
     make_pdf: ['生成 PDF', 'book-open-text'],
+    file_list: ['看工作区', 'book-open-text'],
+    file_read: ['读文件', 'book-open-text'],
+    file_write: ['写文件', 'book'],
+    file_edit: ['改文件', 'book'],
+    publish: ['发布文件', 'globe'],
     make_card: ['生成知识卡片', 'image'],
     make_flashcards: ['生成记忆闪卡', 'book']
   };
@@ -2952,8 +2957,6 @@
       '<div class="shd"><div class="ttl" id="am-ttl">' + esc(o.title || '资料') + '</div>' +
       '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
       '<div class="sheet-body"><div class="artlist">' +
-        '<button type="button" class="caprow" data-act="artifact-continue" data-id="' + esc(o.id) + '">' +
-          '<span class="rowmain">' + ic('sparkles', 'sm') + '继续改</span></button>' +
         '<button type="button" class="caprow" data-act="artifact-rename-open" data-id="' + esc(o.id) + '">' +
           '<span class="rowmain">' + ic('settings', 'sm') + '重命名</span></button>' +
         (dl ? '<a class="caprow" href="' + esc(dl) + '"><span class="rowmain">' + ic('book-open-text', 'sm') + '下载</span></a>' : '') +
@@ -3067,7 +3070,7 @@
     host.innerHTML = '<div class="pvhead"><div class="pvt">' + esc(a.title || '资料') + '</div>' +
       '<div class="pvmeta">' + (a.parent_title ? '改自 ' + esc(a.parent_title) + ' · ' : '') + esc(k[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</div>' +
       '<div class="sp"></div>' +
-      '<button type="button" class="pvact" data-act="artifact-continue" data-id="' + esc(a.id) + '">继续改</button>' +
+      '<button type="button" class="pvact" data-act="artifact-rename-open" data-id="' + esc(a.id) + '">改名</button>' +
       '<a class="pvact" href="' + esc(a.url) + '" target="_blank" rel="noopener">新窗口</a>' +
       '<a class="pvact" href="' + esc(dl) + '">下载</a>' +
       '<button type="button" class="pvx" data-act="close-preview" aria-label="关闭预览">' + ic('x') + '</button></div>' +
@@ -3219,17 +3222,19 @@
     var head = [];
     head.push(totalMs ? '思考 ' + stepSecs(totalMs) : (tools ? '调用工具' : '记忆'));
     if (tools) {
-      var cat = { question: 0, web: 0, memory: 0, create: 0 };
+      var cat = { question: 0, web: 0, memory: 0, file: 0, create: 0 };
       toolNames.forEach(function (n) {
         if (n.indexOf('question_') === 0) cat.question += 1;
         else if (n === 'web_search') cat.web += 1;
         else if (n.indexOf('memory_') === 0) cat.memory += 1;
-        else if (n.indexOf('make_') === 0 || n === 'quiz_create') cat.create += 1;
+        else if (n.indexOf('file_') === 0) cat.file += 1;
+        else if (n === 'publish' || n.indexOf('make_') === 0 || n === 'quiz_create') cat.create += 1;
       });
       var bits = [];
       if (cat.question) bits.push('查题库 ' + cat.question + ' 次');
       if (cat.web) bits.push('搜索 ' + cat.web + ' 次');
       if (cat.memory) bits.push('查记忆 ' + cat.memory + ' 次');
+      if (cat.file) bits.push('工作区 ' + cat.file + ' 次');
       if (cat.create) {
         var uniq = createNames.filter(function (v, i, a) { return a.indexOf(v) === i; });
         bits.push(uniq.length === 1 ? toolMeta(uniq[0])[0] : '生成 ' + cat.create + ' 次');

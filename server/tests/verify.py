@@ -195,7 +195,7 @@ def check_api(run: Run) -> None:
 
             events: list[str] = []
             with client.stream(
-                "POST", "/api/v1/chat", json={"text": "验收自检", "image_ids": []}
+                "POST", "/api/v1/chat", json={"text": "说一句话", "image_ids": []}
             ) as resp:
                 for line in resp.iter_lines():
                     if line.startswith("data:"):

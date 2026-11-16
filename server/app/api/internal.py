@@ -421,3 +421,37 @@ def tool_make_flashcards(payload: FlashcardsIn, db: Session = Depends(get_db)):
         "artifact": artifact_service.payload(art),
         "hint": "闪卡已生成，告诉她点开就能翻面",
     }
+
+
+class PublishIn(BaseModel):
+    conversation_id: str
+    message_id: str = ""
+    path: str
+    title: str = ""
+    kind: str = "html"
+    skill: str = ""
+
+
+@router.post("/internal/tools/publish", dependencies=[Depends(guard)])
+def tool_publish(payload: PublishIn, db: Session = Depends(get_db)):
+    from ..models import Conversation
+    from ..services import artifacts as artifact_service
+
+    conv = db.get(Conversation, payload.conversation_id)
+    if conv is None:
+        return {"ok": False, "error": "对话不存在"}
+    try:
+        art = artifact_service.publish_workspace(
+            db,
+            conversation_id=conv.id,
+            message_id=payload.message_id or None,
+            path=payload.path,
+            title=payload.title,
+            kind=payload.kind,
+            subject=conv.subject or "",
+            skill=payload.skill,
+        )
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        return {"ok": False, "error": str(exc)[:240]}
+    return {"ok": True, "artifact": artifact_service.payload(art), "hint": "文件已发布，卡片会出现在这一轮消息里"}

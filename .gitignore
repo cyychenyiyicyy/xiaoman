@@ -37,8 +37,7 @@ agent/.pi-home/*
 !agent/.pi-home/skills/
 !agent/.pi-home/skills/**
 agent/.pi-sessions/
+agent/workspaces/
 
 agent/.pi-probe/
 agent/probe*.mjs
-
-

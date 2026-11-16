@@ -383,6 +383,51 @@ def save_artifact(
     return artifact
 
 
+def workspace_root() -> Path:
+    p = Path(settings.workspace_dir)
+    if p.is_absolute():
+        return p.resolve()
+    # 从 server/ 或仓库根启动都能找到 agent/workspaces
+    for base in (Path.cwd(), Path(__file__).resolve().parents[2]):
+        q = (base / p).resolve()
+        if q.exists():
+            return q
+    return (Path.cwd() / p).resolve()
+
+
+def publish_workspace(
+    db: Session,
+    *,
+    conversation_id: str,
+    message_id: str | None,
+    path: str,
+    title: str,
+    kind: str = "html",
+    subject: str = "",
+    skill: str = "",
+) -> Artifact:
+    """把受限工作区里的 HTML 文件发布成资料库产物；PDF 交给 Edge 打印。"""
+    ws = workspace_root() / conversation_id
+    target = (ws / path).resolve()
+    if not target.is_relative_to(ws.resolve()) or not target.is_file():
+        raise ValueError("工作区里没有这个文件")
+    doc = target.read_text(encoding="utf-8")
+    if not doc.strip():
+        raise ValueError("文件是空的")
+    real_kind = "pdf" if kind == "pdf" else "html"
+    return save_artifact(
+        db,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        kind=real_kind,
+        title=title or target.stem,
+        subject=subject,
+        document=doc,
+        source_md=doc,
+        skill=skill,
+    )
+
+
 def source_path(aid: str) -> Path:
     return _art_dir() / f"{aid}.src.html"
 

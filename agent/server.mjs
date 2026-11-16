@@ -4,13 +4,14 @@
 import { createAgentSession, DefaultResourceLoader, defineTool, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AGENT_DIR = resolve(HERE, ".pi-home");
 const SESS_DIR = resolve(HERE, ".pi-sessions");
+const WORKSPACES = resolve(HERE, "workspaces");
 const INDEX = resolve(SESS_DIR, "index.json");
 const PORT = Number(process.env.PI_PORT || 8791);
 const CWD = HERE;
@@ -19,6 +20,7 @@ const TOKEN = process.env.PI_INTERNAL_TOKEN || "dev-internal-token";
 
 mkdirSync(AGENT_DIR, { recursive: true });
 mkdirSync(SESS_DIR, { recursive: true });
+mkdirSync(WORKSPACES, { recursive: true });
 
 const SUBJECTS = ["全部", "语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"];
 
@@ -64,8 +66,12 @@ function xiaomanPrompt(subject, activeSkills, skill, artifactContext) {
 - 不确定就说不确定；库里没有的不要编。公式用行内 LaTeX（$...$）。
 - 中文回答。
 
-你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）、quiz_create（给她出一道检测题）。
-不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
+你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）、quiz_create（给她出一道检测题）、file_list / file_read / file_write / file_edit（受限工作区里的文件）、publish（把工作区文件发布成资料）。
+不要执行命令、不要读工作区之外的文件；不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
+
+## 你的工作区
+你有一个按对话隔离的受限工作区，里面有上一轮留下的文件。做网页/PDF 时：用 file_write 写完整 HTML 文件，再用 publish 发布；她说「继续改」「再改一下」「把刚才那个…」时，先 file_list / file_read 找到原文件，直接改并重新 publish——不要问她要文件，也不要另起一份。
+知识卡片和记忆闪卡仍用固定模板（make_card / make_flashcards），其余产物由你自己生成文件。
 她问「记住…」时，用 memory_add 记下来再简短确认。
 当前启用了讲题流程时，按下面技能里的步骤做。` +
     (skill ? `\n\n## 当前技能：${skill.name}\n${skill.prompt || ""}` : "") +
@@ -202,6 +208,8 @@ function makeTools(collect, caps, ctx, skill) {
     ),
   ];
 
+  base.push(...fileTools());
+
   // 题库 + 出题：只在「讲题 / 检测」场景装载，其余时候不挂（不用就卸载）
   if (!caps || !caps.questions) return base.concat(artifactTools());
   return base.concat([
@@ -298,6 +306,116 @@ function makeTools(collect, caps, ctx, skill) {
       }
     ),
   ]).concat(artifactTools());
+}
+
+function workspaceFor(conversationId) {
+  const safe = String(conversationId || "scratch").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "scratch";
+  const dir = resolve(WORKSPACES, safe);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function workspacePath(ws, rel) {
+  const p = resolve(ws, rel || ".");
+  if (p !== ws && !p.startsWith(ws + sep)) throw new Error("只能访问工作区里的文件");
+  return p;
+}
+
+function fileTools() {
+  const ws = workspaceFor(currentCtx.conversation_id);
+  const rel = (p) => p === ws ? "." : p.slice(ws.length + 1);
+  const safe = (p) => workspacePath(ws, p);
+  return [
+    defineTool({
+      name: "file_list",
+      label: "看工作区",
+      description: "列出当前对话工作区里的文件（相对路径 + 大小）。她说继续改时先看这里。",
+      parameters: Type.Object({ path: Type.Optional(Type.String({ description: "相对子目录，留空=根" })) }),
+      async execute(_id, params) {
+        const dir = safe(params.path || ".");
+        if (!existsSync(dir)) return { content: [{ type: "text", text: "空目录" }] };
+        const rows = [];
+        const walk = (d, depth) => {
+          if (rows.length >= 80 || depth > 2) return;
+          for (const ent of readdirSync(d, { withFileTypes: true })) {
+            const full = resolve(d, ent.name);
+            if (ent.isDirectory()) walk(full, depth + 1);
+            else if (ent.isFile()) {
+              try { rows.push(`${rel(full)}  ${statSync(full).size}B`); } catch {}
+            }
+          }
+        };
+        walk(dir, 0);
+        return { content: [{ type: "text", text: rows.length ? rows.join("\n") : "空工作区" }] };
+      },
+    }),
+    defineTool({
+      name: "file_read",
+      label: "读文件",
+      description: "读工作区里的一个文本文件。改之前先读原文件。",
+      parameters: Type.Object({ path: Type.String({ description: "相对路径" }) }),
+      async execute(_id, params) {
+        const p = safe(params.path);
+        if (!existsSync(p)) return { content: [{ type: "text", text: "文件不存在" }] };
+        const text = readFileSync(p, "utf8");
+        return { content: [{ type: "text", text: text.slice(0, 20000) }] };
+      },
+    }),
+    defineTool({
+      name: "file_write",
+      label: "写文件",
+      description: "在工作区里创建/覆盖一个文件。写完整 HTML，不要只写片段。",
+      parameters: Type.Object({
+        path: Type.String({ description: "相对路径，如 index.html" }),
+        content: Type.String({ description: "完整文件内容" }),
+      }),
+      async execute(_id, params) {
+        const p = safe(params.path);
+        mkdirSync(dirname(p), { recursive: true });
+        writeFileSync(p, params.content || "", "utf8");
+        return { content: [{ type: "text", text: `已写入 ${rel(p)}（${Buffer.byteLength(params.content || "", "utf8")}B）` }] };
+      },
+    }),
+    defineTool({
+      name: "file_edit",
+      label: "改文件",
+      description: "把工作区文件里的一段原文替换成新内容；改完记得 publish。",
+      parameters: Type.Object({
+        path: Type.String({ description: "相对路径" }),
+        old: Type.String({ description: "原文，必须精确匹配" }),
+        new: Type.String({ description: "新内容" }),
+      }),
+      async execute(_id, params) {
+        const p = safe(params.path);
+        if (!existsSync(p)) return { content: [{ type: "text", text: "文件不存在" }] };
+        const text = readFileSync(p, "utf8");
+        if (!params.old || !text.includes(params.old)) return { content: [{ type: "text", text: "原文没找到，先 file_read 看看" }] };
+        writeFileSync(p, text.replace(params.old, params.new || ""), "utf8");
+        return { content: [{ type: "text", text: `已改 ${rel(p)}，记得 publish` }] };
+      },
+    }),
+    defineTool({
+      name: "publish",
+      label: "发布文件",
+      description: "把工作区里的 HTML 发布成资料（kind=html），或打印成 PDF（kind=pdf）。发布后对话里会出现产物卡。",
+      parameters: Type.Object({
+        path: Type.String({ description: "相对路径，如 index.html" }),
+        title: Type.String({ description: "标题，不超过 20 字" }),
+        kind: Type.Optional(Type.Union([Type.Literal("html"), Type.Literal("pdf")], { description: "html 或 pdf" })),
+      }),
+      async execute(_id, params) {
+        const result = await callTool("/internal/tools/publish", {
+          conversation_id: currentCtx.conversation_id || "",
+          message_id: currentCtx.message_id || "",
+          path: params.path,
+          title: params.title || "",
+          kind: params.kind || "html",
+          skill: currentCtx.skill || "",
+        });
+        return { content: [{ type: "text", text: cardsText(result) }], details: result };
+      },
+    }),
+  ];
 }
 
 function artifactTools() {

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres@127.0.0.1:5433/xiaoman_dev"
     app_token: str = ""
     app_base_url: str = "http://127.0.0.1:8787"  # 生成 PDF 时让 Edge 打开本服务的产物页
+    workspace_dir: str = "../agent/workspaces"  # Pi 的受限工作区根目录
     data_dir: str = "../data/uploads"
     web_dir: str = "../web"
     auto_create: int = 0
