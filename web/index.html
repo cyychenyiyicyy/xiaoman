@@ -18,6 +18,7 @@
     } catch (e) { /* 无痕模式里 localStorage 会抛，忽略 */ }
   })();
 </script>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
@@ -26,7 +27,7 @@
 
 <div class="shell" id="shell">
   <nav class="rail" aria-label="主导航">
-    <div class="logo" aria-hidden="true">满</div>
+    <img class="logo" src="logo.svg" alt="小满">
     <button type="button" class="it on" id="rail-chat" data-act="rail-chat" aria-current="page">
       <svg class="ic" aria-hidden="true"><use data-i="circle-dot"/></svg><span>对话</span>
     </button>

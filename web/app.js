@@ -26,6 +26,7 @@
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
     preview: null,           // 右侧预览的产物
+    heroSubject: '',         // 新对话页选中的学科
     editArtifact: null,      // 正在基于哪份资料继续改
     lib: { items: [], total: 0, kind: '', q: '', error: '' }, // 资料库
     question: null,          // 当前打开的题目详情（整页）
@@ -315,7 +316,21 @@
       var local = state.messages.filter(function (m) {
         return String(m.id).indexOf('tmp-') === 0;
       });
-      state.messages = local.length ? items.map(normalizeMessage).concat(local) : items.map(normalizeMessage);
+      var rows = items.map(normalizeMessage);
+      if (local.length) {
+        // 发送中的本地占位消息与刚落库的消息可能同时存在：按角色+正文去重
+        var seen = {};
+        rows.forEach(function (r) { seen[r.role + '|' + String(r.content_md || '').trim()] = true; });
+        local = local.filter(function (l) {
+          var k = l.role + '|' + String(l.content_md || '').trim();
+          if (l.role === 'user' && seen[k]) return false;
+          if (l.role === 'assistant' && l.status === 'done' && seen[k]) return false;
+          return true;
+        });
+        state.messages = rows.concat(local);
+      } else {
+        state.messages = rows;
+      }
     setTimeout(function () { typesetMath(q('#stream')); }, 60);
       state.msgState = 'ready';
     } catch (e) {
@@ -773,6 +788,8 @@
     state.convId = '';
     state.convTitle = '';
     state.messages = [];
+    if (!state.heroSubject) state.heroSubject = (state.subjects && state.subjects.current) || '全部';
+    state.convSubject = state.heroSubject;
     openPage(null);
     loadConversations();
   }
@@ -879,7 +896,7 @@
   }
 
   function openNewChatSheet() {
-    setOverlay({ kind: 'newchat' });
+    openConversations();
   }
 
   function newChatSheetHtml() {
@@ -919,6 +936,7 @@
     var c = (state.conversations || []).filter(function (x) { return x.id === id; })[0];
     state.convId = id;
     state.convSubject = c ? c.subject : state.convSubject;
+    state.heroSubject = state.convSubject;
     state.convTitle = c ? c.title : '';
     state.messages = [];
     openPage(null);
@@ -2086,10 +2104,10 @@
       await openReview(decodeURIComponent(location.hash.slice(8)));
       return;
     }
-    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
-    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
-    if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
-    if (location.hash === '#map') { await loadMessages(); openMap(); return; }
+    if (location.hash === '#library') { openLibrary(); return; }
+    if (location.hash === '#library') { openLibrary(); return; }
+    if (location.hash === '#bank') { openBank(); return; }
+    if (location.hash === '#map') { openMap(); return; }
     if (location.hash === '#bankcap') {
       await loadMessages();
       openBank();
@@ -2311,15 +2329,89 @@
     updateToBottom();
   }
 
+
+  function heroSubjectName() {
+    var list = ['全部'].concat(typeof SUBJECTS !== 'undefined' ? SUBJECTS : []);
+    var s = state.heroSubject || (state.subjects && state.subjects.current) || '全部';
+    if (list.indexOf(s) < 0) s = '全部';
+    return s;
+  }
+
+  function heroHtml() {
+    var subj = heroSubjectName();
+    var icon = (typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[subj]) || 'circle-dot';
+    var sug = [
+      { icon: 'book-open-text', text: (subj === '全部' ? '讲讲' : '讲讲' + subj + '里') + '最常考的一个知识点' },
+      { icon: 'clock', text: '帮我梳理这周没弄懂的知识点' },
+      { icon: 'circle-dot', text: '考考我' + (subj === '全部' ? '' : '「' + subj + '」') + '，看看哪里没掌握' }
+    ];
+    return '<div class="hero">' +
+      '<div class="hero-brand"><img src="logo.svg" alt=""><span>小满 · 学习空间</span></div>' +
+      '<h1 class="hero-title">在 <button type="button" class="hero-subj" data-act="open-hero-subjects" aria-haspopup="dialog">' +
+        '<span class="hsi">' + ic(icon) + '</span>' +
+        '<span class="hs">' + esc(subj) + '</span>' +
+        '<span class="hsp">学科空间</span>' +
+        ic('chevron-down', 'sm hv') +
+      '</button> 开始对话</h1>' +
+      '<div class="hero-sugs">' + sug.map(function (x) {
+        return '<button type="button" class="hero-sug" data-act="hero-send" data-text="' + esc(x.text) + '">' +
+          ic(x.icon, 'sm') + '<span>' + esc(x.text) + '</span></button>';
+      }).join('') + '</div>' +
+      '</div>';
+  }
+
+  function openHeroSubjects() {
+    setOverlay({ kind: 'herosub' });
+  }
+
+  function heroSubjectsSheetHtml() {
+    var cur = heroSubjectName();
+    var list = ['全部'].concat(typeof SUBJECTS !== 'undefined' ? SUBJECTS : []);
+    var rows = list.map(function (s) {
+      var on = s === cur;
+      return '<button type="button" class="caprow' + (on ? ' on' : '') + '" data-act="hero-subject" data-subject="' + esc(s) + '">' +
+        ic((typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[s]) || 'circle-dot', 'sm') +
+        '<span>' + esc(s) + '</span><span class="sp"></span>' +
+        (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hs-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="hs-ttl">切换学科空间</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="capmenu">' + rows + '</div></div></div>';
+  }
+
+  function pickHeroSubject(name) {
+    state.heroSubject = name || '全部';
+    state.convSubject = state.heroSubject;
+    state.overlay = null;
+    render();
+  }
+
+  async function heroSend(text) {
+    if (state.sending) return;
+    var subj = heroSubjectName();
+    state.heroSubject = subj;
+    state.convSubject = subj;
+    var ta = q('#ta');
+    if (!ta) return;
+    ta.value = text;
+    autosize();
+    syncSend();
+    await submitMessage();
+  }
+
   function renderStream(force) {
     var el = q('#stream');
     if (!state.convId) {
       document.body.classList.remove('today');
-      el.innerHTML = '<div class="empty"><div class="t">还没有选中对话</div>' +
-        '<div class="m">从左边选一个，或者新建一个</div>' +
-        '<div class="acts"><button type="button" class="btn" data-act="new-conv">新对话</button></div></div>';
+      document.body.classList.add('is-hero');
+      el.innerHTML = '<div class="col">' + heroHtml() + '</div>';
+      el.setAttribute('aria-busy', 'false');
       return;
     }
+    document.body.classList.remove('is-hero');
     if (isToday()) {
       document.body.classList.add('today');
       el.innerHTML = todayHtml();
@@ -3698,7 +3790,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   async function switchSubject(name) {
     try { localStorage.setItem('xm_subject', name || '全部'); } catch (e) {}
     var old = (state.subjects && state.subjects.current) || '全部';
-    if (name === old) { state.overlay = null; render(); return; }
+    if (name === old) { state.heroSubject = name; state.convSubject = name; state.overlay = null; render(); return; }
     var st = q('#stream');
     if (st) state.subjectScroll[old] = st.scrollTop;
     var r;
@@ -3709,6 +3801,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       return;
     }
     state.overlay = null;
+    state.heroSubject = name;
+    state.convSubject = name;
     if (r) {
       state.conversation = {
         id: r.conversation_id, subject: name, message_count: r.message_count
@@ -3882,6 +3976,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'bankfilter' ? bankFilterSheetHtml()
       : kind === 'theme' ? themeSheetHtml()
       : kind === 'skills' ? skillSheetHtml()
+      : kind === 'herosub' ? heroSubjectsSheetHtml()
       : kind === 'artmenu' ? artMenuSheetHtml()
       : kind === 'artrename' ? artifactRenameSheetHtml()
       : kind === 'kpsel' ? kpSheetHtml()
@@ -5481,6 +5576,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         var nrc = await api('/conversations', { method: 'POST', json: { subject: state.convSubject || '全部' } });
         state.convId = nrc.id;
         state.convTitle = (text || '新对话').slice(0, 30);
+        state.messages = [];
       } catch (e) {
         toast('新建对话失败：' + e.message);
         return;
@@ -5934,6 +6030,9 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'week-reload': function () { openWeek(); },
     'open-theme': function () { setOverlay({ kind: 'theme' }); },
     'open-skill-sheet': function () { openSkillSheet(); },
+    'open-hero-subjects': function () { openHeroSubjects(); },
+    'hero-subject': function (el) { pickHeroSubject(el.getAttribute('data-subject') || '全部'); },
+    'hero-send': function (el) { heroSend(el.getAttribute('data-text') || ''); },
     'pick-skill': function (el) { pickSkill(el.getAttribute('data-id') || ''); },
     'clear-skill': function () { clearSkill(); },
     'theme-pick': function (el) { pickTheme(el.getAttribute('data-v') || 'system'); },
@@ -6211,9 +6310,9 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       await openReview(decodeURIComponent(location.hash.slice(8)));
       return;
     }
-    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
-    if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
-    if (location.hash === '#map') { await loadMessages(); openMap(); return; }
+    if (location.hash === '#library') { openLibrary(); return; }
+    if (location.hash === '#bank') { openBank(); return; }
+    if (location.hash === '#map') { openMap(); return; }
     if (location.hash === '#bankcap') {
       await loadMessages();
       openBank();
