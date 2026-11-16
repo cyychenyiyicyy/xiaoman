@@ -1554,3 +1554,23 @@ body.is-hero .stream .col{min-height:100%}
   .hero-subj .hs{font-size:24px}
   .hero-subj .hsp{font-size:24px}
 }
+
+/* 会话顶栏：标题左对齐、学科胶囊独立，不再挤在标题里 */
+.top{display:flex;align-items:center;gap:10px;height:56px;padding:0 24px;min-width:0}
+.top .l1{min-width:0;flex:0 1 auto;max-width:min(62%,620px);margin:0;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.top .l1.chat{font-size:15px;font-weight:600}
+.top .l2{display:flex;align-items:center;flex:none;gap:0;min-width:0}
+.top .l2 .sp{display:none}
+.top .subj{height:30px;padding:0 10px;border:1px solid var(--clayline);background:var(--claybg);
+  border-radius:999px;color:var(--clay);font-size:12px;font-weight:500;gap:5px;line-height:1}
+.top .subj .ic{width:14px;height:14px;color:var(--clay)}
+.top .subj .car{width:12px;height:12px;color:var(--clay)}
+.top .subj:active{background:var(--fill)}
+
+/* 消息里的技能胶囊与文字垂直居中 */
+.me .utextwrap .skilltag,.me .utextwrap .edittag{vertical-align:middle;line-height:1;margin-right:6px}
+.me .utextwrap .skilltag .ic,.me .utextwrap .edittag .ic{width:12px;height:12px}
+
+/* 微调：胶囊比文字高 1px，视觉上再上移 1px */
+.me .utextwrap .skilltag,.me .utextwrap .edittag{position:relative;top:-1px}

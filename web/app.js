@@ -2187,14 +2187,16 @@
     if (brand) {
       brand.classList.toggle('chat', inChat);
       if (inChat) {
-        brand.innerHTML = esc(state.convTitle || '新对话') +
-          (state.convSubject ? ' <span class="topsubj">' + esc(state.convSubject) + '</span>' : '');
+        brand.textContent = state.convTitle || '新对话';
+        brand.title = state.convTitle || '';
       } else {
         brand.textContent = '小满';
       }
     }
-    if (pill) pill.hidden = inChat;
-    if (sub) sub.textContent = inChat ? '' : '对话';
+    if (pill) pill.hidden = !inChat;
+    if (sub) sub.textContent = inChat ? (state.convSubject || '全部') : '对话';
+    var ticon = q('#top-subj-icon use');
+    if (ticon) ticon.setAttribute('href', '#i-' + ((typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[state.convSubject]) || 'circle-dot'));
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
