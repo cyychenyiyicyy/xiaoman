@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方向 B · Ant Design X 原生</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body{background:#eef1f5}
+  .app{box-shadow:0 24px 70px rgba(20,40,80,.12);border:1px solid #e6eaf0}
+  .rail{background:#fff;border-right:1px solid #f0f0f0;color:#8c8c8c}
+  .logo{background:#1677ff;color:#fff;border-radius:10px}
+  .rail .it.on{background:#e6f4ff;color:#1677ff}
+  .side{background:#fff;border-right-color:#f0f0f0}
+  .side-h b{color:#1f1f1f}
+  .side-h .new{background:#1677ff;color:#fff;border-radius:8px;height:32px;font-size:12px}
+  .subs span{background:#f5f5f5;color:#595959}
+  .subs span.on{background:#e6f4ff;color:#1677ff;font-weight:500}
+  .conv{border-radius:8px;padding:10px 12px}
+  .conv.on{background:#e6f4ff}
+  .conv.on:before{left:0;top:12px;width:3px;height:20px;background:#1677ff}
+  .conv b{color:#1f1f1f;font-size:13px}
+  .conv span{color:#8c8c8c;font-size:11px}
+  .main{background:#fff}
+  .top{border-bottom-color:#f0f0f0;background:#fff}
+  .top b{font-size:14px}
+  .top .tag{border-color:#e8e8e8;color:#8c8c8c;background:#fafafa}
+  .stream{background:#fafafa;padding:22px 30px 8px}
+  .stream .col{max-width:760px}
+  .day{color:#bfbfbf;font-size:11px;margin-bottom:16px}
+  .bubble{background:#1677ff;color:#fff;border-radius:12px 12px 2px 12px;font-size:14px;max-width:86%}
+  .skilltag{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.32);color:#fff;font-size:10px}
+  .asst{display:flex;gap:12px}
+  .avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#1677ff,#69b1ff);color:#fff;
+    display:grid;place-items:center;font-size:13px;font-weight:700;flex:none;margin-top:2px}
+  .abody{flex:1;min-width:0}
+  .skillline{color:#1677ff;background:#e6f4ff;border:1px solid #bae0ff;border-radius:6px;display:inline-flex;
+    padding:2px 8px;height:22px;font-size:11px;margin-bottom:8px}
+  .chain{border:1px solid #f0f0f0;border-radius:10px;background:#fff;padding:12px 14px;margin-bottom:12px}
+  .chain .step{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#595959;position:relative;padding-bottom:10px}
+  .chain .step:last-child{padding-bottom:0}
+  .chain .dot{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:10px;
+    border:1px solid #d9d9d9;background:#fafafa;color:#8c8c8c}
+  .chain .step.done .dot{background:#f6ffed;border-color:#b7eb8f;color:#52c41a}
+  .chain b{color:#1f1f1f;font-weight:500}
+  .chain .st{font-size:11px;color:#8c8c8c;margin-top:1px}
+  .reply{font-size:14px;line-height:1.75;margin:0 0 12px;color:#1f1f1f}
+  .artifact{border-color:#e8e8e8;border-radius:10px;box-shadow:none;background:#fff;max-width:520px}
+  .abtn{background:#e6f4ff;border-color:#91caff;color:#1677ff;border-radius:6px}
+  .abtn.ghost{background:#fff;border-color:#d9d9d9;color:#595959}
+  .actions{display:flex;gap:4px;margin-top:10px;color:#bfbfbf}
+  .actions span{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;font-size:12px}
+  .composer{padding:12px 30px 18px;background:#fafafa}
+  .composer .col{max-width:760px}
+  .chips{margin-bottom:6px}
+  .chip{background:#e6f4ff;border-color:#bae0ff;color:#1677ff;border-radius:6px;height:24px;font-size:11px}
+  .chip.gray{background:#fff;border-color:#e8e8e8;color:#595959}
+  .cbox{border:1px solid #e8e8e8;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);background:#fff;padding:8px 10px 6px}
+  .cbox:focus-within{border-color:#1677ff;box-shadow:0 0 0 2px rgba(22,119,255,.12)}
+  .pill{background:#fafafa;border-color:#e8e8e8;color:#595959;border-radius:6px;height:26px;font-size:11px}
+  .pill.skill{background:#e6f4ff;border-color:#bae0ff;color:#1677ff}
+  .send{background:#1677ff;width:32px;height:32px;border-radius:8px}
+  .suggest{display:flex;gap:8px;margin:0 0 8px;flex-wrap:wrap}
+  .suggest span{border:1px solid #e8e8e8;background:#fff;border-radius:999px;height:26px;padding:0 10px;
+    display:inline-flex;align-items:center;font-size:11px;color:#595959}
+  .preview{border-left-color:#f0f0f0;background:#fff}
+  .ph{border-bottom-color:#f0f0f0;background:#fff;height:52px}
+  .ph b{font-size:13px;color:#1f1f1f}
+  .ph a{color:#1677ff;font-size:11px}
+  .pv{background:#fff;padding:28px 30px}
+  .pv .brand{color:#1677ff;font-size:10px}
+  .pv h1{font-size:26px;color:#1f1f1f}
+  .pv .meta{color:#8c8c8c;font-size:11px;border-bottom-color:#f0f0f0}
+  .pv h2{font-size:18px;color:#1f1f1f;margin:18px 0 6px}
+  .pv p{font-size:13px;color:#595959}
+  .pv .formula{background:#fafafa;border-color:#f0f0f0;border-radius:6px;font-size:14px}
+  .pv .callout{background:#fff7e6;border-left:3px solid #fa8c16;color:#614700;border-radius:0 6px 6px 0}
+  .top .act{color:#8c8c8c}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+</svg>
+
+<div class="shell">
+  <div class="app">
+    <aside class="rail">
+      <div class="logo">满</div>
+      <button class="it on"><svg class="ic"><use href="#i-chat"/></svg><span>对话</span></button>
+      <button class="it"><svg class="ic"><use href="#i-book"/></svg><span>题库</span></button>
+      <button class="it"><svg class="ic"><use href="#i-map"/></svg><span>地图</span></button>
+      <button class="it"><svg class="ic"><use href="#i-clock"/></svg><span>记忆</span></button>
+      <button class="it"><svg class="ic"><use href="#i-zap"/></svg><span>本周</span></button>
+      <div class="sp"></div>
+      <button class="it"><svg class="ic"><use href="#i-settings"/></svg><span>设置</span></button>
+    </aside>
+
+    <aside class="side">
+      <div class="side-h"><b>对话</b><button class="new">＋ 新对话</button></div>
+      <div class="subs"><span class="on">全部</span><span>化学</span><span>数学</span><span>英语</span></div>
+      <div class="convs">
+        <div class="conv on"><b>离子反应的条件</b><span>网页做好了，右边可以边看边问</span></div>
+        <div class="conv"><b>验收自检</b><span>把验收拆成「脚本能判」和「人眼判」</span></div>
+        <div class="conv"><b>英语作文如何开头</b><span>先给她一句观点类通用开头</span></div>
+        <div class="conv"><b>错题自检受阻怎么办</b><span>我这边查不到最近的记录</span></div>
+        <div class="conv"><b>二次函数区间最值</b><span>「顶点就是最值」不成立</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <b>离子反应的条件</b><span class="tag">化学</span><div class="sp"></div>
+        <button class="act"><svg class="ic"><use href="#i-more"/></svg></button>
+        <button class="act"><svg class="ic"><use href="#i-search"/></svg></button>
+      </header>
+
+      <div class="stream">
+        <div class="col">
+          <div class="day">今天</div>
+
+          <div class="msg user">
+            <div class="bubble"><span class="skilltag">✦ 讲解网页</span>用讲解网页讲一下「离子反应发生的条件」，要例题和易错点。</div>
+          </div>
+
+          <div class="msg asst" style="margin-top:18px">
+            <div class="avatar">满</div>
+            <div class="abody">
+              <span class="skillline"><svg class="ic sm"><use href="#i-sparkles"/></svg>技能 · 讲解网页</span>
+              <div class="chain">
+                <div class="step done"><span class="dot"><svg class="ic sm"><use href="#i-check"/></svg></span><div><b>加载技能「讲解网页」</b><div class="st">结构化讲解 + 公式 + 例题</div></div></div>
+                <div class="step done"><span class="dot"><svg class="ic sm"><use href="#i-check"/></svg></span><div><b>生成讲解网页</b><div class="st">9 KB · 可预览 / 下载 / 继续改</div></div></div>
+              </div>
+              <p class="reply">网页做好了，右边可以边看边问。你也可以直接说「再加一个易错点」。</p>
+              <div class="artifact">
+                <div class="thumb"><i></i><i></i><i></i><i></i></div>
+                <div class="amain"><b>离子反应发生的条件</b><span>讲解网页 · 9 KB</span></div>
+                <button class="abtn">预览</button>
+                <button class="abtn ghost">下载</button>
+              </div>
+              <div class="actions"><span><svg class="ic sm"><use href="#i-copy"/></svg></span><span>↻</span><span>☆</span></div>
+            </div>
+          </div>
+
+          <div class="msg user" style="margin-top:16px">
+            <div class="bubble">再加一个「与量有关的离子方程式」的易错点。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="col">
+          <div class="suggest"><span>再补一个例题</span><span>做成 PDF</span><span>生成一道检测</span></div>
+          <div class="chips">
+            <span class="chip">✦ 讲解网页 <svg class="ic sm"><use href="#i-x"/></svg></span>
+            <span class="chip gray">基于：离子反应发生的条件 <svg class="ic sm"><use href="#i-x"/></svg></span>
+          </div>
+          <div class="cbox">
+            <div class="tools">
+              <span class="pill">千帆 · deepseek-v4-flash <svg class="ic sm"><use href="#i-chev"/></svg></span>
+              <span class="pill skill"><svg class="ic sm"><use href="#i-sparkles"/></svg>技能 <svg class="ic sm"><use href="#i-chev"/></svg></span>
+              <div class="sp"></div>
+              <span class="pill">中</span>
+            </div>
+            <div class="row">
+              <button class="plus"><svg class="ic"><use href="#i-plus"/></svg></button>
+              <span class="placeholder">说点什么…</span>
+              <button class="send"><svg class="ic"><use href="#i-up"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="preview">
+      <header class="ph"><b>离子反应发生的条件</b><span>讲解网页 · 9 KB</span><div class="sp"></div><a href="#">继续改</a><a href="#">新窗口</a><a href="#">下载</a><button class="x"><svg class="ic"><use href="#i-x"/></svg></button></header>
+      <div class="pv">
+        <div class="brand">小满 · 学习档案</div>
+        <h1>离子反应发生的条件</h1>
+        <div class="meta">化学 · 11 月 16 日</div>
+        <h2>一句话结论</h2>
+        <p>离子反应要发生，必须有<b>沉淀、气体或弱电解质</b>生成，让溶液中某些离子的浓度显著变小。</p>
+        <h2>核心概念</h2>
+        <p>复分解反应交换成分，生成难电离的物质；氧化还原反应则发生电子转移。</p>
+        <div class="formula">Ba²⁺ + SO₄²⁻ → BaSO₄↓</div>
+        <h2>易错点</h2>
+        <div class="callout">「生成水」也算生成弱电解质，不要漏掉中和反应；检查能否反应，要看离子能否共存。</div>
+      </div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
