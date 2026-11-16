@@ -23,6 +23,8 @@
     mapKey: '',              // 当前图对应的 subject|module|chapter|ver
     mapHtmlKey: '',          // 已渲染 HTML 的 key（避免弹层重开时丢图）
     theme: 'system',         // system | light | dark（本地偏好，index.html 已先应用）
+    skills: null,            // 技能注册表（GET /skills）
+    skill: '',               // 当前选中的技能 id（跟着输入框走）
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -335,6 +337,7 @@
       remembered: Array.isArray(m.remembered) ? m.remembered : [],
       parts: Array.isArray(m.parts) ? m.parts : [],
       deposits: Array.isArray(m.deposits) ? m.deposits : [],
+      skill: m.skill || '',
       thinking_ms: m.thinking_ms || 0,
       provider_id: m.provider_id,
       model_key: m.model_key,
@@ -2067,7 +2070,7 @@
     } else {
       await forceToday();
     }
-    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations()]);
+    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations(), loadSkills()]);
     if (location.hash.indexOf('#c=') === 0) {
       await openConversation(decodeURIComponent(location.hash.slice(3)));
     } else {
@@ -2124,6 +2127,8 @@
 
   /* ── 渲染：外壳 / 顶栏 / 胶囊 / 思考 ───────────────── */
   function render() {
+    renderSkillPill();
+    renderSkillChips();
     renderSpaces();
     renderConvSide();
     renderQchips();
@@ -2525,12 +2530,129 @@
     } catch (e) { /* 主动消息失败不打扰 */ }
   }
 
+
+  /* ── 技能：讲解网页 / PDF / 错题报告 ───────────────── */
+
+  function skillById(id) {
+    if (!id || !state.skills) return null;
+    for (var i = 0; i < state.skills.length; i++) if (state.skills[i].id === id) return state.skills[i];
+    return null;
+  }
+
+  async function loadSkills() {
+    try {
+      var r = await api('/skills');
+      state.skills = r.items || [];
+    } catch (e) {
+      state.skills = [];
+    }
+    renderSkillPill();
+    renderSkillChips();
+  }
+
+  function renderSkillPill() {
+    var el = q('#skill-pill');
+    var lab = q('#pill-skill');
+    if (!el || !lab) return;
+    var s = skillById(state.skill);
+    lab.textContent = s ? s.name : '技能';
+    el.classList.toggle('on', !!s);
+    el.setAttribute('aria-label', s ? '技能：' + s.name : '选择技能');
+  }
+
+  function renderSkillChips() {
+    var host = q('#skillchips');
+    if (!host) return;
+    var s = skillById(state.skill);
+    if (!s) {
+      host.hidden = true;
+      host.innerHTML = '';
+      return;
+    }
+    host.hidden = false;
+    host.innerHTML = '<span class="skillchip">' + ic(s.icon || 'sparkles', 'sm') +
+      '<span class="scn">' + esc(s.name) + '</span>' +
+      '<button type="button" class="scx" data-act="clear-skill" aria-label="移除技能">' + ic('x', 'sm') + '</button></span>';
+  }
+
+  function openSkillSheet() {
+    setOverlay({ kind: 'skills' });
+  }
+
+  function skillSheetHtml() {
+    var list = state.skills;
+    var rows = '';
+    if (list === null) {
+      rows = '<div class="skel inmsg">' + skelRows(3) + '</div>';
+    } else if (!list.length) {
+      rows = '<div class="empty"><div class="t">没有可用的技能</div><div class="d">看看 agent/skills.json</div></div>';
+    } else {
+      rows = list.map(function (s) {
+        var on = state.skill === s.id;
+        return '<button type="button" class="skillrow' + (on ? ' on' : '') + '" data-act="pick-skill" data-id="' + esc(s.id) + '">' +
+          '<span class="sic">' + ic(s.icon || 'sparkles') + '</span>' +
+          '<span class="smain"><span class="sname">' + esc(s.name) + '</span>' +
+          '<span class="sdesc">' + esc(s.desc || '') + '</span></span>' +
+          (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') +
+          '</button>';
+      }).join('') +
+        '<button type="button" class="skillrow none" data-act="pick-skill" data-id=""><span class="smain"><span class="sname">不用技能</span></span>' +
+        (state.skill ? '' : '<span class="capchk">' + ic('check', 'sm') + '</span>') + '</button>';
+    }
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet skill-sheet" role="dialog" aria-modal="true" aria-labelledby="sk-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="sk-ttl">技能</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="skilllist">' + rows + '</div></div>' +
+      '</div>';
+  }
+
+  function pickSkill(id) {
+    state.skill = id || '';
+    closeOverlay();
+    renderSkillPill();
+    renderSkillChips();
+  }
+
+  function clearSkill() {
+    state.skill = '';
+    renderSkillPill();
+    renderSkillChips();
+  }
+
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+    if (n >= 1024) return Math.round(n / 1024) + ' KB';
+    return n + ' B';
+  }
+
+  function artifactPartsHtml(m) {
+    return (m.parts || []).filter(function (p) { return p && p.type === 'artifact' && p.artifact; })
+      .map(function (p) {
+        var a = p.artifact;
+        var pdf = a.kind === 'pdf';
+        var dl = a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+        return '<div class="artifactcard">' +
+          '<span class="aic">' + ic(pdf ? 'book-open-text' : 'globe') + '</span>' +
+          '<span class="amain"><span class="atitle">' + esc(a.title || '产物') + '</span>' +
+          '<span class="ameta">' + (pdf ? 'PDF' : '讲解网页') + ' · ' + esc(fmtBytes(a.bytes)) + '</span></span>' +
+          '<a class="abtn" href="' + esc(a.url) + '" target="_blank" rel="noopener">打开</a>' +
+          '<a class="abtn ghost" href="' + esc(dl) + '">下载</a>' +
+          '</div>';
+      }).join('');
+  }
+
   function msgHtml(m) {
     if (m.role === 'user') {
       var imgs = (m.images || []).map(function (im) {
         return '<div class="thumb"><img src="' + esc(imgSrc(im.url || im.id)) + '" alt=""></div>';
       }).join('');
-      var text = m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '';
+      var sk = m.skill ? skillById(m.skill) : null;
+      var sktag = sk ? '<span class="skilltag">' + ic(sk.icon || 'sparkles', 'sm') + esc(sk.name) + '</span>' : '';
+      var textBody = (sktag || '') + (m.content_md ? '<span class="utext">' + escText(m.content_md) + '</span>' : '');
+      var text = textBody ? '<div class="utextwrap">' + textBody + '</div>' : '';
       var mqs = m.questions || [];
       var qs = mqs.length > 2
         ? '<button type="button" class="qstacksum msg" data-act="open-qrefs-msg" data-key="' + esc(m._key || '') + '">' +
@@ -2556,6 +2678,7 @@
       inner += thinkingGroupHtml(m);
       inner += partsAnswersHtml(m);
       inner += quizPartsHtml(m);
+      inner += artifactPartsHtml(m);
     } else {
       if (m.reasoning_md) inner += reasoningHtml(m);
       if (m._st) {
@@ -3417,6 +3540,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'qedit' ? qeditSheetHtml()
       : kind === 'bankfilter' ? bankFilterSheetHtml()
       : kind === 'theme' ? themeSheetHtml()
+      : kind === 'skills' ? skillSheetHtml()
       : kind === 'kpsel' ? kpSheetHtml()
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
@@ -5032,12 +5156,14 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   async function doSend(text, imageIds, imgs, questions, questionIds) {
     var payload = {
       text: text, image_ids: imageIds || [], question_ids: questionIds || [],
-      thinking: thinkValue(), conversation_id: state.convId || '', subject: state.convSubject || '全部'
+      thinking: thinkValue(), conversation_id: state.convId || '', subject: state.convSubject || '全部',
+      skill: state.skill || ''
     };
     var userMsg = {
       id: 'tmp-u-' + Date.now(), _key: newKey('u'), role: 'user',
       kind: (imgs && imgs.length) ? 'image' : 'text',
-      content_md: text, reasoning_md: '', images: imgs || [], questions: questions || [], status: 'done', error: ''
+      content_md: text, reasoning_md: '', images: imgs || [], questions: questions || [], status: 'done', error: '',
+      skill: state.skill || ''
     };
     var asst = {
       id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
@@ -5448,6 +5574,9 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
     'open-theme': function () { setOverlay({ kind: 'theme' }); },
+    'open-skill-sheet': function () { openSkillSheet(); },
+    'pick-skill': function (el) { pickSkill(el.getAttribute('data-id') || ''); },
+    'clear-skill': function () { clearSkill(); },
     'theme-pick': function (el) { pickTheme(el.getAttribute('data-v') || 'system'); },
     'map-reload': function () { loadMap(); },
     'map-subject': function (el) { mapSubject(el.getAttribute('data-subject') || ''); },
@@ -5707,7 +5836,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     } else {
       await forceToday();
     }
-    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations()]);
+    await Promise.all([loadProviders(), loadSettings(true), loadCatalog(), loadSubjects(), loadToday(), loadCapturePending(), loadConversations(), loadSkills()]);
     if (location.hash.indexOf('#c=') === 0) {
       await openConversation(decodeURIComponent(location.hash.slice(3)));
     } else {

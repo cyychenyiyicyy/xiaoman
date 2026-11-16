@@ -106,6 +106,7 @@ import re as _re  # noqa: E402
 class QSearchIn(BaseModel):
     query: str = ""
     subject: str = ""
+    status: str = ""
     limit: int = 8
 
 
@@ -140,6 +141,9 @@ def _q_out(q) -> dict:
         "stem": q.stem_md,
         "options": q.options or [],
         "answer": q.answer_md or "",
+        "status": q.status or "learning",
+        "error_type": q.error_type or "",
+        "next_due_at": q.next_due_at.isoformat() if q.next_due_at else None,
         "source_page": q.source_page,
         "created_at": q.created_at.isoformat() if q.created_at else None,
         "image": f"/api/v1/questions/{q.id}/image" if q.stem_preview_png else "",
@@ -155,6 +159,17 @@ def tool_question_search(payload: QSearchIn, db: Session = Depends(get_db)):
         stmt = stmt.where(Question.subject == payload.subject)
     if payload.query:
         stmt = stmt.where(Question.stem_md.ilike(f"%{payload.query}%"))
+    if payload.status == "due":
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        stmt = stmt.where(
+            Question.status != "mastered",
+            Question.next_due_at.isnot(None),
+            Question.next_due_at <= now,
+        )
+    elif payload.status in ("weak", "learning", "mastered"):
+        stmt = stmt.where(Question.status == payload.status)
     rows = db.scalars(stmt).all()
     items = [_q_out(q) for q in rows]
     return {"items": items, "count": len(items)}
@@ -276,3 +291,60 @@ def tool_quiz_create(payload: QuizIn, db: Session = Depends(get_db)):
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         return {"ok": False, "error": str(exc)[:200]}
+
+
+# ── 技能产物（讲解网页 / PDF）──────────────────────────
+
+class ArtifactIn(BaseModel):
+    conversation_id: str
+    message_id: str = ""
+    subject: str = "全部"
+    title: str = ""
+    markdown: str
+    kps: list[str] = []
+
+
+def _make_artifact(kind: str, payload: ArtifactIn, db: Session) -> dict:
+    from ..models import Conversation
+    from ..services import artifacts as artifact_service
+    from ..services import knowledge
+
+    conv = db.get(Conversation, payload.conversation_id)
+    if conv is None:
+        return {"ok": False, "error": "对话不存在"}
+    if not (payload.markdown or "").strip():
+        return {"ok": False, "error": "正文为空"}
+    kp_ids = []
+    for name in (payload.kps or [])[:4]:
+        kp = knowledge.resolve(db, payload.subject or conv.subject or "全部", name, "")
+        if kp is not None and kp.id not in kp_ids:
+            kp_ids.append(kp.id)
+    try:
+        art = artifact_service.save_artifact(
+            db,
+            conversation_id=conv.id,
+            message_id=payload.message_id or None,
+            kind=kind,
+            title=payload.title or "知识点讲解",
+            markdown=payload.markdown,
+            subject=payload.subject or conv.subject or "",
+            kp_ids=kp_ids,
+        )
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        return {"ok": False, "error": str(exc)[:240]}
+    return {
+        "ok": True,
+        "artifact": artifact_service.payload(art),
+        "hint": "产物已生成，告诉她打开就好；不要粘贴全文",
+    }
+
+
+@router.post("/internal/tools/make_webpage", dependencies=[Depends(guard)])
+def tool_make_webpage(payload: ArtifactIn, db: Session = Depends(get_db)):
+    return _make_artifact("html", payload, db)
+
+
+@router.post("/internal/tools/make_pdf", dependencies=[Depends(guard)])
+def tool_make_pdf(payload: ArtifactIn, db: Session = Depends(get_db)):
+    return _make_artifact("pdf", payload, db)

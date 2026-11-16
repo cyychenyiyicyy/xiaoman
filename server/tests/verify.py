@@ -39,15 +39,17 @@ EXPECTED_TABLES = {
     "quiz",
     "deposit",
     "kp_evidence",
+    "artifact",
 }
 
 EXPECTED_COLUMNS = {
     "llm_provider": {"id", "name", "base_url", "api_style", "api_key", "api_key_tail", "connected", "kind", "sort"},
     "llm_model": {"id", "provider_id", "model_key", "display_name", "context_len", "supports_images", "supports_thinking", "enabled"},
-    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "deposits", "status", "created_at"},
+    "message": {"id", "conversation_id", "role", "kind", "content_md", "reasoning_md", "images", "deposits", "skill", "status", "created_at"},
     "quiz": {"id", "conversation_id", "stem_md", "options", "answer", "status", "chosen", "correct", "source"},
     "deposit": {"id", "message_id", "kind", "status", "question_ids", "kp_ids", "meta"},
     "kp_evidence": {"id", "kp_id", "kind", "weight", "source"},
+    "artifact": {"id", "conversation_id", "kind", "title", "path", "mime", "bytes"},
     "question": {"id", "subject", "stem_md", "answer_md", "solution_md", "grade", "difficulty", "status", "error_type", "next_due_at", "asked_count", "streak", "solve_status", "solve_error", "solved_at", "ai_meta"},
     "kp": {"id", "subject", "name", "name_norm", "kind", "parent_id", "grade", "q_count"},
     "kp_edge": {"id", "from_kp_id", "to_kp_id", "type", "subject"},
@@ -235,6 +237,13 @@ def check_api(run: Run) -> None:
                 f"{len(graph.get('nodes') or [])} 点 / {len(graph.get('edges') or [])} 边 / "
                 f"{len(graph.get('modules') or [])} 模块",
             )
+            skills = client.get("/api/v1/skills").json()
+            items = skills.get("items") or []
+            run.add(
+                "api.skills",
+                "PASS" if len(items) >= 3 and all(x.get("id") for x in items) else "FAIL",
+                ",".join(x.get("id", "") for x in items),
+            )
             nudge = client.post("/api/v1/nudges/check").json()
             run.add(
                 "api.nudges",
@@ -411,6 +420,11 @@ def check_learn(run: Run) -> None:
             and not quiz_service.grade(short, "22%")
         )
         run.add("learn.quiz_grade", "PASS" if ok else "FAIL", "选择题按字母、短答按文本")
+        from app.services import artifacts as artifact_service
+
+        html = artifact_service.render_markdown("## 标题\n\n**重点** 和 $x^2$\n\n- 一\n- 二")
+        md_ok = "<h2>标题</h2>" in html and "<strong>重点</strong>" in html and "<li>一</li>" in html
+        run.add("learn.artifact_md", "PASS" if md_ok else "FAIL", "Markdown → HTML")
     except Exception as exc:  # noqa: BLE001
         run.add("learn.quiz_grade", "FAIL", f"{type(exc).__name__}: {exc}"[:200])
     run.results[-1].ms = int((time.perf_counter() - started) * 1000)

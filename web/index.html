@@ -86,12 +86,18 @@
       <form class="composer" id="composer" autocomplete="off">
         <div class="col">
           <div class="cbox" id="cbox">
+            <div class="skillchips" id="skillchips" hidden></div>
             <div class="qchips" id="qchips" hidden></div>
             <div class="thumbs" id="thumbs" hidden></div>
             <div class="tools">
               <button type="button" class="mpill hit44" id="model-pill" data-act="open-sheet" aria-haspopup="dialog">
                 <span class="pv" id="pill-provider">加载中</span>
                 <span class="md2" id="pill-model">—</span>
+                <svg class="ic sm car" aria-hidden="true"><use data-i="chevron-down"/></svg>
+              </button>
+              <button type="button" class="mpill skillpill hit44" id="skill-pill" data-act="open-skill-sheet" aria-haspopup="dialog">
+                <svg class="ic sm" aria-hidden="true"><use data-i="sparkles"/></svg>
+                <span class="pv" id="pill-skill">技能</span>
                 <svg class="ic sm car" aria-hidden="true"><use data-i="chevron-down"/></svg>
               </button>
               <div class="sp"></div>

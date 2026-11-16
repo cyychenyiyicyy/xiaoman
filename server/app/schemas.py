@@ -103,6 +103,7 @@ class ChatIn(BaseModel):
     question_ids: list[str] = Field(default_factory=list)
     conversation_id: str = ""
     subject: str = ""
+    skill: str = ""
 
 
 

@@ -22,6 +22,17 @@ mkdirSync(SESS_DIR, { recursive: true });
 
 const SUBJECTS = ["全部", "语文", "数学", "英语", "物理", "化学", "生物", "政治", "历史", "地理"];
 
+function loadSkillDefs() {
+  try {
+    const data = JSON.parse(readFileSync(resolve(HERE, "skills.json"), "utf8"));
+    return Array.isArray(data.skills) ? data.skills : [];
+  } catch {
+    return [];
+  }
+}
+const SKILL_DEFS = loadSkillDefs();
+function findSkill(id) { return SKILL_DEFS.find((x) => x.id === id) || null; }
+
 // 把 .pi-home/skills/*/SKILL.md 正文拼进人设：我们的工具白名单挡掉了 Pi 的 skill 触发，
 // 直接注入保证「讲题 → 查库 → 补答案」这套流程一定生效
 function loadSkills(only) {
@@ -39,7 +50,7 @@ function loadSkills(only) {
   return out.length ? "\n\n" + out.join("\n\n") : "";
 }
 
-function xiaomanPrompt(subject, activeSkills) {
+function xiaomanPrompt(subject, activeSkills, skill) {
   const d = new Date();
   const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
   return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
@@ -56,7 +67,9 @@ function xiaomanPrompt(subject, activeSkills) {
 你可以用的工具：memory_search / memory_add / memory_update / memory_delete（长期记住的关于她的事）、web_search（联网搜索，时效问题用）、question_search / question_add / question_update（她的题库）、quiz_create（给她出一道检测题）。
 不要读文件、不要执行命令、不要跟她聊「网关 / 工具 / 系统」这些实现细节——那些不是她该听到的。
 她问「记住…」时，用 memory_add 记下来再简短确认。
-当前启用了讲题流程时，按下面技能里的步骤做。` + loadSkills(activeSkills);
+当前启用了讲题流程时，按下面技能里的步骤做。` +
+    (skill ? `\n\n## 当前技能：${skill.name}\n${skill.prompt || ""}` : "") +
+    loadSkills(activeSkills);
 }
 
 function writeModels() {
@@ -115,7 +128,7 @@ function cardsText(result, limit = 2000) {
 }
 
 // 每个请求一份收集器：工具来源 / 新记忆
-function makeTools(collect, caps, ctx) {
+function makeTools(collect, caps, ctx, skill) {
   const wrap = (name, label, description, parameters, run, extra) =>
     defineTool({
       name,
@@ -187,7 +200,7 @@ function makeTools(collect, caps, ctx) {
   ];
 
   // 题库 + 出题：只在「讲题 / 检测」场景装载，其余时候不挂（不用就卸载）
-  if (!caps || !caps.questions) return base;
+  if (!caps || !caps.questions) return base.concat(artifactTools());
   return base.concat([
     wrap(
       "question_search",
@@ -196,13 +209,15 @@ function makeTools(collect, caps, ctx) {
       Type.Object({
         query: Type.Optional(Type.String({ description: "题干关键词" })),
         subject: Type.Optional(Type.String({ description: "学科，留空=全部" })),
+        status: Type.Optional(Type.String({ description: "weak=待解决，due=待复习" })),
         limit: Type.Optional(Type.Number({ description: "最多几条，默认 5" })),
       }),
       (p) =>
         callTool("/internal/tools/question_search", {
           query: p.query || "",
           subject: p.subject || "",
-          limit: Math.min(10, Math.max(1, p.limit || 5)),
+          status: p.status || "",
+          limit: Math.min(20, Math.max(1, p.limit || 5)),
         }),
       { promptGuidelines: ["回答任何题目之前，先调用 question_search 确认题库里有没有这道题。"] }
     ),
@@ -279,19 +294,76 @@ function makeTools(collect, caps, ctx) {
         ],
       }
     ),
-  ]);
+  ]).concat(artifactTools());
+}
+
+function artifactTools() {
+  if (!currentSkillTools.includes("make_webpage") && !currentSkillTools.includes("make_pdf")) return [];
+  const list = [];
+  if (currentSkillTools.includes("make_webpage")) {
+    list.push(
+      artifactTool(
+        "make_webpage",
+        "生成讲解网页",
+        "把一个知识点做成网页。传完整的 Markdown 正文，服务端负责排版；调用成功后只说一句「网页做好了」。",
+        { promptGuidelines: ["必须调用它交付网页，不要自己输出 HTML/CSS。", "markdown 要完整：结论、概念、公式、例题、易错点。"] }
+      )
+    );
+  }
+  if (currentSkillTools.includes("make_pdf")) {
+    list.push(
+      artifactTool(
+        "make_pdf",
+        "生成 PDF",
+        "把内容做成可打印的 A4 PDF。传完整 Markdown；调用成功后只说一句「做好了」。",
+        { promptGuidelines: ["必须调用它交付 PDF，不要输出 HTML。", "内容控制在一页到两页。"] }
+      )
+    );
+  }
+  return list;
+}
+
+function artifactTool(name, label, description, extra) {
+  const tool = {
+    name,
+    label,
+    description,
+    parameters: Type.Object({
+      title: Type.String({ description: "标题，不超过 20 字" }),
+      markdown: Type.String({ description: "完整 Markdown 正文，公式用 $...$" }),
+      kps: Type.Optional(Type.Array(Type.String(), { description: "涉及的知识点名" })),
+    }),
+    async execute(_id, params) {
+      const body = {
+        conversation_id: currentCtx.conversation_id || "",
+        message_id: currentCtx.message_id || "",
+        subject: currentCtx.subject || "全部",
+        title: params.title || "",
+        markdown: params.markdown || "",
+        kps: params.kps || [],
+      };
+      const path = name === "make_pdf" ? "/internal/tools/make_pdf" : "/internal/tools/make_webpage";
+      const result = await callTool(path, body);
+      return { content: [{ type: "text", text: cardsText(result) }], details: result };
+    },
+  };
+  if (extra && extra.promptGuidelines) tool.promptGuidelines = extra.promptGuidelines;
+  return defineTool(tool);
 }
 
 const THINK = { off: "off", low: "low", med: "medium", high: "high" };
+let currentCtx = {};
+let currentSkillTools = [];
 
 // 这一轮要不要装「讲题」能力：引用题目了，或者话里在问题目
 const QUESTION_RE = /(这|那|哪)道?题|怎么(做|解|写|选)|为什么(选|错)|解析|答案解析|题库|对不对|答案是什么|求[解值]|考考|考我|测一测|测一下|检测|会不会|出(一)?道题/;
 
-function planCapabilities(body, text) {
+function planCapabilities(body, text, skill) {
+  const skillTools = (skill && skill.tools) || [];
   const byRef = Array.isArray(body.question_ids) && body.question_ids.length > 0;
-  const byText = QUESTION_RE.test(text || "");
+  const byText = QUESTION_RE.test(text || "") || skillTools.includes("question_search");
   const questions = byRef || byText;
-  return { questions, skills: questions ? ["answer-question"] : [] };
+  return { questions, skills: questions ? ["answer-question"] : [], skillTools };
 }
 
 function sse(res, obj) {
@@ -332,13 +404,16 @@ async function handleChat(res, body) {
   });
 
   const collect = { sources: [], remembered: [], parts: [], emit: (o) => sse(res, o) };
-  const caps = planCapabilities(body, body.text || "");
-  const tools = makeTools(collect, caps, { conversation_id: body.conversation_id || "", message_id: body.assistant_message_id || "", subject });
+  const skill = findSkill(body.skill || "");
+  currentSkillTools = (skill && skill.tools) || [];
+  const caps = planCapabilities(body, body.text || "", skill);
+  currentCtx = { conversation_id: body.conversation_id || "", message_id: body.assistant_message_id || "", subject };
+  const tools = makeTools(collect, caps, currentCtx, skill);
 
   const loader = new DefaultResourceLoader({
     cwd: CWD,
     agentDir: AGENT_DIR,
-    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills),
+    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills, skill),
     appendSystemPromptOverride: () => [],
   });
   await loader.reload();

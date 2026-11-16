@@ -7,16 +7,22 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Conversation, Message, Quiz
+from ..models import Artifact, Conversation, Message, Quiz
+from ..services import artifacts as artifact_service
 from ..services import deposit as deposit_service
 from ..services import nudge as nudge_service
 from ..services import quiz as quiz_service
+from ..services import skills as skills_service
 
 router = APIRouter(tags=["learn"])
 
@@ -94,4 +100,38 @@ def undo_deposit(deposit_id: str, db: Session = Depends(get_db)):
 def check_nudge(db: Session = Depends(get_db)):
     """每天最多一条：到期题 / 最近薄弱点。没有就不发。"""
     return nudge_service.maybe_nudge(db)
+
+
+@router.get("/skills")
+def list_skills():
+    """技能列表（不含提示词）。前端在输入框旁边选。"""
+    return {"items": skills_service.public_list()}
+
+
+@router.get("/artifacts/{aid}/source")
+def artifact_source(aid: str, db: Session = Depends(get_db)):
+    """PDF 打印用的临时 HTML 源（生成完就删）。"""
+    a = db.get(Artifact, aid)
+    if a is None:
+        raise HTTPException(404, "产物不存在")
+    p = artifact_service.source_path(aid)
+    if not p.exists():
+        raise HTTPException(404, "源文件已清理")
+    return FileResponse(p, media_type="text/html; charset=utf-8")
+
+
+@router.get("/artifacts/{aid}")
+def get_artifact(aid: str, download: bool = False, db: Session = Depends(get_db)):
+    a = db.get(Artifact, aid)
+    if a is None:
+        raise HTTPException(404, "产物不存在")
+    p = Path(a.path)
+    if not p.exists():
+        raise HTTPException(410, "文件已不在")
+    headers = {}
+    if download:
+        suffix = ".pdf" if a.kind == "pdf" else ".html"
+        name = f"{(a.title or '小满')}{suffix}"
+        headers["Content-Disposition"] = "attachment; filename*=UTF-8''" + quote(name)
+    return FileResponse(p, media_type=a.mime, headers=headers)
 

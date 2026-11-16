@@ -100,6 +100,7 @@ class Message(Base):
     remembered: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     parts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     deposits: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    skill: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cache_hit_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -317,4 +318,26 @@ class KpEvidence(Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="asked")  # asked|deposit|quiz_wrong|quiz_right
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=0.3)
     source: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
+class Artifact(Base):
+    """技能产物：讲解网页 / PDF 讲义 / 错题报告。文件落在 data/artifacts/。"""
+
+    __tablename__ = "artifact"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_id)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversation.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    message_id: Mapped[str | None] = mapped_column(
+        ForeignKey("message.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False, default="html")  # html|pdf
+    title: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    subject: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    mime: Mapped[str] = mapped_column(String(120), nullable=False, default="text/html")
+    bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kp_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)

@@ -1320,3 +1320,40 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
 /* 主动消息的动作按钮：描边，不抢 filled */
 .nudgeacts .btn{border:1px solid var(--line2);background:var(--card);padding:0 var(--q4)}
 .nudgeacts .btn:active{background:var(--fill)}
+
+/* ══ 技能（讲解网页 / PDF）════════════════════════════ */
+.skillpill.on{border-color:var(--clayline);background:var(--claybg)}
+.skillpill.on .pv{color:var(--clay)}
+.skillchips{display:flex;flex-wrap:wrap;gap:var(--q1);padding:var(--q2) var(--q3) 0}
+.skillchips[hidden]{display:none}
+.skillchip{display:inline-flex;align-items:center;gap:var(--q1);height:26px;padding:0 var(--q1) 0 var(--q2);
+  border-radius:var(--rp);background:var(--claybg);border:1px solid var(--clayline);color:var(--clay);font-size:var(--s6)}
+.skillchip .scx{width:20px;height:20px;display:grid;place-items:center;border:0;background:none;color:var(--clay);padding:0;cursor:pointer}
+.skilllist{display:flex;flex-direction:column;gap:var(--q1)}
+.skillrow{display:flex;align-items:center;gap:var(--q3);width:100%;min-height:56px;padding:var(--q2) var(--q3);
+  border:1px solid transparent;border-radius:var(--rb);background:transparent;color:var(--ink);
+  font-family:inherit;text-align:left;cursor:pointer}
+.skillrow:active{background:var(--fill)}
+.skillrow.on{background:var(--claybg);border-color:var(--clayline)}
+.skillrow.none{min-height:44px;border-top:1px solid var(--line);border-radius:0}
+.skillrow .sic{width:36px;height:36px;border-radius:var(--rb);background:var(--fill);display:grid;place-items:center;color:var(--ink2);flex:none}
+.skillrow.on .sic{background:var(--claybg);color:var(--clay)}
+.skillrow .smain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.skillrow .sname{font-size:var(--s4);color:var(--ink)}
+.skillrow .sdesc{font-size:var(--s6);color:var(--ink3);overflow-wrap:anywhere}
+.skilltag{display:inline-flex;align-items:center;gap:var(--q1);font-size:var(--s6);color:var(--clay);
+  background:var(--claybg);border:1px solid var(--clayline);border-radius:var(--rp);
+  padding:2px var(--q2);margin-right:var(--q2);vertical-align:middle}
+.artifactcard{display:flex;align-items:center;gap:var(--q2);margin-top:var(--q3);padding:var(--q3);
+  border:1px solid var(--line);border-radius:var(--rc);background:var(--card);max-width:640px}
+.artifactcard .aic{width:36px;height:36px;border-radius:var(--rb);background:var(--fill);display:grid;place-items:center;color:var(--clay);flex:none}
+.artifactcard .amain{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.artifactcard .atitle{font-size:var(--s4);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.artifactcard .ameta{font-size:var(--s6);color:var(--ink3)}
+.artifactcard .abtn{display:inline-flex;align-items:center;height:36px;padding:0 var(--q3);
+  border:1px solid var(--clayline);border-radius:var(--rb);color:var(--clay);font-size:var(--s5);text-decoration:none;flex:none}
+.artifactcard .abtn.ghost{border-color:var(--line);color:var(--ink2)}
+.artifactcard .abtn:active{background:var(--fill)}
+
+/* 用户消息里的技能 tag 与正文同一行开头 */
+.utextwrap{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}

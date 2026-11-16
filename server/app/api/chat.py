@@ -23,6 +23,7 @@ from ..db import SessionLocal, get_db
 from ..models import Attachment, Conversation, Message, Memory
 from ..schemas import ChatIn
 from ..seed import get_current, get_memory_cfg, get_search_cfg
+from ..services import artifacts as artifact_service
 from ..services import compact as compact_service
 from ..services import deposit as deposit_service
 from ..services import memory as memory_service
@@ -67,6 +68,7 @@ def _msg_out(m: Message) -> dict:
         "remembered": m.remembered or [],
         "parts": m.parts or [],
         "deposits": m.deposits or [],
+        "skill": m.skill or "",
         "status": m.status,
         "error": m.error,
         "created_at": m.created_at.isoformat() if m.created_at else None,
@@ -284,6 +286,7 @@ async def _relay_gateway(
                     "images": image_paths or [],
                     "conversation_id": conv.id,
                     "assistant_message_id": assistant.id,
+                    "skill": user_msg.skill or "",
                 },
             ) as resp:
                 if resp.status_code >= 400:
@@ -386,6 +389,8 @@ async def _relay_gateway(
                 row.cache_miss_tokens = int(usage.get("cache_miss") or 0)
             try:
                 parts = quiz_service.append_quiz_parts(s2, row)
+                row.parts = parts
+                parts = artifact_service.append_artifact_parts(s2, row)
                 row.parts = parts
             except Exception:  # noqa: BLE001
                 pass
@@ -509,6 +514,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         model_key=model.model_key,
         thinking=thinking,
         status="done",
+        skill=(payload.skill or "")[:32],
     )
     db.add(user_msg)
     db.flush()
