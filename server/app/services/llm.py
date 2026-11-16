@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import uuid
 from collections.abc import AsyncIterator
 
 from datetime import datetime
@@ -109,6 +110,8 @@ async def _mock_stream(user_text: str, n_images: int, thinking: str) -> AsyncIte
     yield {"type": "usage", "prompt_tokens": 0, "completion_tokens": 0}
 
 
+OPENCODE_SESSION = uuid.uuid4().hex
+
 async def stream_chat(
     provider: LLMProvider,
     model: LLMModel,
@@ -148,6 +151,8 @@ async def stream_chat(
     headers = {"Content-Type": "application/json"}
     if provider.api_key:
         headers["Authorization"] = f"Bearer {provider.api_key}"
+    if "opencode.ai" in (provider.base_url or ""):
+        headers["x-opencode-session"] = OPENCODE_SESSION
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=15.0)) as client:
@@ -308,6 +313,8 @@ async def complete_text(
     headers = {"Content-Type": "application/json"}
     if provider.api_key:
         headers["Authorization"] = f"Bearer {provider.api_key}"
+    if "opencode.ai" in (provider.base_url or ""):
+        headers["x-opencode-session"] = OPENCODE_SESSION
     content: object = user
     if image_path:
         with open(image_path, "rb") as fh:
@@ -379,6 +386,8 @@ async def stream_with_tools(
     headers = {"Content-Type": "application/json"}
     if provider.api_key:
         headers["Authorization"] = f"Bearer {provider.api_key}"
+    if "opencode.ai" in (provider.base_url or ""):
+        headers["x-opencode-session"] = OPENCODE_SESSION
 
     msgs = list(messages)
     for _round in range(3):

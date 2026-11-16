@@ -1537,13 +1537,20 @@ body.is-hero .stream .col{min-height:100%}
   .composer{padding:8px 16px 16px}
 }
 
-/* ── A 外壳：桌面留白 + 圆角，像一张纸卡 ─────────── */
+/* ── A 外壳：全出血；顶部不留空白带 ─────────────── */
 @media (min-width:900px){
   body{background:var(--paper)}
-  .shell{padding:14px;gap:0;background:var(--paper)}
-  .rail{border-radius:16px 0 0 16px}
-  .pane{border-radius:0 16px 16px 0;overflow:hidden}
-  body.preview-open .pane{border-radius:0}
-  .previewpane{border-radius:0 16px 16px 0;overflow:hidden}
+  .shell{padding:0;gap:0;background:var(--paper)}
+  .rail,.pane,.previewpane{border-radius:0}
   .convside{border-radius:0}
+}
+
+/* 标题胶囊与外文字统一字号/间距 */
+.hero-subj{margin:0 12px;font-family:inherit;font-size:34px;font-weight:600;gap:8px}
+.hero-subj .hs{font-size:34px;font-weight:600}
+.hero-subj .hsp{font-size:34px;font-weight:600;color:var(--ink2);margin-left:1px;letter-spacing:-.02em}
+@media (max-width:760px){
+  .hero-subj{margin:0 5px;font-size:24px;gap:5px}
+  .hero-subj .hs{font-size:24px}
+  .hero-subj .hsp{font-size:24px}
 }

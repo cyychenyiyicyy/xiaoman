@@ -2342,7 +2342,7 @@
     var icon = (typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[subj]) || 'circle-dot';
     var sug = [
       { icon: 'book-open-text', text: (subj === '全部' ? '讲讲' : '讲讲' + subj + '里') + '最常考的一个知识点' },
-      { icon: 'clock', text: '帮我梳理这周没弄懂的知识点' },
+      { icon: 'clock', text: (subj === '全部' ? '这周' : subj + '这周') + '没弄懂的知识点，帮我梳理一下' },
       { icon: 'circle-dot', text: '考考我' + (subj === '全部' ? '' : '「' + subj + '」') + '，看看哪里没掌握' }
     ];
     return '<div class="hero">' +
