@@ -298,7 +298,8 @@ function makeTools(collect, caps, ctx, skill) {
 }
 
 function artifactTools() {
-  if (!currentSkillTools.includes("make_webpage") && !currentSkillTools.includes("make_pdf")) return [];
+  const wanted = ["make_webpage", "make_pdf", "make_card", "make_flashcards"];
+  if (!wanted.some((x) => currentSkillTools.includes(x))) return [];
   const list = [];
   if (currentSkillTools.includes("make_webpage")) {
     list.push(
@@ -320,7 +321,52 @@ function artifactTools() {
       )
     );
   }
+  if (currentSkillTools.includes("make_card")) {
+    list.push(
+      artifactTool(
+        "make_card",
+        "生成知识卡片",
+        "把一个知识点做成一张 1080×1440 的卡片图。传简短 Markdown；调用成功后只说「卡片做好了」。",
+        { promptGuidelines: ["一张卡片只讲一个点，总字数 350 以内。", "必须调用它交付，不要自己输出图片或 HTML。"] }
+      )
+    );
+  }
+  if (currentSkillTools.includes("make_flashcards")) {
+    list.push(flashcardTool());
+  }
   return list;
+}
+
+function flashcardTool() {
+  return defineTool({
+    name: "make_flashcards",
+    label: "生成记忆闪卡",
+    description: "把知识点拆成 5–8 张可翻面的自测闪卡。正面问题/术语，背面答案；调用成功后只说一句。",
+    parameters: Type.Object({
+      title: Type.String({ description: "标题，不超过 16 字" }),
+      cards: Type.Array(
+        Type.Object({
+          front: Type.String({ description: "正面：问题或术语，不超过 40 字" }),
+          back: Type.String({ description: "背面：答案或一句解释，不超过 120 字" }),
+        }),
+        { description: "3–8 张卡" }
+      ),
+      kps: Type.Optional(Type.Array(Type.String(), { description: "涉及的知识点名" })),
+    }),
+    async execute(_id, params) {
+      const body = {
+        conversation_id: currentCtx.conversation_id || "",
+        message_id: currentCtx.message_id || "",
+        subject: currentCtx.subject || "全部",
+        title: params.title || "",
+        cards: params.cards || [],
+        kps: params.kps || [],
+      };
+      const result = await callTool("/internal/tools/make_flashcards", body);
+      return { content: [{ type: "text", text: cardsText(result) }], details: result };
+    },
+    promptGuidelines: ["每张卡只考一个点；正面是问题，背面是答案。", "必须调用它交付，不要输出 HTML。"],
+  });
 }
 
 function artifactTool(name, label, description, extra) {
@@ -342,7 +388,12 @@ function artifactTool(name, label, description, extra) {
         markdown: params.markdown || "",
         kps: params.kps || [],
       };
-      const path = name === "make_pdf" ? "/internal/tools/make_pdf" : "/internal/tools/make_webpage";
+      const paths = {
+        make_pdf: "/internal/tools/make_pdf",
+        make_card: "/internal/tools/make_card",
+        make_webpage: "/internal/tools/make_webpage",
+      };
+      const path = paths[name] || "/internal/tools/make_webpage";
       const result = await callTool(path, body);
       return { content: [{ type: "text", text: cardsText(result) }], details: result };
     },

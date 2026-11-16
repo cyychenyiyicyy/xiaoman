@@ -348,3 +348,50 @@ def tool_make_webpage(payload: ArtifactIn, db: Session = Depends(get_db)):
 @router.post("/internal/tools/make_pdf", dependencies=[Depends(guard)])
 def tool_make_pdf(payload: ArtifactIn, db: Session = Depends(get_db)):
     return _make_artifact("pdf", payload, db)
+
+
+@router.post("/internal/tools/make_card", dependencies=[Depends(guard)])
+def tool_make_card(payload: ArtifactIn, db: Session = Depends(get_db)):
+    return _make_artifact("png", payload, db)
+
+
+class FlashcardsIn(BaseModel):
+    conversation_id: str
+    message_id: str = ""
+    subject: str = "全部"
+    title: str = ""
+    cards: list[dict] = []
+    kps: list[str] = []
+
+
+@router.post("/internal/tools/make_flashcards", dependencies=[Depends(guard)])
+def tool_make_flashcards(payload: FlashcardsIn, db: Session = Depends(get_db)):
+    from ..models import Conversation
+    from ..services import artifacts as artifact_service
+    from ..services import cards
+
+    conv = db.get(Conversation, payload.conversation_id)
+    if conv is None:
+        return {"ok": False, "error": "对话不存在"}
+    if not payload.cards:
+        return {"ok": False, "error": "没有卡片"}
+    doc = cards.build_flashcards_document(payload.title or "记忆闪卡", payload.cards, payload.subject or "")
+    try:
+        art = artifact_service.save_artifact(
+            db,
+            conversation_id=conv.id,
+            message_id=payload.message_id or None,
+            kind="flashcards",
+            title=payload.title or "记忆闪卡",
+            subject=payload.subject or conv.subject or "",
+            kp_ids=[],
+            document=doc,
+        )
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        return {"ok": False, "error": str(exc)[:240]}
+    return {
+        "ok": True,
+        "artifact": artifact_service.payload(art),
+        "hint": "闪卡已生成，告诉她点开就能翻面",
+    }

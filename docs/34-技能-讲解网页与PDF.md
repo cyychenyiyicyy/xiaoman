@@ -42,13 +42,15 @@
 
 ---
 
-## 3. 三个内置技能
+## 3. 内置技能
 
 | id | 名称 | 给模型的能力 | 交付 |
 |---|---|---|---|
 | `webpage` | 讲解网页 | `make_webpage` | 一页自包含 HTML：结论 / 概念 / 公式 / 例题 / 易错点 |
 | `pdf` | PDF 讲义 | `make_pdf` | A4 PDF：学习目标 / 知识梳理 / 例题 / 易错点 / 自测 |
 | `mistake-report` | 错题报告 | `question_search(status="weak")` + `make_pdf` | 按知识点分组的错题复盘 PDF |
+| `card` | 知识卡片 | `make_card` | 1080×1440 卡片 PNG（见 `docs/35`） |
+| `flashcards` | 记忆闪卡 | `make_flashcards` | 可翻面的自包含 HTML（见 `docs/35`） |
 
 技能定义在 `agent/skills.json`，**网关和服务端读同一份**：
 

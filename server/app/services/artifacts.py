@@ -265,6 +265,31 @@ def _print_pdf(source_url: str, pdf_path: Path) -> None:
         raise RuntimeError(f"PDF 生成失败：{detail or 'Edge 没有输出'}")
 
 
+def _screenshot_png(source_url: str, png_path: Path, width: int = 1080, height: int = 1440) -> None:
+    edge = _edge()
+    if not edge:
+        raise RuntimeError("找不到 Edge/Chrome，无法生成卡片图片")
+    with tempfile.TemporaryDirectory() as profile:
+        proc = subprocess.run(
+            [
+                edge,
+                "--headless=new",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                f"--user-data-dir={profile}",
+                f"--window-size={width},{height}",
+                "--virtual-time-budget=5000",
+                f"--screenshot={png_path}",
+                source_url,
+            ],
+            capture_output=True,
+            timeout=120,
+        )
+    if not png_path.exists() or png_path.stat().st_size < 1500:
+        detail = (proc.stderr or b"").decode(errors="replace")[:200]
+        raise RuntimeError(f"卡片生成失败：{detail or 'Edge 没有输出'}")
+
+
 def save_artifact(
     db: Session,
     *,
@@ -272,66 +297,78 @@ def save_artifact(
     message_id: str | None,
     kind: str,
     title: str,
-    markdown: str,
+    markdown: str = "",
     subject: str = "",
     kp_ids: list | None = None,
+    document: str | None = None,
 ) -> Artifact:
-    kind = "pdf" if kind == "pdf" else "html"
+    kind = kind if kind in ("html", "pdf", "png", "flashcards") else "html"
     title = (title or "知识点讲解").strip()[:120]
     aid = uuid.uuid4().hex
     folder = _art_dir()
-    doc = build_document(title, markdown, subject)
+    if document is None:
+        if kind == "png":
+            from .cards import build_card_document
 
-    if kind == "html":
+            doc = build_card_document(title, markdown, subject)
+        else:
+            doc = build_document(title, markdown, subject)
+    else:
+        doc = document
+
+    if kind in ("html", "flashcards"):
         path = folder / f"{aid}.html"
         path.write_text(doc, encoding="utf-8")
         mime = "text/html; charset=utf-8"
-    else:
-        path = folder / f"{aid}.pdf"
-        src = folder / f"{aid}.src.html"
-        src.write_text(doc, encoding="utf-8")
         artifact = Artifact(
             id=aid,
             conversation_id=conversation_id,
             message_id=message_id,
-            kind="pdf",
+            kind=kind,
             title=title,
             subject=(subject or "")[:20],
             path=str(path),
-            mime="application/pdf",
-            bytes=0,
+            mime=mime,
+            bytes=path.stat().st_size,
             kp_ids=kp_ids or [],
         )
         db.add(artifact)
         db.commit()
-        base = (settings.app_base_url or "http://127.0.0.1:8787").rstrip("/")
-        try:
-            _print_pdf(f"{base}/api/v1/artifacts/{aid}/source", path)
-        except Exception:
-            db.delete(artifact)
-            db.commit()
-            raise
-        finally:
-            if src.exists():
-                src.unlink(missing_ok=True)
-        artifact.bytes = path.stat().st_size if path.exists() else 0
-        db.commit()
         db.refresh(artifact)
         return artifact
 
+    # PDF / PNG：先写临时 HTML，交给 Edge 打开后再打印 / 截图
+    path = folder / f"{aid}.pdf" if kind == "pdf" else folder / f"{aid}.png"
+    src = folder / f"{aid}.src.html"
+    src.write_text(doc, encoding="utf-8")
     artifact = Artifact(
         id=aid,
         conversation_id=conversation_id,
         message_id=message_id,
-        kind="html",
+        kind=kind,
         title=title,
         subject=(subject or "")[:20],
         path=str(path),
-        mime=mime,
-        bytes=path.stat().st_size,
+        mime="application/pdf" if kind == "pdf" else "image/png",
+        bytes=0,
         kp_ids=kp_ids or [],
     )
     db.add(artifact)
+    db.commit()
+    base = (settings.app_base_url or "http://127.0.0.1:8787").rstrip("/")
+    try:
+        if kind == "pdf":
+            _print_pdf(f"{base}/api/v1/artifacts/{aid}/source", path)
+        else:
+            _screenshot_png(f"{base}/api/v1/artifacts/{aid}/source", path)
+    except Exception:
+        db.delete(artifact)
+        db.commit()
+        raise
+    finally:
+        if src.exists():
+            src.unlink(missing_ok=True)
+    artifact.bytes = path.stat().st_size if path.exists() else 0
     db.commit()
     db.refresh(artifact)
     return artifact

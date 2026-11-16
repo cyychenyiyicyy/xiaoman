@@ -244,6 +244,12 @@ def check_api(run: Run) -> None:
                 "PASS" if len(items) >= 3 and all(x.get("id") for x in items) else "FAIL",
                 ",".join(x.get("id", "") for x in items),
             )
+            arts = client.get("/api/v1/artifacts?limit=3").json()
+            run.add(
+                "api.artifacts",
+                "PASS" if isinstance(arts, dict) and "items" in arts and "total" in arts else "FAIL",
+                f"total={arts.get('total')}" if isinstance(arts, dict) else "bad",
+            )
             nudge = client.post("/api/v1/nudges/check").json()
             run.add(
                 "api.nudges",
@@ -425,6 +431,15 @@ def check_learn(run: Run) -> None:
         html = artifact_service.render_markdown("## 标题\n\n**重点** 和 $x^2$\n\n- 一\n- 二")
         md_ok = "<h2>标题</h2>" in html and "<strong>重点</strong>" in html and "<li>一</li>" in html
         run.add("learn.artifact_md", "PASS" if md_ok else "FAIL", "Markdown → HTML")
+        from app.services import cards
+
+        card_doc = cards.build_card_document("测试卡", "## 一句话\n内容", "化学")
+        flash_doc = cards.build_flashcards_document("测试闪卡", [{"front": "a", "back": "b"}])
+        run.add(
+            "learn.skill_templates",
+            "PASS" if "知识卡片" in card_doc and "测试闪卡" in flash_doc else "FAIL",
+            "卡片 / 闪卡模板",
+        )
     except Exception as exc:  # noqa: BLE001
         run.add("learn.quiz_grade", "FAIL", f"{type(exc).__name__}: {exc}"[:200])
     run.results[-1].ms = int((time.perf_counter() - started) * 1000)

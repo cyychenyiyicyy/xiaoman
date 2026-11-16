@@ -13,7 +13,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -106,6 +106,39 @@ def check_nudge(db: Session = Depends(get_db)):
 def list_skills():
     """技能列表（不含提示词）。前端在输入框旁边选。"""
     return {"items": skills_service.public_list()}
+
+
+@router.get("/artifacts")
+def list_artifacts(
+    kind: str = "",
+    subject: str = "",
+    limit: int = 80,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """资料库：所有生成过的网页 / PDF / 卡片。"""
+    where = []
+    if kind in ("html", "pdf", "png", "flashcards"):
+        where.append(Artifact.kind == kind)
+    if subject:
+        where.append(Artifact.subject == subject)
+    rows = list(
+        db.scalars(
+            select(Artifact)
+            .where(*where)
+            .order_by(Artifact.created_at.desc())
+            .offset(max(0, offset))
+            .limit(max(1, min(limit, 200)))
+        ).all()
+    )
+    total = int(db.scalar(select(func.count()).select_from(Artifact).where(*where)) or 0)
+    items = []
+    for a in rows:
+        item = artifact_service.payload(a)
+        item["created_at"] = a.created_at.isoformat() if a.created_at else None
+        item["conversation_id"] = a.conversation_id
+        items.append(item)
+    return {"items": items, "total": total}
 
 
 @router.get("/artifacts/{aid}/source")

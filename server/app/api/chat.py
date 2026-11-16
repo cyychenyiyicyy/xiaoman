@@ -528,6 +528,7 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
         model_key=model.model_key,
         thinking=thinking,
         status="streaming",
+        skill=(payload.skill or "")[:32],
         sources=web_sources,
         tools=["web_search"] if web_sources else [],
     )

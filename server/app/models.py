@@ -333,7 +333,7 @@ class Artifact(Base):
     message_id: Mapped[str | None] = mapped_column(
         ForeignKey("message.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    kind: Mapped[str] = mapped_column(String(8), nullable=False, default="html")  # html|pdf
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="html")  # html|pdf|png|flashcards
     title: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     subject: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     path: Mapped[str] = mapped_column(String(500), nullable=False, default="")

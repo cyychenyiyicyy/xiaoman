@@ -1203,6 +1203,7 @@ body.noconv .top .l2{display:none}
 select.fi{height:44px;appearance:none;padding:0 var(--q3);background:var(--card);font-family:inherit}
 select.fi:focus{outline:none;border-color:var(--clayline)}
 .qacts{flex-wrap:wrap;padding-top:var(--q3)}
+@media (max-width:1500px){ body.preview-open .convside{display:none} }
 @media (max-width:900px){ .frow2{flex-direction:column} }
 
 /* 知识点「编辑」按钮：视觉 28，热区扩到 44（AGENTS §3.2） */
@@ -1357,3 +1358,43 @@ select.fi:focus{outline:none;border-color:var(--clayline)}
 
 /* 用户消息里的技能 tag 与正文同一行开头 */
 .utextwrap{white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
+
+/* ══ 资料库 + 右侧预览 ═══════════════════════════════ */
+.libchips{margin-bottom:var(--q2)}
+.libgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--q3);margin:0 0 var(--q4)}
+.libcard{display:flex;align-items:center;gap:var(--q3);width:100%;padding:var(--q3);border:1px solid var(--line);
+  border-radius:var(--rc);background:var(--card);color:var(--ink);font-family:inherit;text-align:left;cursor:pointer}
+.libcard:active{background:var(--fill)}
+.libcard .lik{width:40px;height:40px;border-radius:var(--rb);background:var(--fill);display:grid;place-items:center;color:var(--clay);flex:none}
+.libcard .lmain{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.libcard .lt{font-size:var(--s4);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.libcard .lm{font-size:var(--s6);color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.libcard .lgo{display:inline-flex;align-items:center;gap:2px;font-size:var(--s6);color:var(--ink3);flex:none}
+
+.previewpane{width:min(42vw,680px);min-width:min(42vw,680px);flex:none;display:flex;flex-direction:column;
+  border-left:1px solid var(--line);background:var(--card);min-height:0}
+.previewpane[hidden]{display:none}
+.pvhead{display:flex;align-items:center;gap:var(--q2);padding:0 var(--q3);height:56px;flex:none;
+  border-bottom:1px solid var(--line);min-width:0}
+.pvhead .pvt{font-size:var(--s4);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pvhead .pvmeta{font-size:var(--s6);color:var(--ink3);white-space:nowrap;flex:none}
+.pvhead .sp{flex:1}
+.pvact{display:inline-flex;align-items:center;height:36px;padding:0 var(--q2);color:var(--clay);
+  font-size:var(--s6);text-decoration:none;flex:none}
+.pvact:active{background:var(--fill);border-radius:var(--rb)}
+.pvx{width:44px;height:44px;display:grid;place-items:center;border:0;background:none;color:var(--ink2);cursor:pointer;flex:none}
+.pvbody{flex:1;min-height:0;display:flex;background:var(--paper)}
+.pvframe{width:100%;height:100%;border:0;background:#fff}
+.pvimg{width:100%;height:100%;object-fit:contain;padding:var(--q3);background:var(--paper)}
+
+.skillused{display:flex;align-items:center;gap:var(--q1);color:var(--clay);font-size:var(--s6);
+  margin:0 0 var(--q2);letter-spacing:.02em}
+.skillused .ic{color:var(--clay)}
+.stools{font-size:var(--s6);color:var(--ink3)}
+
+@media (max-width:1500px){ body.preview-open .convside{display:none} }
+@media (max-width:900px){
+  .libgrid{grid-template-columns:1fr}
+  .previewpane{position:fixed;inset:0;width:100%;min-width:0;z-index:60;border-left:0}
+  .pvhead{height:52px;padding-top:env(safe-area-inset-top)}
+}

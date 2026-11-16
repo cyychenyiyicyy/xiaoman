@@ -25,6 +25,8 @@
     theme: 'system',         // system | light | dark（本地偏好，index.html 已先应用）
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
+    preview: null,           // 右侧预览的产物
+    lib: { items: [], total: 0, kind: '', error: '' }, // 资料库
     question: null,          // 当前打开的题目详情（整页）
     conversations: [],       // 对话列表
     convId: '',              // 当前对话 id
@@ -2082,6 +2084,8 @@
       await openReview(decodeURIComponent(location.hash.slice(8)));
       return;
     }
+    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
+    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#map') { await loadMessages(); openMap(); return; }
     if (location.hash === '#bankcap') {
@@ -2180,6 +2184,7 @@
     var mem = q('#rail-memories');
     var kind = state.view === 'page' && state.page ? state.page.kind : '';
     var onBank = kind === 'bank' || kind === 'question';
+    var onLib = kind === 'library';
     var onWeek = kind === 'week';
     var wk = q('#rail-week');
     if (wk) { wk.classList.toggle('on', onWeek); if (onWeek) wk.setAttribute('aria-current', 'page'); else wk.removeAttribute('aria-current'); }
@@ -2193,6 +2198,12 @@
       if (onMap) map.setAttribute('aria-current', 'page');
       else map.removeAttribute('aria-current');
     }
+    var lib = q('#rail-library');
+    if (lib) {
+      lib.classList.toggle('on', onLib);
+      if (onLib) lib.setAttribute('aria-current', 'page');
+      else lib.removeAttribute('aria-current');
+    }
     var bank = q('#rail-bank');
     if (bank) {
       bank.classList.toggle('on', onBank);
@@ -2200,7 +2211,7 @@
       else bank.removeAttribute('aria-current');
     }
     if (chat) {
-      var chatOn = !onSettings && !onMem && !onBank && !onWeek && !onMap;
+      var chatOn = !onSettings && !onMem && !onBank && !onWeek && !onMap && !onLib;
       chat.classList.toggle('on', chatOn);
       if (chatOn) chat.setAttribute('aria-current', 'page');
       else chat.removeAttribute('aria-current');
@@ -2533,6 +2544,29 @@
 
   /* ── 技能：讲解网页 / PDF / 错题报告 ───────────────── */
 
+  var ART_KINDS = {
+    html: ['讲解网页', 'globe'],
+    pdf: ['PDF', 'book-open-text'],
+    png: ['知识卡片', 'image'],
+    flashcards: ['记忆闪卡', 'book']
+  };
+  function artKindMeta(k) { return ART_KINDS[k] || ['资料', 'book']; }
+
+  var TOOL_META = {
+    memory_search: ['检索记忆', 'database'], memory_add: ['记住', 'database'],
+    memory_update: ['修正记忆', 'database'], memory_delete: ['忘掉', 'database'],
+    web_search: ['联网搜索', 'search'],
+    question_search: ['查题库', 'book-open-text'],
+    question_add: ['收进题库', 'book-open-text'],
+    question_update: ['改题库', 'book-open-text'],
+    quiz_create: ['出题检测', 'circle-dot'],
+    make_webpage: ['生成讲解网页', 'globe'],
+    make_pdf: ['生成 PDF', 'book-open-text'],
+    make_card: ['生成知识卡片', 'image'],
+    make_flashcards: ['生成记忆闪卡', 'book']
+  };
+  function toolMeta(name) { return TOOL_META[name] || [name, 'search']; }
+
   function skillById(id) {
     if (!id || !state.skills) return null;
     for (var i = 0; i < state.skills.length; i++) if (state.skills[i].id === id) return state.skills[i];
@@ -2592,7 +2626,9 @@
         return '<button type="button" class="skillrow' + (on ? ' on' : '') + '" data-act="pick-skill" data-id="' + esc(s.id) + '">' +
           '<span class="sic">' + ic(s.icon || 'sparkles') + '</span>' +
           '<span class="smain"><span class="sname">' + esc(s.name) + '</span>' +
-          '<span class="sdesc">' + esc(s.desc || '') + '</span></span>' +
+          '<span class="sdesc">' + esc(s.desc || '') + '</span>' +
+          ((s.tools || []).length ? '<span class="stools">工具：' + esc((s.tools || []).map(function (t) { return toolMeta(t)[0]; }).join(' · ')) + '</span>' : '') +
+          '</span>' +
           (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') +
           '</button>';
       }).join('') +
@@ -2632,16 +2668,167 @@
     return (m.parts || []).filter(function (p) { return p && p.type === 'artifact' && p.artifact; })
       .map(function (p) {
         var a = p.artifact;
-        var pdf = a.kind === 'pdf';
+        var km = artKindMeta(a.kind);
         var dl = a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
         return '<div class="artifactcard">' +
-          '<span class="aic">' + ic(pdf ? 'book-open-text' : 'globe') + '</span>' +
+          '<span class="aic">' + ic(km[1]) + '</span>' +
           '<span class="amain"><span class="atitle">' + esc(a.title || '产物') + '</span>' +
-          '<span class="ameta">' + (pdf ? 'PDF' : '讲解网页') + ' · ' + esc(fmtBytes(a.bytes)) + '</span></span>' +
-          '<a class="abtn" href="' + esc(a.url) + '" target="_blank" rel="noopener">打开</a>' +
+          '<span class="ameta">' + esc(km[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</span></span>' +
+          '<button type="button" class="abtn" data-act="artifact-open" data-id="' + esc(a.id) + '">预览</button>' +
           '<a class="abtn ghost" href="' + esc(dl) + '">下载</a>' +
           '</div>';
       }).join('');
+  }
+
+  function skillUsedHtml(m) {
+    var s = m.skill ? skillById(m.skill) : null;
+    if (!s) return '';
+    return '<div class="skillused">' + ic(s.icon || 'sparkles', 'sm') +
+      '<span>技能 · ' + esc(s.name) + '</span></div>';
+  }
+
+
+  /* ── 资料库 ───────────────────────────────────────── */
+
+  function libState() {
+    return state.lib || { items: [], total: 0, kind: '', error: '' };
+  }
+
+  function openLibrary() {
+    openPage({ kind: 'library' });
+    loadLibrary();
+  }
+
+  async function loadLibrary() {
+    var b = libState();
+    try {
+      var url = '/artifacts?limit=120' + (b.kind ? '&kind=' + encodeURIComponent(b.kind) : '');
+      var r = await api(url);
+      state.lib = { items: r.items || [], total: r.total || 0, kind: b.kind, error: '' };
+    } catch (e) {
+      state.lib = { items: [], total: 0, kind: b.kind, error: e.message };
+    }
+    render();
+  }
+
+  function libKind(kind) {
+    state.lib = { items: [], total: 0, kind: kind || '', error: '' };
+    loadLibrary();
+  }
+
+  function libCardHtml(a) {
+    var k = artKindMeta(a.kind);
+    var meta = [k[0]];
+    if (a.subject) meta.push(a.subject);
+    meta.push(bankGroupDate(a.created_at) || '');
+    meta.push(fmtBytes(a.bytes));
+    return '<button type="button" class="libcard" data-act="artifact-open" data-id="' + esc(a.id) + '">' +
+      '<span class="lik">' + ic(k[1]) + '</span>' +
+      '<span class="lmain"><span class="lt">' + esc(a.title || '资料') + '</span>' +
+      '<span class="lm">' + esc(meta.filter(Boolean).join(' · ')) + '</span></span>' +
+      '<span class="lgo">预览' + ic('chevron-right', 'sm') + '</span></button>';
+  }
+
+  function libraryPageHtml() {
+    var b = libState();
+    var nav = navbar('资料', (b.total || 0) + ' 份', '', '', false);
+    if (b.error) {
+      return nav + '<div class="settings">' +
+        pageErrorState('加载失败', b.error, 'library-reload', 'rail-chat', '返回对话') + '</div>';
+    }
+    var kinds = [['', '全部'], ['html', '网页'], ['pdf', 'PDF'], ['png', '卡片'], ['flashcards', '闪卡']];
+    var chips = kinds.map(function (x) {
+      var on = (b.kind || '') === x[0];
+      return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="library-kind" data-kind="' + esc(x[0]) + '">' +
+        x[1] + '</span>';
+    }).join('');
+
+    var items = b.items || [];
+    var groups = [];
+    var byDay = {};
+    items.forEach(function (a) {
+      var d = bankGroupDate(a.created_at) || '更早';
+      if (!byDay[d]) { byDay[d] = []; groups.push(d); }
+      byDay[d].push(a);
+    });
+    var list = groups.map(function (d) {
+      return '<div class="dhead">' + esc(d) + '</div>' +
+        '<div class="libgrid">' + byDay[d].map(libCardHtml).join('') + '</div>';
+    }).join('');
+    if (!list) {
+      list = '<div class="empty"><div class="t">还没有资料</div>' +
+        '<div class="d">在对话里选一个技能，让她做一份网页、PDF 或卡片</div>' +
+        '<div class="btnbar"><button type="button" class="btn p" data-act="rail-chat">去对话</button></div></div>';
+    }
+    return nav +
+      '<div class="bankchips libchips">' + chips + '</div>' +
+      '<div class="settings bankwrap">' + list + '</div>';
+  }
+
+  /* ── 右侧资料预览 ─────────────────────────────────── */
+
+  function findArtifact(id) {
+    var items = (state.lib && state.lib.items) || [];
+    for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    for (var j = 0; j < state.messages.length; j++) {
+      var parts = state.messages[j].parts || [];
+      for (var k = 0; k < parts.length; k++) {
+        if (parts[k] && parts[k].type === 'artifact' && parts[k].artifact && parts[k].artifact.id === id) {
+          return parts[k].artifact;
+        }
+      }
+    }
+    return null;
+  }
+
+  function openArtifactPreview(a) {
+    if (!a) return;
+    state.preview = a;
+    renderPreview();
+  }
+
+  async function openArtifactById(id) {
+    var a = findArtifact(id);
+    if (!a) {
+      try {
+        var r = await api('/artifacts?limit=200');
+        state.lib = { items: r.items || [], total: r.total || 0, kind: libState().kind, error: '' };
+        a = findArtifact(id);
+      } catch (e) { /* 下面统一提示 */ }
+    }
+    if (!a) { toast('找不到这份资料'); return; }
+    openArtifactPreview(a);
+  }
+
+  function closePreview() {
+    state.preview = null;
+    renderPreview();
+  }
+
+  function renderPreview() {
+    var host = q('#previewpane');
+    if (!host) return;
+    var a = state.preview;
+    if (!a) {
+      host.hidden = true;
+      host.innerHTML = '';
+      document.body.classList.remove('preview-open');
+      return;
+    }
+    var k = artKindMeta(a.kind);
+    var dl = a.url + (a.url.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+    var body = a.kind === 'png'
+      ? '<img class="pvimg" src="' + esc(a.url) + '" alt="' + esc(a.title || '知识卡片') + '">'
+      : '<iframe class="pvframe" src="' + esc(a.url) + '" title="' + esc(a.title || '资料') + '" loading="lazy"></iframe>';
+    host.hidden = false;
+    document.body.classList.add('preview-open');
+    host.innerHTML = '<div class="pvhead"><div class="pvt">' + esc(a.title || '资料') + '</div>' +
+      '<div class="pvmeta">' + esc(k[0]) + ' · ' + esc(fmtBytes(a.bytes)) + '</div>' +
+      '<div class="sp"></div>' +
+      '<a class="pvact" href="' + esc(a.url) + '" target="_blank" rel="noopener">新窗口</a>' +
+      '<a class="pvact" href="' + esc(dl) + '">下载</a>' +
+      '<button type="button" class="pvx" data-act="close-preview" aria-label="关闭预览">' + ic('x') + '</button></div>' +
+      '<div class="pvbody">' + body + '</div>';
   }
 
   function msgHtml(m) {
@@ -2673,6 +2860,7 @@
     if (m.kind === 'nudge') {
       return '<div class="ag nudgeag" data-key="' + esc(m._key) + '">' + nudgeHtml(m) + '</div>';
     }
+    if (m.skill) inner += skillUsedHtml(m);
     var useParts = !!(m.parts && m.parts.length && m.status !== 'streaming');
     if (useParts) {
       inner += thinkingGroupHtml(m);
@@ -2750,6 +2938,7 @@
     var ms = 0;
     var tools = 0;
     var toolNames = [];
+    var createNames = [];
     (m.parts || []).forEach(function (p) {
       if (!p || !p.type) return;
       if (p.type === 'reasoning') {
@@ -2759,16 +2948,9 @@
       } else if (p.type === 'tool') {
         tools += 1;
         toolNames.push(p.name || '');
+        if ((p.name || '').indexOf('make_') === 0 || p.name === 'quiz_create') createNames.push(p.name);
         var q = (p.queries && p.queries.length) ? '「' + p.queries.join('、') + '」' : '';
-        var TOOL_LABEL = {
-          memory_search: ['检索记忆', 'database'], memory_add: ['记住', 'database'],
-          memory_update: ['修正记忆', 'database'], memory_delete: ['忘掉', 'database'],
-          web_search: ['联网搜索', 'search'],
-          question_search: ['查题库', 'book-open-text'],
-          question_add: ['收进题库', 'book-open-text'],
-          question_update: ['改题库', 'book-open-text']
-        };
-        var tl = TOOL_LABEL[p.name] || [p.name, 'search'];
+        var tl = toolMeta(p.name);
         var tname = tl[0];
         var ticon = tl[1];
         body.push('<button type="button" class="tstep tstep-tool" data-act="open-sources" data-key="' +
@@ -2793,15 +2975,22 @@
     var head = [];
     head.push(totalMs ? '思考 ' + stepSecs(totalMs) : (tools ? '调用工具' : '记忆'));
     if (tools) {
-      var cat = { question: 0, web: 0, memory: 0 };
+      var cat = { question: 0, web: 0, memory: 0, create: 0 };
       toolNames.forEach(function (n) {
         if (n.indexOf('question_') === 0) cat.question += 1;
         else if (n === 'web_search') cat.web += 1;
         else if (n.indexOf('memory_') === 0) cat.memory += 1;
+        else if (n.indexOf('make_') === 0 || n === 'quiz_create') cat.create += 1;
       });
-      var kinds = Object.keys(cat).filter(function (k) { return cat[k]; });
-      var label = kinds.length === 1 ? (kinds[0] === 'question' ? '查题库' : kinds[0] === 'web' ? '搜索' : '查记忆') : '工具';
-      head.push(label + ' ' + tools + ' 次');
+      var bits = [];
+      if (cat.question) bits.push('查题库 ' + cat.question + ' 次');
+      if (cat.web) bits.push('搜索 ' + cat.web + ' 次');
+      if (cat.memory) bits.push('查记忆 ' + cat.memory + ' 次');
+      if (cat.create) {
+        var uniq = createNames.filter(function (v, i, a) { return a.indexOf(v) === i; });
+        bits.push(uniq.length === 1 ? toolMeta(uniq[0])[0] : '生成 ' + cat.create + ' 次');
+      }
+      head.push(bits.join(' · '));
     }
     if (rem.length) head.push('记忆 +' + rem.length);
     return '<details class="tgroup">' +
@@ -4661,6 +4850,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       html = weekPageHtml();
     } else if (page.kind === 'bank') {
       html = bankPageHtml();
+    } else if (page.kind === 'library') {
+      html = libraryPageHtml();
     } else if (page.kind === 'question') {
       html = questionPageHtml();
     } else if (page.kind === 'map') {
@@ -5167,7 +5358,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     };
     var asst = {
       id: 'tmp-a-' + Date.now(), _key: newKey('a'), role: 'assistant', kind: 'text',
-      content_md: '', reasoning_md: '', images: [], status: 'streaming', error: '',
+      content_md: '', reasoning_md: '', images: [], status: 'streaming', error: '', skill: state.skill || '',
       _payload: payload, _userMsg: userMsg
     };
     state.messages.push(userMsg, asst);
@@ -5570,6 +5761,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'open-conv': function (el) { openConversation(el.getAttribute('data-id')); },
     'conv-filter': function (el) { state.convFilter = el.getAttribute('data-subject') || ''; loadConversations(); },
     'rail-bank': function () { openBank(); },
+    'rail-library': function () { openLibrary(); },
+    'library-reload': function () { loadLibrary(); },
+    'library-kind': function (el) { libKind(el.getAttribute('data-kind') || ''); },
+    'artifact-open': function (el) { openArtifactById(el.getAttribute('data-id') || ''); },
+    'close-preview': function () { closePreview(); },
     'rail-map': function () { openMap(); },
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
@@ -5848,6 +6044,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       await openReview(decodeURIComponent(location.hash.slice(8)));
       return;
     }
+    if (location.hash === '#library') { await loadMessages(); openLibrary(); return; }
     if (location.hash === '#bank') { await loadMessages(); openBank(); return; }
     if (location.hash === '#map') { await loadMessages(); openMap(); return; }
     if (location.hash === '#bankcap') {
