@@ -3405,10 +3405,13 @@
   }
 
   function msgErrorHtml(m) {
-    var canRetry = !!m.canRetry && state.messages[state.messages.length - 1] === m;
+    var last = state.messages[state.messages.length - 1] === m;
+    var canRetry = !!m.canRetry && last;
+    var canResend = !canRetry && last && m.role === 'assistant';
     return '<div class="merr">' + ic('alert-circle') +
       '<span class="msg">' + esc(m.error || '') + '</span>' +
       (canRetry ? '<button type="button" class="btn" data-act="retry" data-key="' + esc(m._key) + '">重试</button>' : '') +
+      (canResend ? '<button type="button" class="btn" data-act="resend-last">重新发送</button>' : '') +
       '</div>';
   }
 
@@ -5781,6 +5784,21 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     if (sawDone && !srvErr && asst.id) pollDeposit(asst.id);
   }
 
+  async function resendLast() {
+    if (state.sending) return;
+    var user = null;
+    for (var i = state.messages.length - 1; i >= 0; i--) {
+      if (state.messages[i].role === 'user') { user = state.messages[i]; break; }
+    }
+    if (!user || !(user.content_md || '').trim()) return;
+    var ta = q('#ta');
+    if (!ta) return;
+    ta.value = user.content_md;
+    autosize();
+    syncSend();
+    await submitMessage();
+  }
+
   async function retryMessage(key) {
     var idx = -1;
     for (var i = 0; i < state.messages.length; i++) {
@@ -6180,6 +6198,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'ask-disconnect': function (el) { askDisconnect(el.getAttribute('data-pid')); },
     'confirm-disconnect': function () { doDisconnect(); },
     'retry': function (el) { retryMessage(el.getAttribute('data-key')); },
+    'resend-last': function () { resendLast(); },
     'reload-all': function () { reloadAll(); },
     'reload-providers': function () { reloadProviders(); },
     'focus-composer': function () { q('#ta').focus(); },

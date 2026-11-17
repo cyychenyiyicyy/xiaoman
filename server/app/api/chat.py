@@ -275,6 +275,7 @@ async def _relay_gateway(
     cur_reason: dict | None = None
     cur_text: dict | None = None
     error = None
+    got_done = False
     t0 = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=15.0)) as client:
@@ -356,6 +357,7 @@ async def _relay_gateway(
                             error = {"code": ev.get("code", "pi"), "message": ev.get("message", "")}
                             yield _sse({"type": "error", **error})
                         elif kind == "done":
+                            got_done = True
                             if isinstance(ev.get("usage"), dict):
                                 usage = ev["usage"]
                             for it in ev.get("remembered") or []:
@@ -369,6 +371,11 @@ async def _relay_gateway(
                             break
     except Exception as exc:  # noqa: BLE001
         error = {"code": "gateway", "message": str(exc)[:300]}
+        yield _sse({"type": "error", **error})
+
+    # 网关流被重启/断开时，可能没有 done；不能把它当正常完成存成空消息
+    if error is None and not got_done:
+        error = {"code": "stream_closed", "message": "这一轮连接中断了，重新发一条继续"}
         yield _sse({"type": "error", **error})
 
     think_ms = int((time.monotonic() - t0) * 1000) if reason_parts else 0

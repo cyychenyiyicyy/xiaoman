@@ -689,7 +689,10 @@ async function handleChat(res, body) {
       return;
     }
     // 官方建议：agent_settled 才代表 Pi 不会再自动继续（agent_end 之后可能有重试/排队）
-    if (ev.type === "agent_settled") finish();
+    if (ev.type === "agent_settled") {
+      if (ev.aborted) sse(res, { type: "error", code: "aborted", message: "这一轮被中断了" });
+      finish();
+    }
   });
 
   // 多模态：把附件读成 ImageContent（{type:'image', data: base64, mimeType}）
