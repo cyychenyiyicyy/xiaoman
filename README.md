@@ -146,6 +146,22 @@ gradle assembleDebug -PserverUrl=http://your-server:8787
 
 APK 通过 `BuildConfig.SERVER_URL` 加载你的服务器；GitHub Actions 从 repository variable `XIAOMAN_SERVER_URL` 注入，不把地址写进仓库。本地构建用 `-PserverUrl=...`。支持平板与手机、横竖屏、前摄拍题、文件选择与系统返回。
 
+### 5. 部署到自己的服务器
+
+服务器上只需要拉代码、装依赖、重启两个进程：
+
+```bash
+cd /srv/xiaoman
+git pull
+server/.venv/bin/pip install -r server/requirements.txt
+server/.venv/bin/alembic upgrade head     # 没有新迁移时是空操作
+# 重启 API（systemd / docker compose / 你的进程管理方式）
+# 重启 Pi 网关：cd agent && node server.mjs
+```
+
+> 首次引导会把资料写进 `app_setting`，不需要新建表。  
+> 服务器没有登录体系；公网访问请加反向代理鉴权或 Tailscale。
+
 ---
 
 ## 当前状态（alpha 0.1）
