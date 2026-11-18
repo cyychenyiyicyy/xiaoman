@@ -44,13 +44,20 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: gradle assembleDebug --no-daemon
+        env:
+          XIAOMAN_SERVER_URL: ${{ vars.XIAOMAN_SERVER_URL }}
+        run: |
+          SERVER_URL="${XIAOMAN_SERVER_URL:-http://127.0.0.1:8787}"
+          gradle assembleDebug --no-daemon -PserverUrl="$SERVER_URL"
+
+      - name: Name alpha APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/xiaoman-alpha-0.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: xiaoman-alpha-0.1
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/xiaoman-alpha-0.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -61,7 +68,7 @@ jobs:
           name: 小满 alpha 0.1
           tag_name: ${{ github.ref_name }}
           prerelease: true
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          files: android/app/build/outputs/apk/debug/xiaoman-alpha-0.1.apk
           fail_on_unmatched_files: true
           body: |
             WebView 壳，加载自建服务器（地址由构建变量 XIAOMAN_SERVER_URL 注入）。不是离线应用；服务器不可达时会显示离线页。
