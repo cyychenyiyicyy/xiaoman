@@ -72,6 +72,14 @@ class SettingsPatch(BaseModel):
     thinking: str | None = None
 
 
+class ProfilePatch(BaseModel):
+    agent_name: str | None = None
+    user_name: str | None = None
+    gender: str | None = None
+    grade: str | None = None
+    completed: bool | None = None
+
+
 class UploadOut(BaseModel):
     id: str
     url: str

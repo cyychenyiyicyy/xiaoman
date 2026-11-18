@@ -1,0 +1,43 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "site.e1e.xiaoman"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "site.e1e.xiaoman"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0-alpha"
+
+        // 服务器地址由构建注入：gradle -PserverUrl=http://your-server:8787
+        // CI 从 repository variable XIAOMAN_SERVER_URL 读取；缺省只用于本机。
+        def serverUrl = project.findProperty("serverUrl") ?: "http://127.0.0.1:8787"
+        buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        encoding "UTF-8"
+    }
+}
+
+dependencies {
+    implementation "androidx.core:core:1.13.1"
+    implementation "androidx.webkit:webkit:1.11.0"
+}

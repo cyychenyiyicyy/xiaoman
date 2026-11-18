@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="md3">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -20,6 +20,7 @@
 </script>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="theme-md3.css?v=md3j">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -139,10 +140,45 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
+<section class="ob" id="onboarding" hidden aria-labelledby="ob-title">
+  <div class="ob-card">
+    <div class="ob-brand"><img src="logo.svg" alt=""><span>小满 · 第一次见</span></div>
+    <div class="ob-kicker">先互相认识一下</div>
+    <h1 class="ob-title" id="ob-title">她叫什么，你叫什么？</h1>
+    <p class="ob-sub">之后都可以在设置里改。</p>
+
+    <label class="ob-field">
+      <span>她的名字</span>
+      <input id="ob-agent" maxlength="12" value="小满" autocomplete="off">
+    </label>
+    <label class="ob-field">
+      <span>你的名字</span>
+      <input id="ob-user" maxlength="20" placeholder="比如：小陈" autocomplete="off">
+    </label>
+    <div class="ob-field">
+      <span>性别</span>
+      <div class="ob-seg" role="group" aria-label="性别">
+        <button type="button" data-gender="female">女生</button>
+        <button type="button" data-gender="male">男生</button>
+        <button type="button" data-gender="other" class="on">不填</button>
+      </div>
+    </div>
+    <label class="ob-field">
+      <span>年级</span>
+      <select id="ob-grade">
+        <option>高一</option><option>高二</option><option>高三</option>
+      </select>
+    </label>
+
+    <button type="button" class="ob-go" id="ob-go">开始对话</button>
+    <p class="ob-fine">资料只保存在你的服务器和这台设备上。</p>
+  </div>
+</section>
+
 <noscript>小满需要 JavaScript。</noscript>
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor/katex/auto-render.min.js"></script>
 <script src="vendor/cytoscape/cytoscape.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=md3j"></script>
 </body>
 </html>

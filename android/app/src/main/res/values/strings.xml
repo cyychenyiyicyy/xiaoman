@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">小满</string>
+    <string name="offline_title">连不上小满</string>
+    <string name="offline_detail">检查服务器是否在运行，或稍后再试。</string>
+    <string name="retry">重试</string>
+    <string name="open_in_browser">在浏览器打开</string>
+    <string name="file_chooser_title">选择照片</string>
+    <string name="no_file_picker">没有可用的文件选择器</string>
+    <string name="no_app_for_link">没有可打开这个链接的应用</string>
+    <string name="download_started">已开始下载</string>
+    <string name="download_failed">无法下载这个文件</string>
+</resources>

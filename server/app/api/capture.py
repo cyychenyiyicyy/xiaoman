@@ -31,7 +31,7 @@ def _sniff(raw: bytes) -> str | None:
     return None
 
 
-async def run_task(task_id: str) -> None:
+async def run_task(task_id: str, correct: bool = True) -> None:
     """后台跑一页：parsing → extracting → review/failed。"""
     with SessionLocal() as db:
         task = db.get(CaptureTask, task_id)
@@ -42,7 +42,7 @@ async def run_task(task_id: str) -> None:
         try:
             # ① 配了阿里云切题就用它：题组是算法切的，比「OCR+模型猜」稳
             if (settings.papercut_auth or "").lower() in ("appcode", "aksk"):
-                cut = await papercut.cut(Path(task.page_path), task.subject)
+                cut = await papercut.cut(Path(task.page_path), task.subject, correct)
                 task.blocks_json = {"provider": "papercut", "groups": cut.get("groups")}
                 task.groups_json = cut
                 task.confidence = 0.92 if cut.get("groups") else 0.2
@@ -98,6 +98,7 @@ async def upload_page(
     subject: str = Form("全部"),
     paper_id: str = Form(""),
     page_no: int = Form(1),
+    correct: bool = Form(True),
     db: Session = Depends(get_db),
 ):
     raw = await file.read()
@@ -124,7 +125,7 @@ async def upload_page(
     db.commit()
     db.refresh(task)
 
-    background.add_task(run_task, task.id)
+    background.add_task(run_task, task.id, correct)
     return {"task_id": task.id, "status": task.status, "sha256": hashlib.sha256(raw).hexdigest()[:16]}
 
 
@@ -153,7 +154,7 @@ async def retry_task(task_id: str, background: BackgroundTasks, db: Session = De
         raise HTTPException(410, "原图已丢失，需要重拍")
     task.status, task.error = "queued", ""
     db.commit()
-    background.add_task(run_task, task.id)
+    background.add_task(run_task, task.id, True)
     return {"task_id": task.id, "status": "queued"}
 
 

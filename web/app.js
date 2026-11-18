@@ -23,6 +23,8 @@
     mapKey: '',              // 当前图对应的 subject|module|chapter|ver
     mapHtmlKey: '',          // 已渲染 HTML 的 key（避免弹层重开时丢图）
     theme: 'system',         // system | light | dark（本地偏好，index.html 已先应用）
+    profile: null,           // {agent_name,user_name,gender,grade,completed}
+    profileLoaded: false,
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
     preview: null,           // 右侧预览的产物
@@ -83,8 +85,47 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  /* Material Symbols：Lucide 名 → M3 图标名（全部动态图标都走 ic()，改这一处即可） */
+  var MS_ICON = {
+    'circle-dot': 'forum', 'book-open-text': 'menu_book', 'book': 'menu_book',
+    'map': 'account_tree', 'clock': 'history', 'zap': 'bolt', 'settings': 'settings',
+    'chevron-left': 'chevron_left', 'chevron-right': 'chevron_right', 'chevron-down': 'expand_more',
+    'sparkles': 'auto_awesome', 'plus': 'add', 'arrow-up': 'arrow_upward', 'x': 'close',
+    'check': 'check', 'camera': 'photo_camera', 'image': 'image', 'search': 'search',
+    'more-horizontal': 'more_horiz', 'refresh-cw': 'refresh', 'panel-left': 'left_panel_close',
+    'sun': 'light_mode', 'bell': 'notifications', 'atom': 'science', 'flask-conical': 'science',
+    'languages': 'translate', 'leaf': 'biotech', 'landmark': 'balance', 'globe': 'public',
+    'scale': 'balance', 'sigma': 'functions', 'key': 'key', 'database': 'database',
+    'cpu': 'memory', 'plug': 'cloud', 'external-link': 'open_in_new', 'alert-circle': 'error',
+    'message-square': 'chat_bubble', 'mic': 'mic', 'minus': 'remove', 'scan': 'document_scanner',
+    'notebook': 'menu_book', 'palette': 'palette'
+  };
+  function msIcon(name) { return MS_ICON[name] || name || 'forum'; }
   function ic(name, cls) {
-    return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
+    return '<span class="ic msym' + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + msIcon(name) + '</span>';
+  }
+  /* 把 index.html 里写死的 <svg class="ic"><use ...> 换成 Material Symbols；
+     rail 的 7 个目的地按新稿换成语义更准的图标。 */
+  function upgradeIcons() {
+    var railIcon = {
+      'rail-chat': 'forum', 'rail-bank': 'library_books', 'rail-library': 'folder_open',
+      'rail-map': 'account_tree', 'rail-memories': 'history', 'rail-week': 'monitoring',
+      'rail-settings': 'settings'
+    };
+    qa('svg.ic').forEach(function (svg) {
+      var use = svg.querySelector('use');
+      if (!use) return;
+      var name = use.getAttribute('data-i') || (use.getAttribute('href') || '').replace('#i-', '');
+      var it = svg.closest('.rail .it');
+      if (it && railIcon[it.id]) name = railIcon[it.id];
+      var extra = (svg.getAttribute('class') || '').replace(/\bic\b/g, '').replace(/\s+/g, ' ').trim();
+      var span = document.createElement('span');
+      span.className = 'ic msym' + (extra ? ' ' + extra : '');
+      if (svg.id) span.id = svg.id;
+      span.setAttribute('aria-hidden', 'true');
+      span.textContent = msIcon(name);
+      svg.replaceWith(span);
+    });
   }
   function idVal(x) { return x != null && /^\d+$/.test(String(x)) ? Number(x) : x; }
   var keySeq = 0;
@@ -446,6 +487,7 @@
       selected: {},
       preview: '',
       startedAt: 0,
+      correct: true,
       error: ''
     });
   }
@@ -465,6 +507,7 @@
     var fd = new FormData();
     fd.append('file', file);
     fd.append('subject', o.subject || currentSubjectName());
+    fd.append('correct', o.correct === false ? 'false' : 'true');
     try {
       var t = await api('/capture/pages', { method: 'POST', form: fd });
       o.taskId = t.task_id;
@@ -598,6 +641,10 @@
         (isBank ? '' :
           '<button type="button" class="caprow" data-act="open-picker">' + ic('book-open-text') +
           '<span>题库</span><span class="sp"></span><span class="caparr">›</span></button>') +
+        '<button type="button" class="caprow" data-act="cap-correct" role="switch" aria-checked="' +
+          (o.correct === false ? 'false' : 'true') + '">' + ic('sparkles') +
+          '<span>自动矫正</span><span class="sp"></span><span class="sw' +
+          (o.correct === false ? '' : ' on') + '"></span></button>' +
         '</div>' + subs;
     } else if (o.step === 'scanning') {
       var t = o.task || {};
@@ -649,7 +696,7 @@
       '<div class="shd"><div class="ttl" id="cap-ttl">' + title + '</div>' +
       '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
       '<div class="sheet-body">' + body + '</div>' + foot +
-      '<input type="file" id="cap-camera" accept="image/*" capture="environment" hidden>' +
+      '<input type="file" id="cap-camera" accept="image/*" capture="user" hidden>' +
       '<input type="file" id="cap-file" accept="image/*" hidden>' +
       '</div>';
   }
@@ -2190,13 +2237,21 @@
         brand.textContent = state.convTitle || '新对话';
         brand.title = state.convTitle || '';
       } else {
-        brand.textContent = '小满';
+        brand.textContent = agentName();
       }
     }
     if (pill) pill.hidden = !inChat;
     if (sub) sub.textContent = inChat ? (state.convSubject || '全部') : '对话';
-    var ticon = q('#top-subj-icon use');
-    if (ticon) ticon.setAttribute('href', '#i-' + ((typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[state.convSubject]) || 'circle-dot'));
+    var ticon = q('#top-subj-icon');
+    if (ticon) {
+      var iconName = (typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[state.convSubject]) || 'circle-dot';
+      var msName = iconName === 'sun' ? 'apps' : msIcon(iconName);
+      if (ticon.tagName === 'SPAN') ticon.textContent = msName;
+      else {
+        var tuse = ticon.querySelector('use');
+        if (tuse) tuse.setAttribute('href', '#i-' + iconName);
+      }
+    }
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
@@ -2341,14 +2396,14 @@
 
   function heroHtml() {
     var subj = heroSubjectName();
-    var icon = (typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[subj]) || 'circle-dot';
+    var icon = subj === '全部' ? 'apps' : ((typeof SUBJECT_ICON !== 'undefined' && SUBJECT_ICON[subj]) || 'circle-dot');
     var sug = [
       { icon: 'book-open-text', text: (subj === '全部' ? '讲讲' : '讲讲' + subj + '里') + '最常考的一个知识点' },
       { icon: 'clock', text: (subj === '全部' ? '这周' : subj + '这周') + '没弄懂的知识点，帮我梳理一下' },
       { icon: 'circle-dot', text: '考考我' + (subj === '全部' ? '' : '「' + subj + '」') + '，看看哪里没掌握' }
     ];
     return '<div class="hero">' +
-      '<div class="hero-brand"><img src="logo.svg" alt=""><span>小满 · 学习空间</span></div>' +
+      '<div class="hero-brand"><img src="logo.svg" alt=""><span>' + esc(agentName()) + ' · 学习空间</span></div>' +
       '<h1 class="hero-title">在 <button type="button" class="hero-subj" data-act="open-hero-subjects" aria-haspopup="dialog">' +
         '<span class="hsi">' + ic(icon) + '</span>' +
         '<span class="hs">' + esc(subj) + '</span>' +
@@ -2632,7 +2687,7 @@
         await loadMessages();
         render();
       } else {
-        toast('小满给你留了句话');
+        toast(agentName() + '给你留了句话');
       }
     } catch (e) { /* 主动消息失败不打扰 */ }
   }
@@ -4299,12 +4354,20 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         '<span class="trail"><span class="val">' + esc(themeLabel(themeMode())) + '</span>' +
         ic('chevron-right', 'sm chev') + '</span></button>');
 
+    var p = state.profile || {};
+    var profileGroup = groupHtml('个人资料',
+      '<button type="button" class="srow" data-act="open-profile">' +
+        '<span class="lead">' + ic('person') + '</span>' +
+        '<span class="md"><span class="n1">' + esc(agentName()) + '</span>' +
+        '<span class="n2">' + esc(p.user_name ? ('你 · ' + p.user_name) : '还没填你的名字') + '</span></span>' +
+        '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>');
+
     if (state.searchState === 'loading' && !state.search) {
-      return nav + '<div class="det">' + themeGroup +
+      return nav + '<div class="det">' + profileGroup + themeGroup +
         '<div class="skel">' + skelRows(4) + '</div></div>';
     }
     if (state.searchState === 'error') {
-      return nav + '<div class="det">' + themeGroup +
+      return nav + '<div class="det">' + profileGroup + themeGroup +
         pageErrorState('加载失败', state.searchError, 'reload-settings', 'goto-chat', '返回对话') + '</div>';
     }
 
@@ -4337,7 +4400,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
 
     return nav + '<div class="det">' +
-      themeGroup +
+      profileGroup + themeGroup +
       groupHtml('模型', '<button type="button" class="srow" data-act="open-models">' +
         '<span class="lead">' + ic('cpu') + '</span>' +
         '<span class="md"><span class="n1">当前模型</span></span>' +
@@ -4767,18 +4830,18 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     var clay = v('--clay'), claybg = v('--claybg'), clayline = v('--clayline');
     return [
       { selector: 'node[kind="chapter"]', style: {
-        shape: 'round-rectangle', width: 168, height: 34, 'background-color': card,
+        shape: 'round-rectangle', width: 196, height: 38, 'background-color': card,
         'border-width': 1.5, 'border-color': clayline, label: 'data(label)',
-        'font-size': 12, 'font-family': v('--sans'), color: clay,
+        'font-size': 13, 'font-family': v('--sans'), color: clay,
         'text-valign': 'center', 'text-halign': 'center',
-        'text-wrap': 'ellipsis', 'text-max-width': '150px', 'min-zoomed-font-size': 7
+        'text-wrap': 'ellipsis', 'text-max-width': '180px', 'min-zoomed-font-size': 0
       } },
       { selector: 'node[kind="point"]', style: {
-        shape: 'ellipse', width: 18, height: 18, 'background-color': v('--fill'),
-        'border-width': 1.5, 'border-color': v('--line2'), label: 'data(label)',
-        'font-size': 11, 'font-family': v('--sans'), color: ink2,
+        shape: 'ellipse', width: 24, height: 24, 'background-color': v('--fill2'),
+        'border-width': 1.5, 'border-color': v('--outline'), label: 'data(label)',
+        'font-size': 12, 'font-family': v('--sans'), color: ink2,
         'text-valign': 'bottom', 'text-margin-y': 3,
-        'text-wrap': 'ellipsis', 'text-max-width': '104px', 'min-zoomed-font-size': 10,
+        'text-wrap': 'ellipsis', 'text-max-width': '120px', 'min-zoomed-font-size': 7,
         'text-outline-color': paper, 'text-outline-width': 2
       } },
       { selector: 'node[kind="point"].hasq', style: { 'background-color': claybg, 'border-color': clay } },
@@ -6054,6 +6117,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
     'open-theme': function () { setOverlay({ kind: 'theme' }); },
+    'open-profile': function () { showOnboarding(true); },
     'open-skill-sheet': function () { openSkillSheet(); },
     'open-hero-subjects': function () { openHeroSubjects(); },
     'hero-subject': function (el) { pickHeroSubject(el.getAttribute('data-subject') || '全部'); },
@@ -6123,6 +6187,12 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'confirm-capture': function () { confirmCapture(); },
     'cap-camera': function () { var f = q('#cap-camera'); if (f) f.click(); },
     'cap-album': function () { var f = q('#cap-file'); if (f) f.click(); },
+    'cap-correct': function () {
+      var o = state.overlay;
+      if (!o || o.kind !== 'capture') return;
+      o.correct = o.correct === false;
+      renderOverlay();
+    },
     'open-picker': function () { state.overlay = null; openQuestionPicker(); },
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
     'cap-subject': function (el) {
@@ -6291,6 +6361,101 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     stream.addEventListener('toggle', onToggle, true);
   }
 
+  /* ── 个人资料 / 首次引导 ───────────────────────────── */
+  var PROFILE_KEY = 'xm_profile';
+  function agentName() { return (state.profile && state.profile.agent_name) || '小满'; }
+  function localProfile() {
+    try {
+      var raw = localStorage.getItem(PROFILE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function applyProfile() {
+    var name = agentName();
+    document.title = name + ' · 学习空间';
+    var brand = q('#top-brand');
+    if (brand && state.view === 'chat' && !state.convId) brand.textContent = name;
+    var heroBrand = q('.hero-brand span');
+    if (heroBrand) heroBrand.textContent = name + ' · 学习空间';
+  }
+  async function loadProfile() {
+    var local = localProfile();
+    var server = null;
+    try { server = await api('/profile'); } catch (e) { /* 旧服务器没有这个接口 */ }
+    var pick = null;
+    if (server && server.completed) pick = server;
+    else if (local && local.completed) pick = local;
+    else pick = server || local;
+    state.profile = pick;
+    state.profileLoaded = true;
+    if (!pick || !pick.completed) {
+      showOnboarding(false);
+    } else {
+      applyProfile();
+      if (local && local.completed && (!server || !server.completed)) {
+        try { await api('/profile', { method: 'PATCH', json: local }); } catch (e) {}
+      }
+    }
+  }
+  function showOnboarding(edit) {
+    var p = state.profile || {};
+    var box = q('#onboarding');
+    if (!box) return;
+    q('#ob-title').textContent = edit ? '个人资料' : '她叫什么，你叫什么？';
+    q('#ob-agent').value = p.agent_name || '小满';
+    q('#ob-user').value = p.user_name || '';
+    q('#ob-grade').value = p.grade || '高一';
+    var gender = p.gender === 'female' || p.gender === 'male' ? p.gender : 'other';
+    qa('.ob-seg [data-gender]').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-gender') === gender);
+      b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false');
+    });
+    box.dataset.edit = edit ? '1' : '0';
+    box.hidden = false;
+    setTimeout(function () { var a = q('#ob-agent'); if (a) a.focus(); }, 30);
+  }
+  function closeOnboarding() { var b = q('#onboarding'); if (b) b.hidden = true; }
+  async function saveOnboarding() {
+    var go = q('#ob-go');
+    var agent = (q('#ob-agent').value || '').trim().slice(0, 12) || '小满';
+    var user = (q('#ob-user').value || '').trim().slice(0, 20);
+    var grade = q('#ob-grade').value || '高一';
+    var g = q('.ob-seg [data-gender].on');
+    var profile = {
+      agent_name: agent,
+      user_name: user,
+      gender: g ? g.getAttribute('data-gender') : '',
+      grade: grade,
+      completed: true
+    };
+    if (go) { go.disabled = true; go.textContent = '保存中…'; }
+    state.profile = profile;
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch (e) {}
+    try { await api('/profile', { method: 'PATCH', json: profile }); } catch (e) {}
+    if (go) { go.disabled = false; go.textContent = '开始对话'; }
+    closeOnboarding();
+    applyProfile();
+    render();
+    var ta = q('#ta');
+    if (ta) setTimeout(function () { ta.focus(); }, 80);
+  }
+  function bindOnboarding() {
+    var box = q('#onboarding');
+    if (!box) return;
+    qa('.ob-seg [data-gender]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        qa('.ob-seg [data-gender]').forEach(function (x) {
+          x.classList.remove('on'); x.setAttribute('aria-pressed', 'false');
+        });
+        b.classList.add('on'); b.setAttribute('aria-pressed', 'true');
+      });
+    });
+    q('#ob-go').addEventListener('click', saveOnboarding);
+    q('#ob-user').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); saveOnboarding(); }
+    });
+  }
+
   /* ── 启动 ─────────────────────────────────────────── */
   async function forceToday() {
     try { await api('/subject', { method: 'PATCH', json: { subject: '全部' } }); } catch (e) { /* 忽略 */ }
@@ -6299,9 +6464,12 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
   async function boot() {
     applyTheme(themeMode(), false);
     await loadSprite();
+    upgradeIcons();
     hydrateIcons();
     bindEvents();
     bindReviewInputs();
+    bindOnboarding();
+    await loadProfile();
     document.addEventListener('change', function (e) {
       var id = e.target && e.target.id;
       if (id === 'cap-camera' || id === 'cap-file') {

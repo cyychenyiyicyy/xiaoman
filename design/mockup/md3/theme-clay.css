@@ -1,0 +1,134 @@
+/* ==========================================================================
+   小满 · Material 3 陶土色方案（clay seed #B0563A）
+   由 material-color-utilities 的 Tonal Spot 算法生成，contrast level 0。
+   .light / .dark 是 MICL 识别的 scheme 类，挂在 <body> 上。
+   成功率（已掌握）不是 M3 标准角色，作为应用自定义角色补在最后。
+   ========================================================================== */
+
+.light {
+  color-scheme: light;
+  --md-sys-color-primary: #8f4c37;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #ffdbd0;
+  --md-sys-color-on-primary-container: #723522;
+  --md-sys-color-secondary: #77574d;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #ffdbd0;
+  --md-sys-color-on-secondary-container: #5d4037;
+  --md-sys-color-tertiary: #6b5e2f;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f5e2a7;
+  --md-sys-color-on-tertiary-container: #524619;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #93000a;
+  --md-sys-color-background: #fff8f6;
+  --md-sys-color-on-background: #231917;
+  --md-sys-color-surface: #fff8f6;
+  --md-sys-color-on-surface: #231917;
+  --md-sys-color-surface-variant: #f5ded7;
+  --md-sys-color-on-surface-variant: #53433f;
+  --md-sys-color-surface-dim: #e8d6d2;
+  --md-sys-color-surface-bright: #fff8f6;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #fff1ed;
+  --md-sys-color-surface-container: #fceae5;
+  --md-sys-color-surface-container-high: #f7e4df;
+  --md-sys-color-surface-container-highest: #f1dfda;
+  --md-sys-color-outline: #85736e;
+  --md-sys-color-outline-variant: #d8c2bc;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-inverse-surface: #392e2b;
+  --md-sys-color-inverse-on-surface: #ffede8;
+  --md-sys-color-inverse-primary: #ffb59f;
+  --md-sys-color-surface-tint: #8f4c37;
+  --md-sys-color-primary-fixed: #ffdbd0;
+  --md-sys-color-primary-fixed-dim: #ffb59f;
+  --md-sys-color-on-primary-fixed: #3a0b00;
+  --md-sys-color-on-primary-fixed-variant: #723522;
+  --md-sys-color-secondary-fixed: #ffdbd0;
+  --md-sys-color-secondary-fixed-dim: #e7bdb1;
+  --md-sys-color-on-secondary-fixed: #2c150f;
+  --md-sys-color-on-secondary-fixed-variant: #5d4037;
+  --md-sys-color-tertiary-fixed: #f5e2a7;
+  --md-sys-color-tertiary-fixed-dim: #d8c68d;
+  --md-sys-color-on-tertiary-fixed: #231b00;
+  --md-sys-color-on-tertiary-fixed-variant: #524619;
+  --md-sys-color-success: #4E6146;
+  --md-sys-color-on-success: #FFFFFF;
+  --md-sys-color-success-container: #DDE8D3;
+  --md-sys-color-on-success-container: #1D2A17;
+  /* 本轮报告里要引用的对比度：正文/容器至少 4.5:1 */
+  /* on-primary/primary 6.45:1 · on-primary-container/primary-container 7.25:1 · on-secondary-container/secondary-container 7.23:1 · on-tertiary-container/tertiary-container 7.26:1 · on-surface/surface 16.36:1 · on-surface/surface-container-highest 13.34:1 · on-surface-variant/surface 8.92:1 · on-success-container/success-container 11.86:1 */
+}
+
+.dark {
+  color-scheme: dark;
+  --md-sys-color-primary: #ffb59f;
+  --md-sys-color-on-primary: #561f0e;
+  --md-sys-color-primary-container: #723522;
+  --md-sys-color-on-primary-container: #ffdbd0;
+  --md-sys-color-secondary: #e7bdb1;
+  --md-sys-color-on-secondary: #442a22;
+  --md-sys-color-secondary-container: #5d4037;
+  --md-sys-color-on-secondary-container: #ffdbd0;
+  --md-sys-color-tertiary: #d8c68d;
+  --md-sys-color-on-tertiary: #3a2f05;
+  --md-sys-color-tertiary-container: #524619;
+  --md-sys-color-on-tertiary-container: #f5e2a7;
+  --md-sys-color-error: #ffb4ab;
+  --md-sys-color-on-error: #690005;
+  --md-sys-color-error-container: #93000a;
+  --md-sys-color-on-error-container: #ffdad6;
+  --md-sys-color-background: #1a110f;
+  --md-sys-color-on-background: #f1dfda;
+  --md-sys-color-surface: #1a110f;
+  --md-sys-color-on-surface: #f1dfda;
+  --md-sys-color-surface-variant: #53433f;
+  --md-sys-color-on-surface-variant: #d8c2bc;
+  --md-sys-color-surface-dim: #1a110f;
+  --md-sys-color-surface-bright: #423734;
+  --md-sys-color-surface-container-lowest: #140c0a;
+  --md-sys-color-surface-container-low: #231917;
+  --md-sys-color-surface-container: #271d1b;
+  --md-sys-color-surface-container-high: #322825;
+  --md-sys-color-surface-container-highest: #3d322f;
+  --md-sys-color-outline: #a08c87;
+  --md-sys-color-outline-variant: #53433f;
+  --md-sys-color-shadow: #000000;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-inverse-surface: #f1dfda;
+  --md-sys-color-inverse-on-surface: #392e2b;
+  --md-sys-color-inverse-primary: #8f4c37;
+  --md-sys-color-surface-tint: #ffb59f;
+  --md-sys-color-primary-fixed: #ffdbd0;
+  --md-sys-color-primary-fixed-dim: #ffb59f;
+  --md-sys-color-on-primary-fixed: #3a0b00;
+  --md-sys-color-on-primary-fixed-variant: #723522;
+  --md-sys-color-secondary-fixed: #ffdbd0;
+  --md-sys-color-secondary-fixed-dim: #e7bdb1;
+  --md-sys-color-on-secondary-fixed: #2c150f;
+  --md-sys-color-on-secondary-fixed-variant: #5d4037;
+  --md-sys-color-tertiary-fixed: #f5e2a7;
+  --md-sys-color-tertiary-fixed-dim: #d8c68d;
+  --md-sys-color-on-tertiary-fixed: #231b00;
+  --md-sys-color-on-tertiary-fixed-variant: #524619;
+  --md-sys-color-success: #A8C79A;
+  --md-sys-color-on-success: #16220F;
+  --md-sys-color-success-container: #33472B;
+  --md-sys-color-on-success-container: #C3E2B5;
+  /* 本轮报告里要引用的对比度：正文/容器至少 4.5:1 */
+  /* on-primary/primary 7.74:1 · on-primary-container/primary-container 7.25:1 · on-secondary-container/secondary-container 7.23:1 · on-tertiary-container/tertiary-container 7.26:1 · on-surface/surface 14.42:1 · on-surface/surface-container-highest 9.62:1 · on-surface-variant/surface 10.93:1 · on-success-container/success-container 7.16:1 */
+}
+
+/* 字体：拉丁与数字用 Instrument Sans，中文回落到系统黑体（平板上是 Noto Sans CJK / MiSans）。
+   MICL 的 typescale token 会读取这两个 ref 变量。 */
+:root {
+  --md-ref-typeface-plain: "ISans", "Instrument Sans", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --md-ref-typeface-brand: "ISans", "Instrument Sans", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --md-ref-typeface-weight-regular: 400;
+  --md-ref-typeface-weight-medium: 500;
+  --md-ref-typeface-weight-bold: 600;
+}

@@ -52,10 +52,15 @@ function loadSkills(only) {
   return out.length ? "\n\n" + out.join("\n\n") : "";
 }
 
-function xiaomanPrompt(subject, activeSkills, skill, artifactContext) {
+function xiaomanPrompt(subject, activeSkills, skill, artifactContext, profile = {}) {
   const d = new Date();
   const today = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`;
-  return `你是小满，一个陪着一个高一学生学习的伙伴。她叫小满，是名字，不是「AI 助手」。
+  const agent = (profile.agent_name || "小满").slice(0, 20);
+  const user = (profile.user_name || "").slice(0, 20);
+  const grade = (profile.grade || "高一").slice(0, 10);
+  const gender = { female: "女生", male: "男生", other: "不限定" }[profile.gender] || "";
+  const who = user ? `${user}（${grade}${gender ? "，" + gender : ""}）` : `一个${grade}学生`;
+  return `你是${agent}，一个陪着${who}学习的伙伴。${user ? `她叫${user}。` : ""}你的名字是${agent}，是名字，不是「AI 助手」。
 
 今天是 ${today}。当前学科空间：${subject || "全部"}。
 
@@ -589,7 +594,7 @@ async function handleChat(res, body) {
   const loader = new DefaultResourceLoader({
     cwd: CWD,
     agentDir: AGENT_DIR,
-    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills, skill, body.artifact_context || ""),
+    systemPromptOverride: () => xiaomanPrompt(subject, caps.skills, skill, body.artifact_context || "", body.profile || {}),
     appendSystemPromptOverride: () => [],
   });
   await loader.reload();

@@ -1,0 +1,683 @@
+/* ══════════════════════════════════════════════════════════════════════
+   小满 · Material Design 3 正式版皮肤（2026-11-18）
+   挂在 <html class="md3"> 上；只覆盖视觉与布局，不改 app.js 行为。
+   颜色/字号/间距全部来自 M3 角色（与 design/mockup/md3/theme-clay.css 同源）。
+   ══════════════════════════════════════════════════════════════════════ */
+
+@font-face{
+  font-family:"Material Symbols Outlined";
+  font-style:normal;font-weight:100 700;font-display:block;
+  src:url("fonts/material-symbols-outlined.woff2") format("woff2");
+}
+
+/* ---------- 颜色 / 字号 / 间距 ---------- */
+html.md3{
+  --md-canvas:#fceae5;
+  --paper:#fff8f6; --card:#fff8f6; --fill:#f7e4df; --fill2:#f1dfda;
+  --ink:#231917; --ink2:#53433f; --ink3:#85736e;
+  --line:#d8c2bc; --line2:#c8b2ac;
+  --clay:#8f4c37; --claybg:#ffdbd0; --clayline:#e8b8a8; --on-clay:#ffffff;
+  --conf-fg:#6b5e2f; --conf-bg:#f5eacb; --conf-line:#e0cf9e;
+  --sage:#4e6146; --sagebg:#dde8d3;
+  --knob:#ffffff; --clay-a06:rgba(143,76,55,.06);
+
+  --sans:"ISans","Instrument Sans","Noto Sans SC","Source Han Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --s1:36px;--l1:1.2; --s2:24px;--l2:1.3; --s3:20px;--l3:1.45;
+  --s4:16px;--l4:1.65; --s5:14px;--l5:1.55; --s6:12px;--l6:1.4;
+  --q1:4px;--q2:8px;--q3:12px;--q4:16px;--q5:24px;--q6:32px;
+  --i-sm:18px;--i-md:20px;--i-lg:24px;--stroke:1.7px;--stroke-soft:1.4px;
+  --rc:16px;--rb:12px;--rp:999px;
+
+  --md-shadow-1:0 1px 2px color-mix(in srgb,var(--ink) 12%,transparent),
+                0 1px 3px 1px color-mix(in srgb,var(--ink) 6%,transparent);
+  --md-shadow-2:0 2px 6px 2px color-mix(in srgb,var(--ink) 14%,transparent),
+                0 1px 2px color-mix(in srgb,var(--ink) 24%,transparent);
+}
+@media (prefers-color-scheme: dark){
+  html.md3:not([data-theme="light"]):not(.light){
+    --md-canvas:#271d1b;
+    --paper:#1a110f; --card:#1a110f; --fill:#322825; --fill2:#3b2f2c;
+    --ink:#f1dfda; --ink2:#d8c2bc; --ink3:#a08c87;
+    --line:#53433f; --line2:#5d4037;
+    --clay:#ffb59f; --claybg:#723522; --clayline:#8a4a33; --on-clay:#561f0e;
+    --conf-fg:#d8c68d; --conf-bg:#3b3520; --conf-line:#5a5230;
+    --sage:#a8c79a; --sagebg:#33472b;
+    --knob:#1a110f; --clay-a06:rgba(255,181,159,.08);
+  }
+}
+html.md3[data-theme="dark"], html.md3.dark{
+  --md-canvas:#271d1b;
+  --paper:#1a110f; --card:#1a110f; --fill:#322825; --fill2:#3b2f2c;
+  --ink:#f1dfda; --ink2:#d8c2bc; --ink3:#a08c87;
+  --line:#53433f; --line2:#5d4037;
+  --clay:#ffb59f; --claybg:#723522; --clayline:#8a4a33; --on-clay:#561f0e;
+  --conf-fg:#d8c68d; --conf-bg:#3b3520; --conf-line:#5a5230;
+  --sage:#a8c79a; --sagebg:#33472b;
+  --knob:#1a110f; --clay-a06:rgba(255,181,159,.08);
+}
+
+/* ---------- 基础 ---------- */
+html.md3 body{
+  background:var(--md-canvas);color:var(--ink);
+  font-family:var(--sans);font-size:var(--s4);line-height:var(--l4);
+  letter-spacing:0;-webkit-font-smoothing:antialiased;
+}
+html.md3 ::selection{background:var(--claybg);color:var(--ink)}
+html.md3 .num{font-variant-numeric:tabular-nums}
+html.md3 .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace}
+
+/* ---------- 图标：Material Symbols ---------- */
+html.md3 .ic.msym{
+  font-family:"Material Symbols Outlined";
+  font-weight:400;font-style:normal;font-size:20px;line-height:1;
+  inline-size:20px;block-size:20px;display:inline-flex;align-items:center;justify-content:center;
+  flex:none;stroke:none;fill:currentColor;letter-spacing:0;text-transform:none;
+  font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24;
+  overflow:hidden;vertical-align:middle;
+}
+html.md3 .ic.msym.sm{font-size:18px;inline-size:18px;block-size:18px}
+html.md3 .ic.msym.lg{font-size:24px;inline-size:24px;block-size:24px}
+
+/* ---------- 外壳：rail + 浮动面板 ---------- */
+html.md3 .shell{
+  padding:24px 24px calc(24px + env(safe-area-inset-bottom)) 0;
+  gap:24px;background:var(--md-canvas);
+}
+html.md3 .rail{
+  inline-size:96px;flex:0 0 96px;block-size:100%;
+  padding:20px 0 16px;border:0;border-radius:0;background:transparent;
+  gap:0;overflow:visible;align-items:center;
+}
+html.md3 .rail .logo{
+  inline-size:44px;block-size:44px;padding:7px;border-radius:14px;
+  background:var(--claybg);object-fit:contain;margin:0 0 28px;flex:none;
+}
+html.md3 .rail .it{
+  position:relative;inline-size:72px;block-size:56px;min-block-size:56px;flex:none;
+  margin:2px 0;padding:8px 0 4px;border:0;border-radius:999px;background:transparent;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  color:var(--ink2);font-family:inherit;font-size:12px;line-height:16px;font-weight:500;
+  letter-spacing:0;cursor:pointer;
+}
+html.md3 .rail .it .ic,html.md3 .rail .it>span{position:relative;z-index:1}
+html.md3 .rail .it .ic{font-size:24px;inline-size:24px;block-size:24px;color:currentColor}
+html.md3 .rail .it.on{color:var(--clay)}
+html.md3 .rail .it.on::before{
+  content:"";position:absolute;inset-block-start:2px;inset-inline-start:50%;
+  transform:translateX(-50%);inline-size:56px;block-size:32px;border-radius:16px;
+  background:var(--claybg);z-index:0;
+}
+html.md3 .rail .it:active{background:color-mix(in srgb,var(--ink) 8%,transparent)}
+html.md3 .rail .sp{flex:1}
+
+html.md3 .convside{
+  inline-size:344px;flex:0 0 344px;min-inline-size:0;
+  background:var(--card);border:0;border-radius:24px;
+  box-shadow:var(--md-shadow-1);overflow:hidden;
+}
+html.md3 .pane{
+  background:var(--card);border:0;border-radius:24px;
+  box-shadow:var(--md-shadow-1);overflow:hidden;
+}
+html.md3 .view{background:transparent}
+
+/* ---------- 对话列表 ---------- */
+html.md3 .cshead{display:flex;align-items:center;gap:8px;padding:20px 12px 6px 24px}
+html.md3 .csbrand{font-size:22px;line-height:28px;font-weight:500;color:var(--ink);flex:1}
+html.md3 .csnew{
+  display:inline-flex;align-items:center;gap:6px;block-size:40px;padding:0 14px;
+  border:0;border-radius:999px;background:var(--claybg);color:var(--clay);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
+}
+html.md3 .csnew .ic{font-size:18px;inline-size:18px;block-size:18px}
+html.md3 .csnew:hover{filter:brightness(.97)}
+html.md3 .csfilter{
+  display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;
+  padding:4px 16px 10px;scrollbar-width:none;
+}
+html.md3 .csfilter::-webkit-scrollbar{display:none}
+html.md3 .cslist{flex:1;min-block-size:0;overflow-y:auto;padding:0 12px 24px}
+html.md3 .csday{
+  padding:14px 12px 6px;font-size:12px;line-height:16px;letter-spacing:.06em;
+  color:var(--ink3);font-weight:500;
+}
+html.md3 .convrow{
+  position:relative;display:flex;flex-direction:column;gap:2px;
+  inline-size:100%;padding:10px 12px;margin:0 0 2px;border:0;border-radius:16px;
+  background:transparent;color:inherit;text-align:left;cursor:pointer;
+}
+html.md3 .convrow:hover{background:var(--fill)}
+html.md3 .convrow.on{background:var(--claybg);border:0}
+html.md3 .convrow.on::before{content:none}
+html.md3 .convttl{font-size:14px;line-height:20px;font-weight:500;color:var(--ink)}
+html.md3 .convrow.on .convttl{color:var(--ink)}
+html.md3 .convprev{font-size:12px;line-height:18px;color:var(--ink2);margin:0}
+
+/* ---------- 顶栏 ---------- */
+html.md3 .top{
+  display:flex;align-items:center;gap:8px;min-block-size:80px;block-size:auto;
+  padding:8px 12px 8px 24px;border-block-end:1px solid var(--line);
+  background:transparent;flex:none;min-inline-size:0;
+}
+html.md3 .top .l1,html.md3 .top .l1.chat{
+  min-inline-size:0;flex:0 1 auto;max-inline-size:min(56%,620px);margin:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:22px;line-height:28px;font-weight:500;letter-spacing:0;color:var(--ink);
+}
+html.md3 .top .l2{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;min-inline-size:0}
+html.md3 .top .l2 .sp{display:none}
+html.md3 .top .subj{
+  display:inline-flex;align-items:center;gap:6px;block-size:36px;padding:0 12px 0 10px;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  color:var(--ink);font-family:inherit;font-size:13px;font-weight:500;line-height:18px;
+  cursor:pointer;white-space:nowrap;
+}
+html.md3 .top .subj .ic{font-size:18px;inline-size:18px;block-size:18px;color:var(--clay)}
+html.md3 .top .subj .car{font-size:16px;inline-size:16px;block-size:16px;color:var(--ink2)}
+html.md3 .top .subj:active{background:var(--fill)}
+html.md3 .top .topback{inline-size:44px;block-size:44px;border-radius:999px;color:var(--ink2)}
+
+/* ---------- 对话流 ---------- */
+html.md3 .stream{padding:4px 24px 12px}
+html.md3 .stream .col{max-inline-size:720px;margin-inline:auto}
+html.md3 .ag{inline-size:100%;margin:0 0 20px}
+html.md3 .agbody p{font-size:16px;line-height:26px;margin:0 0 12px;color:var(--ink)}
+html.md3 .agbody p:last-child{margin-block-end:0}
+html.md3 .md-li{font-size:16px;line-height:26px;margin:0 0 4px}
+html.md3 .md-ul,html.md3 .md-ol{margin:0 0 12px;padding-inline-start:24px}
+html.md3 .mdh{font-size:20px;line-height:28px;font-weight:500;margin:20px 0 8px}
+html.md3 .mdh2{font-size:16px;line-height:24px;font-weight:600;margin:16px 0 6px}
+html.md3 .md-q{border-inline-start:3px solid var(--line2);color:var(--ink2);padding-inline-start:12px}
+html.md3 .md-pre{background:var(--fill);border-radius:12px;padding:12px}
+
+html.md3 .me{display:flex;justify-content:flex-end;margin:0 0 20px}
+html.md3 .ubx{max-inline-size:82%;align-items:flex-end}
+html.md3 .utextwrap{
+  display:inline-block;max-inline-size:100%;padding:10px 14px;
+  background:var(--claybg);color:var(--ink);
+  border-radius:20px 20px 6px 20px;font-size:16px;line-height:24px;
+  white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;
+}
+html.md3 .me .utextwrap .utext{font-size:inherit;line-height:inherit;background:none;padding:0}
+html.md3 .me .utextwrap .skilltag,html.md3 .me .utextwrap .edittag{
+  display:inline-flex;align-items:center;gap:3px;block-size:20px;padding:0 7px;margin-inline-end:6px;
+  border-radius:999px;background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--ink2);
+  font-size:11px;vertical-align:middle;
+}
+html.md3 .me .utextwrap .skilltag .ic,html.md3 .me .utextwrap .edittag .ic{font-size:14px;inline-size:14px;block-size:14px}
+
+/* 思考 / 工具链 */
+html.md3 .tgroup{
+  border:1px solid var(--line);border-radius:16px;background:var(--card);
+  margin:0 0 12px;padding:0 14px;
+}
+html.md3 .tgsum{display:flex;align-items:center;gap:8px;min-block-size:44px;font-size:12px;color:var(--ink2)}
+html.md3 .tgsum .ic{font-size:18px;inline-size:18px;block-size:18px}
+html.md3 .tgbody{border-block-start:1px solid var(--line);padding:8px 0 12px}
+html.md3 .tstep-t,html.md3 .tstep-t p{font-size:13px;line-height:21px;color:var(--ink2)}
+html.md3 .tgroup[open] .tgchev{transform:rotate(180deg)}
+
+/* 消息里的题目/产物卡 */
+html.md3 .qattach{
+  background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:14px;display:flex;flex-direction:column;gap:8px;min-inline-size:0;
+}
+html.md3 .qattach .stem{font-size:14px;line-height:23px;color:var(--ink)}
+html.md3 .qattach .tag,html.md3 .tag{
+  display:inline-flex;align-items:center;border:0;border-radius:8px;
+  background:var(--fill);color:var(--ink2);padding:3px 8px;font-size:11px;line-height:16px;
+  margin:0;white-space:nowrap;
+}
+html.md3 .kptag{border:0;border-radius:8px;background:var(--sagebg);color:var(--sage);font-size:11px}
+html.md3 .artifactcard{
+  display:flex;align-items:center;gap:10px;margin-block-start:12px;padding:14px;
+  border:1px solid var(--line);border-radius:16px;background:var(--card);
+}
+html.md3 .artifactcard .aic{inline-size:36px;block-size:36px;border-radius:12px;background:var(--fill);color:var(--clay)}
+
+/* ---------- 输入框 ---------- */
+html.md3 .composer{padding:8px 24px calc(20px + env(safe-area-inset-bottom))}
+html.md3 .composer .col{max-inline-size:720px;margin-inline:auto}
+html.md3 .cbox{
+  background:var(--fill);border:1px solid transparent;border-radius:28px;
+  padding:6px 8px 8px;overflow:visible;
+}
+html.md3 .cbox:focus-within{border-color:var(--clay);background:var(--fill2)}
+html.md3 .cbox .tools{display:flex;align-items:center;gap:4px;padding:4px 4px 0}
+html.md3 .crow{display:flex;align-items:center;gap:2px;padding:2px 2px 0}
+html.md3 .ta{
+  flex:1;min-inline-size:0;border:0;outline:none;background:transparent;color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:24px;resize:none;
+  max-block-size:148px;padding:10px 12px;margin:0;
+}
+html.md3 .ta::placeholder{color:var(--ink3)}
+html.md3 .crow .ib{inline-size:44px;block-size:44px;border:0;border-radius:999px;background:transparent;color:var(--ink2)}
+html.md3 .crow .send{
+  inline-size:48px;block-size:48px;border:0;border-radius:50%;
+  background:var(--clay);color:var(--on-clay);display:grid;place-items:center;
+}
+html.md3 .crow .send .ic{font-size:24px;inline-size:24px;block-size:24px}
+html.md3 .crow .send:disabled{background:var(--fill2);color:var(--ink3)}
+html.md3 .mpill,html.md3 .tpill{
+  display:inline-flex;align-items:center;gap:6px;block-size:36px;min-block-size:36px;
+  padding:0 10px;border:1px solid var(--line);border-radius:999px;
+  background:var(--card);color:var(--ink2);font-family:inherit;font-size:12px;line-height:16px;
+  white-space:nowrap;cursor:pointer;
+}
+html.md3 .mpill .pv{color:var(--ink3);font-size:12px}
+html.md3 .mpill .md2{color:var(--ink);font-weight:500;max-inline-size:160px;overflow:hidden;text-overflow:ellipsis}
+html.md3 .tpill{background:transparent;border-color:transparent}
+html.md3 .tpill.on{background:var(--claybg);border-color:transparent;color:var(--clay);font-weight:600}
+html.md3 .tpill .ic,html.md3 .mpill .ic{font-size:18px;inline-size:18px;block-size:18px}
+html.md3 .think{gap:2px}
+html.md3 .think .tpill{block-size:32px;min-block-size:32px;padding:0 8px}
+html.md3 .skillchips,html.md3 .qchips,html.md3 .thumbs{padding:6px 6px 0}
+
+/* ---------- 通用按钮 / 芯片 ---------- */
+html.md3 .btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-block-size:44px;block-size:44px;padding:0 20px;border:1px solid var(--line);
+  border-radius:999px;background:var(--card);color:var(--ink);
+  font-family:inherit;font-size:14px;line-height:20px;font-weight:500;cursor:pointer;
+}
+html.md3 .btn .ic{font-size:18px;inline-size:18px;block-size:18px}
+html.md3 .btn.p{background:var(--clay);border-color:var(--clay);color:var(--on-clay)}
+html.md3 .btn.g{background:transparent;border-color:transparent;color:var(--ink2)}
+html.md3 .btn.d{color:var(--clay);border-color:var(--clayline);background:transparent}
+html.md3 .btn.danger{color:var(--clay);border-color:var(--clayline)}
+html.md3 .btn:disabled{color:var(--ink3);border-color:var(--line);background:var(--fill)}
+html.md3 .btn:active{transform:scale(.98)}
+html.md3 .fchip{
+  display:inline-flex;align-items:center;gap:5px;block-size:32px;min-block-size:32px;
+  padding:0 12px;border:1px solid var(--line);border-radius:999px;background:transparent;
+  color:var(--ink2);font-size:13px;line-height:18px;font-weight:500;white-space:nowrap;cursor:pointer;
+}
+html.md3 .fchip.on{background:var(--claybg);border-color:transparent;color:var(--clay)}
+html.md3 .fchip.sm{block-size:30px;min-block-size:30px;font-size:12px;padding:0 10px}
+html.md3 .sw{
+  position:relative;inline-size:52px;block-size:32px;border-radius:16px;background:var(--fill2);
+  display:inline-block;flex:none;transition:background .15s;
+}
+html.md3 .sw::after{
+  content:"";position:absolute;inset-block-start:6px;inset-inline-start:6px;
+  inline-size:20px;block-size:20px;border-radius:50%;background:var(--knob);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--ink) 30%,transparent);
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+html.md3 .sw.on{background:var(--clay)}
+html.md3 .sw.on::after{transform:translateX(20px);inline-size:24px;block-size:24px;inset-block-start:4px;inset-inline-start:4px}
+
+/* ---------- 页面/导航条 ---------- */
+html.md3 .navbar{
+  display:flex;align-items:center;gap:8px;min-block-size:80px;block-size:auto;
+  padding:8px 16px 8px 24px;border-block-end:1px solid var(--line);
+  background:transparent;flex:none;
+}
+html.md3 .navbar .tbox{flex:1;min-inline-size:0;display:flex;flex-direction:column;justify-content:center}
+html.md3 .navbar .ttl{font-size:22px;line-height:28px;font-weight:500;letter-spacing:0;color:var(--ink)}
+html.md3 .navbar .sub{font-size:12px;line-height:18px;letter-spacing:0;color:var(--ink2);margin-block-start:2px}
+html.md3 .navbar .hit{inline-size:44px;block-size:44px;border-radius:999px;color:var(--ink2);display:grid;place-items:center}
+html.md3 .navbar .act{font-size:14px;color:var(--clay);font-weight:500}
+
+/* ---------- 题库 ---------- */
+html.md3 .bankwrap{padding:0 24px 96px;overflow-y:auto;flex:1;min-block-size:0}
+html.md3 .bankbar{display:flex;align-items:center;gap:12px;padding:4px 0 12px}
+html.md3 .bankbar .fi{
+  flex:1;block-size:48px;min-block-size:48px;padding:0 18px;border:1px solid transparent;
+  border-radius:999px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;
+}
+html.md3 .bankbar .fi::placeholder{color:var(--ink3)}
+html.md3 .bankchips{display:flex;gap:8px;flex-wrap:wrap;padding:0 0 14px}
+html.md3 .bankgrid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:12px;align-items:start;
+}
+html.md3 .bankgrid .qattach{min-block-size:184px;padding:16px}
+html.md3 .qattach .rowtop{gap:8px}
+html.md3 .qattach .qno{font-size:12px;color:var(--clay)}
+html.md3 .qattach .stem{font-size:14px;line-height:23px}
+html.md3 .qansline{font-size:12px;line-height:18px;color:var(--ink2);border-block-start:1px solid var(--line);padding-block-start:8px}
+
+/* ---------- 资料库 ---------- */
+html.md3 .libsearch{padding:4px 0 12px}
+html.md3 .libsearch .fi{
+  inline-size:100%;block-size:48px;padding:0 18px;border:1px solid transparent;border-radius:999px;
+  background:var(--fill);color:var(--ink);font-family:inherit;font-size:14px;
+}
+html.md3 .libchips{display:flex;gap:8px;flex-wrap:wrap;padding:0 0 14px}
+html.md3 .libgrid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:12px;padding:0 0 80px;
+}
+html.md3 .libcard{
+  display:flex;gap:12px;align-items:center;inline-size:100%;padding:14px;
+  border:1px solid var(--line);border-radius:16px;background:var(--card);
+  text-align:left;color:inherit;cursor:pointer;
+}
+html.md3 .libcard:hover{background:var(--fill)}
+html.md3 .libcard .lthumb{
+  inline-size:52px;block-size:52px;border-radius:14px;background:var(--fill);
+  display:grid;place-items:center;flex:none;color:var(--clay);overflow:hidden;
+}
+html.md3 .libcard .lthumb img{inline-size:100%;block-size:100%;object-fit:cover}
+html.md3 .libcard .lm{flex:1;min-inline-size:0}
+html.md3 .libcard .lt{font-size:14px;line-height:20px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.md3 .libcard .lik{font-size:12px;line-height:18px;color:var(--ink2);margin-block-start:2px}
+html.md3 .libmore{color:var(--ink3)}
+
+/* ---------- 本周 ---------- */
+html.md3 .weekwrap{padding:0 24px 48px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+html.md3 .wsum{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+html.md3 .wstat{
+  background:var(--fill);border-radius:20px;padding:16px 18px;min-block-size:96px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+html.md3 .wstat .n{font-size:36px;line-height:44px;font-weight:500;color:var(--ink)}
+html.md3 .wstat .l{font-size:12px;line-height:16px;color:var(--ink2)}
+html.md3 .wchart{
+  background:var(--fill);border-radius:20px;padding:18px 20px 12px;
+  display:flex;align-items:flex-end;gap:12px;min-block-size:190px;
+}
+html.md3 .wcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end;block-size:100%}
+html.md3 .wbar{inline-size:100%;max-inline-size:44px;border-radius:10px 10px 4px 4px;background:var(--clay);min-block-size:4px}
+html.md3 .wlb{font-size:11px;line-height:16px;color:var(--ink2);white-space:nowrap}
+html.md3 .wsubs{background:var(--fill);border-radius:20px;padding:16px 20px}
+html.md3 .wrow{display:flex;align-items:center;gap:12px;padding:8px 0}
+html.md3 .wrow+.wrow{border-block-start:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+html.md3 .wn{inline-size:56px;font-size:13px;color:var(--ink2)}
+html.md3 .wtrack{flex:1;block-size:6px;border-radius:999px;background:var(--fill2);overflow:hidden}
+html.md3 .wtrack i{display:block;block-size:100%;border-radius:999px;background:var(--clay)}
+html.md3 .wv{inline-size:44px;text-align:end;font-size:12px;color:var(--ink2)}
+
+/* ---------- 设置 / 记忆 / 通用分组 ---------- */
+html.md3 .settings{flex:1;min-block-size:0;overflow-y:auto;padding:8px 24px 48px}
+html.md3 .det{flex:1;min-block-size:0;overflow-y:auto;padding:8px 24px 48px;max-inline-size:860px}
+html.md3 .sgroup{margin-block-end:20px}
+html.md3 .slabel{font-size:12px;line-height:16px;letter-spacing:.06em;color:var(--ink2);font-weight:500;padding:0 8px 8px}
+html.md3 .scard{
+  background:var(--fill);border:0;border-radius:20px;overflow:hidden;
+}
+html.md3 .srow{
+  display:flex;align-items:center;gap:12px;inline-size:100%;min-block-size:56px;
+  padding:8px 16px;border:0;background:transparent;color:inherit;text-align:left;
+  font-family:inherit;cursor:pointer;
+}
+html.md3 .srow+.srow,html.md3 .srow+div{border-block-start:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+html.md3 .srow:active{background:var(--fill2)}
+html.md3 .srow .lead{inline-size:36px;block-size:36px;border-radius:12px;background:var(--card);display:grid;place-items:center;flex:none;color:var(--clay)}
+html.md3 .srow .md{flex:1;min-inline-size:0}
+html.md3 .srow .n1{display:block;font-size:14px;line-height:20px;font-weight:500;color:var(--ink)}
+html.md3 .srow .n2{display:block;font-size:12px;line-height:18px;color:var(--ink2);margin-block-start:2px}
+html.md3 .srow .trail{display:flex;align-items:center;gap:6px;flex:none;color:var(--ink2);font-size:12px}
+html.md3 .srow .val{color:var(--ink2);font-size:12px;max-inline-size:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.md3 .srow .chev{font-size:18px;inline-size:18px;block-size:18px;color:var(--ink3)}
+html.md3 .stepper{display:inline-flex;align-items:center;gap:8px}
+html.md3 .stepper .b{inline-size:32px;block-size:32px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--ink2);display:grid;place-items:center}
+
+/* ---------- 侧边面板 / 弹层 ---------- */
+html.md3 .qpanel-body{
+  position:absolute;inset-block:0;inset-inline-end:0;inline-size:min(440px,92vw);
+  background:var(--card);border-radius:24px 0 0 24px;box-shadow:var(--md-shadow-2);
+}
+html.md3 .qpanel-scrim{background:color-mix(in srgb,var(--ink) 32%,transparent)}
+html.md3 .previewpane{
+  inline-size:360px;min-inline-size:360px;flex:0 0 360px;
+  background:var(--card);border:0;border-radius:24px;box-shadow:var(--md-shadow-1);
+  overflow:hidden;
+}
+html.md3 .overlay .scrim{background:color-mix(in srgb,var(--ink) 40%,transparent)}
+html.md3 .overlay .sheet{
+  position:absolute;inset-block:0;inset-inline-end:0;inset-inline-start:auto;
+  inline-size:min(420px,92vw);max-inline-size:420px;margin:0;border-radius:24px 0 0 24px;
+  background:var(--card);box-shadow:var(--md-shadow-2);z-index:5;
+  display:flex;flex-direction:column;
+}
+html.md3 .sheet .grab{display:none}
+html.md3 .shd{padding:4px 12px 4px 24px;min-block-size:56px;border-block-end:1px solid var(--line);display:flex;align-items:center;gap:8px}
+html.md3 .shd .ttl{font-size:20px;line-height:28px;font-weight:500;flex:1}
+html.md3 .shd .hit{inline-size:44px;block-size:44px;border-radius:999px;color:var(--ink2)}
+html.md3 .sheet-body{padding:16px 24px 24px}
+html.md3 .sheet-foot{border-block-start:1px solid var(--line);padding:12px 24px calc(16px + env(safe-area-inset-bottom))}
+html.md3 .capmenu{gap:8px}
+html.md3 .caprow{
+  border:1px solid var(--line);border-radius:16px;background:var(--card);
+  min-block-size:56px;padding:8px 14px;font-size:14px;
+}
+html.md3 .caprow .ic{color:var(--clay)}
+html.md3 .capseg .tpill{border:1px solid var(--line);background:transparent}
+html.md3 .capseg .tpill.on{background:var(--claybg);border-color:transparent}
+html.md3 .scanwrap{border-radius:20px}
+
+/* ---------- Hero ---------- */
+html.md3 .hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px 16px;text-align:center}
+html.md3 .hero-brand{font-size:12px;line-height:18px;color:var(--ink2)}
+html.md3 .hero-title{font-size:36px;line-height:46px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:0}
+html.md3 .hero-subj{
+  display:inline-flex;align-items:center;gap:6px;block-size:54px;padding:0 14px 0 16px;
+  border:0;border-radius:999px;background:var(--claybg);color:var(--ink);
+  font-family:inherit;font-size:32px;line-height:42px;font-weight:600;
+}
+html.md3 .hero-subj .hs{font-size:inherit;font-weight:inherit}
+html.md3 .hero-subj .hsp{font-size:inherit;font-weight:inherit;color:var(--ink2)}
+html.md3 .hero-subj .hsi .ic{font-size:26px;inline-size:26px;block-size:26px;color:var(--ink2)}
+html.md3 .hero-subj .hv{font-size:22px;inline-size:22px;block-size:22px;color:var(--ink2)}
+html.md3 .hero-sugs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-inline-size:760px;margin:0}
+html.md3 .hero-sug{
+  display:inline-flex;align-items:center;gap:8px;min-block-size:44px;padding:0 16px;
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  color:var(--ink);font-family:inherit;font-size:14px;line-height:20px;text-align:left;cursor:pointer;
+}
+html.md3 .hero-sug .ic{color:var(--clay)}
+html.md3 .hero-sug:hover{background:var(--fill)}
+
+/* ---------- 空态 / 错误 / toast ---------- */
+html.md3 .empty .ic,html.md3 .err .ic{font-size:34px;inline-size:34px;block-size:34px}
+html.md3 .toast{background:var(--ink);color:var(--paper);border-radius:12px;font-size:14px}
+
+/* ---------- 旧文档外壳（design 稿）保持原样 ---------- */
+html.md3 .tab,html.md3 .wrap,html.md3 .frame{font-family:var(--sans)}
+
+/* ---------- 窄屏：rail 收窄，列表抽屉由 app.js 控制 ---------- */
+@media (max-width:1100px){
+  html.md3 .shell{padding:16px 16px calc(16px + env(safe-area-inset-bottom)) 0;gap:16px}
+  html.md3 .rail{inline-size:80px;flex-basis:80px}
+  html.md3 .rail .it{inline-size:64px}
+  html.md3 .convside{inline-size:300px;flex-basis:300px}
+  html.md3 .pane{border-radius:20px}
+  html.md3 .convside{border-radius:20px}
+}
+@media (max-width:899px){
+  html.md3 .shell{padding:0;gap:0}
+  html.md3 .rail{inline-size:64px;flex-basis:64px;padding-block-start:12px}
+  html.md3 .convside{inline-size:100%;border-radius:0}
+  html.md3 .pane{border-radius:0;box-shadow:none}
+  html.md3 .stream{padding-inline:16px}
+  html.md3 .composer{padding-inline:16px}
+  html.md3 .overlay .sheet{inline-size:100%;max-inline-size:100%;border-radius:20px 20px 0 0;inset-block-start:auto;inset-block-end:0;block-size:auto;max-block-size:88vh}
+}
+
+/* 修正：rail active 只留 56×32 的胶囊，不要整块 72×56 底色 */
+html.md3 .rail .it.on{background:transparent}
+/* 新对话页学科胶囊只显示科目，不再带「学科空间」四个字 */
+html.md3 .hero-subj .hsp{display:none}
+
+/* 记忆页是「多个 .settings 段落」拼起来的；旧布局把每段都当 flex:1 的滚动页，
+   导致段落之间出现大裂口。这里只让承载多段的 #view-page 滚动。 */
+html.md3 #view-page:has(> .settings + .settings){display:block;overflow-y:auto;flex:1;min-block-size:0}
+html.md3 #view-page:has(> .settings + .settings) > .settings{flex:none;min-block-size:0;overflow:visible;padding:0 24px}
+html.md3 #view-page:has(> .settings + .settings) > .settings:first-of-type{padding-block-start:16px}
+html.md3 #view-page:has(> .settings + .settings) > .settings .sgroup{margin-block-end:20px}
+
+/* 侧边 sheet 要占满整高：旧 .sheet 的 max-height:88% 会截断 */
+html.md3 .overlay .sheet{max-block-size:none;block-size:auto}
+/* 题目详情整页：阅读宽度收一点 */
+html.md3 .qdetail{max-inline-size:920px;margin-inline:auto;padding:8px 24px 96px}
+html.md3 .qansbox{background:var(--fill);border-radius:16px;padding:16px 20px;margin-block:8px;font-size:16px;line-height:26px;color:var(--ink)}
+html.md3 .qansbox p{margin:0}
+/* 记忆页的「添加/自动记忆」卡和下面分组对齐 */
+html.md3 #view-page:has(> .settings + .settings) .sgroup.flat .scard{margin-block-end:8px}
+
+/* 知识地图：点阵底 + 面板卡 + 搜索框 */
+html.md3 .mapstage{
+  background:
+    radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--line) 75%,transparent) 1.2px,transparent 0) 0 0/26px 26px,
+    var(--card);
+}
+html.md3 .mapside{
+  background:var(--card);border:1px solid var(--line);border-radius:20px;
+  box-shadow:var(--md-shadow-1);
+}
+html.md3 .mapzooms{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+html.md3 .mapzooms button{color:var(--ink2)}
+html.md3 .mapsearch .fi{
+  block-size:44px;border:1px solid transparent;border-radius:999px;background:var(--fill);
+  color:var(--ink);padding:0 14px;font-family:inherit;
+}
+html.md3 .mapchips .mapchip{border-radius:999px}
+
+/* ══════════════════════════════════════════════════════════════════
+   间距收口（2026-11-19 反馈：按钮/分界线/边框贴在一起）
+   - 列表分隔线左右各缩进 16，不再顶到卡片圆角
+   - 卡片行高 60，按钮组之间 12，图标按钮 40/44
+   - 书库/题库/设置/拍题统一 16 外边距
+   ══════════════════════════════════════════════════════════════════ */
+html.md3 .top{padding-inline:24px;gap:12px}
+html.md3 .top .l2{gap:10px}
+html.md3 .navbar{padding-inline:24px;gap:12px}
+html.md3 .navbar .act{margin-inline-start:8px}
+html.md3 .rail .it{gap:4px}
+html.md3 .composer .tools{gap:6px}
+html.md3 .crow .send{margin-inline-start:8px}
+html.md3 .btnbar{gap:12px;flex-wrap:wrap}
+html.md3 .sheet-foot .btnbar{gap:12px}
+html.md3 .sheet .shd{padding-inline:24px}
+html.md3 .sheet-body .slabel{margin-block-start:12px}
+html.md3 .capsub{gap:10px;padding-block-start:12px}
+
+/* 卡片列表：分隔线内缩，行距拉开 */
+html.md3 .scard{padding-block:4px}
+html.md3 .srow{position:relative;padding:10px 16px;min-block-size:60px;gap:14px}
+html.md3 .srow + .srow{border-block-start:0}
+html.md3 .srow + .srow::before{
+  content:"";position:absolute;inset-block-start:0;inset-inline:16px;block-size:1px;
+  background:var(--line);
+}
+html.md3 .srow .lead{inline-size:40px;block-size:40px;border-radius:12px}
+html.md3 .srow .trail{gap:10px}
+html.md3 .stepper{gap:6px;border:0;overflow:visible}
+html.md3 .stepper .b{
+  inline-size:40px;block-size:40px;border:1px solid var(--line);border-radius:50%;
+  background:var(--card);
+}
+html.md3 .stepper .v{
+  min-inline-size:44px;block-size:40px;display:grid;place-items:center;
+  border:1px solid var(--line);border-radius:12px;background:var(--card);
+}
+html.md3 .stepper.c44 .b{inline-size:40px;block-size:40px}
+
+/* 资料卡：右侧操作留出独立位置，不再贴着标题 */
+html.md3 .libgrid{gap:16px}
+html.md3 .libcard{padding:16px;gap:14px}
+html.md3 .libcard .lmain{padding-inline-end:36px}
+html.md3 .libcard .lgo{gap:6px;padding:4px 8px;border-radius:999px;background:var(--fill);color:var(--ink2)}
+html.md3 .libcard .libmore{
+  inline-size:36px;block-size:36px;inset-block-start:12px;inset-inline-end:12px;
+  border-radius:50%;color:var(--ink2);
+}
+html.md3 .libchips{gap:10px;padding-block-end:16px}
+
+/* 题库：筛选/卡片留白 */
+html.md3 .bankbar{gap:12px;padding-block-end:14px;flex-wrap:wrap}
+html.md3 .bankbar .fi{min-inline-size:240px}
+html.md3 .bankchips{gap:10px;padding-block-end:16px}
+html.md3 .bankgrid{gap:16px}
+html.md3 .qattach{padding:16px;gap:10px}
+html.md3 .qattach .tags{gap:6px}
+html.md3 .qattach .rowtop{min-block-size:24px}
+html.md3 .qattach .rmd{inline-size:32px;block-size:32px;border-radius:50%;margin-inline-start:4px}
+html.md3 .qansline{padding-block-start:10px;border-block-start:1px solid var(--line);margin-block-start:4px}
+html.md3 .qattach .tag{margin:0}
+html.md3 .qattach .kptag{margin-inline-end:2px}
+
+/* 答题卡/选项：每个选项独立圆角，不再边框贴边框 */
+html.md3 .quizcard{padding:16px}
+html.md3 .quizopts{gap:10px;margin-block-start:12px}
+html.md3 .quizopt{padding:12px 14px;border-radius:12px;background:var(--card)}
+
+/* 本周：面板/行距 */
+html.md3 .weekwrap{gap:16px}
+html.md3 .wrow{padding:10px 0}
+html.md3 .wchart{padding:20px 22px 14px}
+html.md3 .wsubs{padding:18px 22px}
+
+/* 地图/资料夹：chip 间距 */
+html.md3 .mapchips{gap:10px}
+html.md3 .libchips,
+html.md3 .bankchips{gap:10px}
+html.md3 .mapsearch{gap:10px}
+
+/* 题库日期分隔线：上下各留 8/12，不和卡片贴住 */
+html.md3 .bankwrap .dhead{
+  margin:8px 0 12px;padding:4px 2px 8px;
+  border-block-end:1px solid var(--line);
+  font-size:12px;line-height:16px;color:var(--ink2);
+}
+/* 资料卡右侧只留一个箭头，给标题/元信息让出宽度 */
+html.md3 .libcard .lgo{
+  font-size:0;gap:0;padding:6px;border-radius:50%;
+  background:transparent;color:var(--ink3);
+}
+html.md3 .libcard .lgo .ic{font-size:18px;inline-size:18px;block-size:18px}
+/* 拍题菜单行距 */
+html.md3 .capmenu{gap:10px}
+html.md3 .caprow{padding:10px 14px}
+/* 题目详情底部按钮 */
+html.md3 .qdetail .btnbar{gap:12px;padding-block:16px}
+
+html.md3 .think{gap:6px}
+html.md3 .composer .tools{gap:8px}
+
+/* ══════════════════════════════════════════════════════════════════
+   首次引导：agent 名字 + 用户资料
+   ══════════════════════════════════════════════════════════════════ */
+html.md3 .ob{
+  position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:24px;
+  background:
+    radial-gradient(120% 80% at 50% 0%,color-mix(in srgb,var(--claybg) 72%,var(--md-canvas)) 0%,var(--md-canvas) 62%);
+  overflow:auto;color:var(--ink);
+}
+html.md3 .ob[hidden]{display:none}
+html.md3 .ob-card{
+  inline-size:min(520px,100%);background:var(--card);border:1px solid var(--line);
+  border-radius:28px;padding:32px;box-shadow:var(--md-shadow-2);
+}
+html.md3 .ob-brand{display:flex;align-items:center;gap:10px;font-size:12px;line-height:18px;color:var(--ink2)}
+html.md3 .ob-brand img{inline-size:28px;block-size:28px;border-radius:9px;background:var(--claybg);padding:4px;object-fit:contain}
+html.md3 .ob-kicker{margin-block-start:22px;font-size:12px;line-height:16px;letter-spacing:.08em;color:var(--clay)}
+html.md3 .ob-title{margin:6px 0 0;font-size:32px;line-height:40px;font-weight:500;letter-spacing:0;color:var(--ink)}
+html.md3 .ob-sub{margin:6px 0 22px;font-size:14px;line-height:22px;color:var(--ink2)}
+html.md3 .ob-field{display:flex;flex-direction:column;gap:8px;margin-block-end:16px}
+html.md3 .ob-field>span{font-size:12px;line-height:16px;color:var(--ink2);font-weight:500}
+html.md3 .ob-field input,html.md3 .ob-field select{
+  inline-size:100%;block-size:52px;padding:0 16px;border:1px solid var(--line);
+  border-radius:16px;background:var(--fill);color:var(--ink);font-family:inherit;font-size:16px;outline:none;
+}
+html.md3 .ob-field input:focus,html.md3 .ob-field select:focus{border-color:var(--clay);background:var(--card);box-shadow:0 0 0 3px color-mix(in srgb,var(--clay) 16%,transparent)}
+html.md3 .ob-field input::placeholder{color:var(--ink3)}
+html.md3 .ob-seg{display:flex;gap:8px;flex-wrap:wrap}
+html.md3 .ob-seg button{
+  flex:1;min-inline-size:84px;block-size:44px;border:1px solid var(--line);border-radius:999px;
+  background:var(--card);color:var(--ink2);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;
+}
+html.md3 .ob-seg button.on{background:var(--claybg);border-color:transparent;color:var(--clay)}
+html.md3 .ob-go{
+  inline-size:100%;block-size:52px;margin-block-start:8px;border:0;border-radius:999px;
+  background:var(--clay);color:var(--on-clay);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+}
+html.md3 .ob-go:active{transform:scale(.99)}
+html.md3 .ob-go:disabled{background:var(--fill2);color:var(--ink3)}
+html.md3 .ob-fine{margin:14px 0 0;font-size:11px;line-height:16px;color:var(--ink3);text-align:center}
+@media (max-width:600px){
+  html.md3 .ob-card{padding:24px;border-radius:24px}
+  html.md3 .ob-title{font-size:26px;line-height:34px}
+}

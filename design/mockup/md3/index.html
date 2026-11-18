@@ -1,0 +1,1208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>小满 · Material 3 平板界面</title>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('xm_md3_theme');
+      if (t !== 'dark' && t !== 'light') t = 'light';
+      document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="theme-clay.css">
+<link rel="stylesheet" href="vendor/micl.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="light">
+<div class="xm-app" id="app">
+
+  <!-- ================= 导航 rail ================= -->
+  <nav class="micl-navigationrail xm-rail" aria-label="主导航">
+    <div class="micl-navigationrail__headline">
+      <a class="xm-logo" href="#/chat" aria-label="小满"><img src="logo.svg" alt=""></a>
+    </div>
+    <div class="micl-navigationrail__content">
+      <a class="micl-navigationrail__item" href="#/chat" data-nav="chat" aria-current="page">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">forum</span>
+        <span class="micl-navigationrail__text">对话</span>
+      </a>
+      <a class="micl-navigationrail__item" href="#/bank" data-nav="bank">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">library_books</span>
+        <span class="micl-navigationrail__text">题库</span>
+      </a>
+      <a class="micl-navigationrail__item" href="#/library" data-nav="library">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">folder_open</span>
+        <span class="micl-navigationrail__text">资料</span>
+      </a>
+      <a class="micl-navigationrail__item" href="#/map" data-nav="map">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">account_tree</span>
+        <span class="micl-navigationrail__text">地图</span>
+      </a>
+      <a class="micl-navigationrail__item" href="#/memories" data-nav="memories">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">history</span>
+        <span class="micl-navigationrail__text">记忆</span>
+      </a>
+      <a class="micl-navigationrail__item" href="#/week" data-nav="week">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">monitoring</span>
+        <span class="micl-navigationrail__text">本周</span>
+      </a>
+      <div class="xm-rail-spacer"></div>
+      <a class="micl-navigationrail__item" href="#/settings" data-nav="settings">
+        <span class="micl-navigationrail__icon material-symbols-outlined" aria-hidden="true">settings</span>
+        <span class="micl-navigationrail__text">设置</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ================= 对话 ================= -->
+  <section class="micl-panes xm-screen" data-screen="chat" data-detail="0">
+
+    <aside class="micl-pane xm-pane xm-pane--list">
+      <header class="micl-appbar xm-appbar">
+        <div class="micl-appbar__headline"><h1>对话</h1></div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-body">
+        <div class="xm-listsearch">
+          <div class="micl-textfield-filled">
+            <span class="micl-textfield__icon-leading material-symbols-outlined" aria-hidden="true">search</span>
+            <label for="conv-q">搜对话</label>
+            <input type="text" id="conv-q">
+          </div>
+        </div>
+        <div class="xm-list">
+          <div class="xm-daylabel">今天</div>
+          <button type="button" class="xm-conv is-on" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">连接体问题怎么拆</span><span class="xm-conv__time">09:12</span></span>
+            <span class="xm-conv__sub">物理 · 整体法先求加速度，再隔离</span>
+          </button>
+          <button type="button" class="xm-conv" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">氧化还原配平总出错</span><span class="xm-conv__time">08:40</span></span>
+            <span class="xm-conv__sub">化学 · 化合价升降法</span>
+          </button>
+          <div class="xm-daylabel">更早</div>
+          <button type="button" class="xm-conv" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">that 和 which 怎么选</span><span class="xm-conv__time">昨天</span></span>
+            <span class="xm-conv__sub">英语 · 限制性定语从句</span>
+          </button>
+          <button type="button" class="xm-conv" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">函数的单调性判断</span><span class="xm-conv__time">11/15</span></span>
+            <span class="xm-conv__sub">数学 · 定义法与导数</span>
+          </button>
+          <button type="button" class="xm-conv" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">细胞呼吸三个阶段</span><span class="xm-conv__time">11/13</span></span>
+            <span class="xm-conv__sub">生物 · 糖酵解与三羧酸循环</span>
+          </button>
+          <button type="button" class="xm-conv" data-action="open-thread">
+            <span class="xm-conv__row"><span class="xm-conv__title">分封制与宗法制的区别</span><span class="xm-conv__time">11/11</span></span>
+            <span class="xm-conv__sub">历史 · 西周政治制度</span>
+          </button>
+        </div>
+      </div>
+      <button type="button" class="xm-fab" data-action="new-chat">
+        <span class="material-symbols-outlined">add</span>新对话
+      </button>
+    </aside>
+
+    <section class="micl-pane xm-pane xm-pane--main">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1 id="chat-title">小满</h1>
+          <div class="xm-appbar__sub" id="chat-sub">全部学科 · 今天</div>
+        </div>
+        <button type="button" class="xm-space" data-action="open-subject" aria-haspopup="dialog">
+          <span class="material-symbols-outlined" id="space-icon">school</span>
+          <span class="xm-space__name" id="space-name">全部</span>
+          <span class="material-symbols-outlined xm-caret">expand_more</span>
+        </button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="搜索">search</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+
+      <div class="xm-chat">
+        <!-- 新对话 -->
+        <div class="xm-stream" id="stream-new">
+          <div class="xm-col">
+            <div class="xm-hero">
+              <div class="xm-hero__eyebrow"><img src="logo.svg" alt="">小满 · 学习空间</div>
+              <h2 class="xm-hero__title">在
+                <button type="button" class="xm-hero__subject" data-action="open-subject" aria-haspopup="dialog">
+                  <span class="material-symbols-outlined" id="hero-icon">school</span>
+                  <span id="hero-name">全部</span>
+                  <span class="material-symbols-outlined xm-caret">expand_more</span>
+                </button>
+                开始对话
+              </h2>
+              <div class="xm-suggests">
+                <button type="button" class="micl-chip-assist">
+                  <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">bolt</span>
+                  讲讲连接体最常考的一类题
+                </button>
+                <button type="button" class="micl-chip-assist">
+                  <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">task_alt</span>
+                  把这周的错题按知识点排一下
+                </button>
+                <button type="button" class="micl-chip-assist">
+                  <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">quiz</span>
+                  考考我「牛顿运动定律」
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 会话 -->
+        <div class="xm-stream" id="stream-thread" hidden>
+          <div class="xm-col">
+            <div class="xm-day"><span>今天 19:12</span></div>
+
+            <div class="xm-msg xm-msg--me">
+              <div class="xm-bubble">老师今天讲了连接体，两个物体用一根轻绳连着。我还是不知道该整体看还是隔离看。</div>
+            </div>
+
+            <div class="xm-msg">
+              <div class="xm-msg__ava"><img src="logo.svg" alt=""></div>
+              <div class="xm-msg__body">
+                <div class="xm-msg__name"><span>小满</span><span>19:12</span></div>
+                <div class="xm-msg__text">
+                  <p>先记一句话：<b>先整体求加速度，再隔离求内力。</b></p>
+                  <p>两个物体加速度一样时，把它们看成一个整体，外力只剩 <span class="xm-formula">F</span>，于是
+                    <span class="xm-formula">a = F / (m<sub>1</sub> + m<sub>2</sub>)</span>。要求绳子的张力，再把其中一个物体单独隔离，
+                    它受的合力就是 <span class="xm-formula">T</span>。</p>
+                </div>
+                <button type="button" class="xm-trace" aria-expanded="false" data-action="trace">
+                  <span class="material-symbols-outlined">progress_activity</span>
+                  <span>思考 8 秒 · 查了 2 个知识点</span>
+                  <span class="material-symbols-outlined xm-caret">expand_more</span>
+                </button>
+                <div class="xm-trace__detail">
+                  <p>调用 knowledge_search：连接体、整体法与隔离法</p>
+                  <p>调用 question_search：受力分析 · 3 道同类题</p>
+                </div>
+                <div class="xm-card xm-card--link" data-action="open-detail" tabindex="0" role="button">
+                  <div class="xm-card__head">
+                    <span class="xm-card__ico"><span class="material-symbols-outlined">account_tree</span></span>
+                    <div>
+                      <div class="xm-card__kicker">知识点 · 物理 / 必修一</div>
+                      <p class="xm-card__title">连接体问题：整体法与隔离法</p>
+                    </div>
+                  </div>
+
+                  <div class="xm-card__acts">
+                    <button type="button" class="micl-button-tonal-s" data-action="open-detail">展开</button>
+                    <button type="button" class="micl-button-text-s">在对话里问</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="xm-msg">
+              <div class="xm-msg__ava"><img src="logo.svg" alt=""></div>
+              <div class="xm-msg__body">
+                <div class="xm-msg__name"><span>小满</span><span>19:13</span></div>
+                <div class="xm-msg__text"><p>拿这道题对一遍，就能看出顺序：</p></div>
+                <div class="xm-card">
+                  <div class="xm-card__head">
+                    <span class="xm-card__ico"><span class="material-symbols-outlined">function</span></span>
+                    <div>
+                      <div class="xm-card__kicker">题目 · 2024 期末 · 第 18 题</div>
+                      <p class="xm-card__title">光滑水平面上，m₁ = 2 kg、m₂ = 4 kg 用轻绳相连，F = 12 N 拉 m₁，求绳张力</p>
+                    </div>
+                  </div>
+                  <p class="xm-card__text">整体系：a = 12 / 6 = 2 m/s²。隔离 m₂：T = m₂a = 8 N。答案是 8 N。</p>
+                  <div class="xm-card__meta">
+                    <span class="xm-badge xm-badge--now">未掌握</span>
+                    <span>牛顿第二定律</span><span>·</span><span>上次 3 天前</span>
+                  </div>
+                  <div class="xm-card__acts">
+                    <button type="button" class="micl-button-tonal-s" data-action="open-question">看解析</button>
+                    <button type="button" class="micl-button-text-s" data-action="open-review">加入复习</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="xm-msg xm-msg--me">
+              <div class="xm-bubble">那如果桌面有摩擦呢？</div>
+            </div>
+
+            <div class="xm-msg">
+              <div class="xm-msg__ava"><img src="logo.svg" alt=""></div>
+              <div class="xm-msg__body">
+                <div class="xm-msg__name"><span>小满</span><span>19:14</span></div>
+                <div class="xm-msg__text">
+                  <p>顺序不变，只是整体方程多一项摩擦：<span class="xm-formula">F − μ(m<sub>1</sub>+m<sub>2</sub>)g = (m<sub>1</sub>+m<sub>2</sub>)a</span>。
+                    隔离 m₂ 时，绳张力要同时克服它的摩擦，<span class="xm-formula">T = m<sub>2</sub>a + μm<sub>2</sub>g</span>。</p>
+                </div>
+              </div>
+            </div>
+            <div style="block-size:8px"></div>
+          </div>
+        </div>
+
+        <!-- 输入框 -->
+        <div class="xm-composer">
+          <div class="xm-composer__box">
+            <div class="micl-chips xm-composer__top">
+              <span class="micl-chip-input">
+                <button type="button" class="micl-chip__primary">
+                  <span class="material-symbols-outlined" style="font-size:16px">link</span>引用：连接体问题
+                </button>
+                <button type="button" class="micl-chip__remove material-symbols-outlined" aria-label="移除引用">close</button>
+              </span>
+            </div>
+            <textarea class="xm-composer__ta" id="ta" rows="1" placeholder="问小满，或贴一道题…" aria-label="输入内容"></textarea>
+            <div class="xm-composer__bar">
+              <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" aria-label="添加附件">add</button>
+              <button type="button" class="micl-chip-assist" data-action="open-capture">
+                <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">photo_camera</span>拍题
+              </button>
+              <button type="button" class="micl-chip-assist" data-action="open-skill">
+                <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">auto_awesome</span>技能
+              </button>
+              <button type="button" class="micl-chip-assist" data-action="open-model">
+                <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">bolt</span>思考 · 中
+              </button>
+              <span class="xm-composer__sp"></span>
+              <button type="button" class="xm-send" id="send" aria-label="发送">
+                <span class="material-symbols-outlined">arrow_upward</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧详情（卡片展开到这一栏，对话不中断） -->
+    <aside class="micl-pane xm-pane xm-pane--detail" id="detail-pane" hidden>
+      <div class="xm-dhead">
+        <span class="xm-kicker">物理 / 必修一 / 牛顿运动定律</span>
+        <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" aria-label="关闭详情" data-action="close-detail">close</button>
+      </div>
+      <div class="xm-body">
+        <div class="xm-detail">
+          <div class="xm-detail__hero">
+            <h2 class="xm-h2">连接体问题：整体法与隔离法</h2>
+            <div class="xm-ring">
+              <progress class="micl-circular-progress" value="68" max="100" aria-label="掌握度 68%"></progress>
+              <span class="xm-ring__num">68%<small>掌握度</small></span>
+            </div>
+          </div>
+          <p class="xm-sub">先整体求加速度，再隔离求内力。适用于加速度相同的两个或多个物体。</p>
+          <div class="xm-facts">
+            <div class="xm-fact"><b>3</b><span>复习次数</span></div>
+            <div class="xm-fact"><b>2 天</b><span>距上次复习</span></div>
+          </div>
+
+          <div class="xm-section">
+            <div class="xm-section__head"><span class="xm-kicker">先修</span></div>
+            <div class="xm-wrap">
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>牛顿第二定律</span>
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>受力分析</span>
+              <span class="xm-badge"><span class="xm-dot xm-dot--todo"></span>摩擦力</span>
+            </div>
+          </div>
+
+          <div class="xm-section">
+            <div class="xm-section__head"><span class="xm-kicker">相关题目 · 3</span><a href="#/bank" class="xm-meta">全部</a></div>
+            <button type="button" class="xm-qrow" data-action="open-question">
+              <span class="xm-qrow__no">18</span>
+              <span class="xm-qrow__t"><b>光滑面上两物块相连，求绳张力</b><span>2024 期末 · 未掌握</span></span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+            <button type="button" class="xm-qrow" data-action="open-question">
+              <span class="xm-qrow__no">07</span>
+              <span class="xm-qrow__t"><b>斜面上连接体的加速度</b><span>练习册 · 复习中</span></span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+            <button type="button" class="xm-qrow" data-action="open-question">
+              <span class="xm-qrow__no">12</span>
+              <span class="xm-qrow__t"><b>有摩擦时绳张力与 μ 的关系</b><span>自测 · 已掌握</span></span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+
+          <div class="xm-section">
+            <button type="button" class="micl-button-tonal-m" style="inline-size:100%" data-action="close-detail">
+              在对话里继续问
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ================= 题库 ================= -->
+  <section class="micl-panes xm-screen" data-screen="bank" hidden>
+    <section class="micl-pane xm-pane xm-pane--main xm-pane--tint">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>题库</h1>
+          <div class="xm-appbar__sub">1,284 道 · 42 道待复习</div>
+        </div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="搜索">search</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="筛选">filter_list</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-toolbar">
+        <div class="micl-chips xm-chiprow" role="group" aria-label="题目筛选">
+          <label class="micl-chip-filter">
+            <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">check</span>
+            <input type="checkbox" checked><span>全部</span>
+          </label>
+          <label class="micl-chip-filter">
+            <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">check</span>
+            <input type="checkbox"><span>待复习</span>
+          </label>
+          <label class="micl-chip-filter">
+            <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">check</span>
+            <input type="checkbox"><span>未掌握</span>
+          </label>
+          <label class="micl-chip-filter">
+            <span class="micl-button__icon material-symbols-outlined" aria-hidden="true">check</span>
+            <input type="checkbox"><span>已掌握</span>
+          </label>
+        </div>
+        <button type="button" class="xm-space" data-action="open-subject">
+          <span class="material-symbols-outlined">bolt</span>
+          <span class="xm-space__name">物理</span>
+          <span class="material-symbols-outlined xm-caret">expand_more</span>
+        </button>
+      </div>
+      <div class="xm-body">
+        <div class="xm-grid">
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">bolt</span>物理</span>
+              <span class="xm-badge xm-badge--now">未掌握</span>
+            </div>
+            <p class="xm-qcard__stem">光滑水平面上，质量 <span class="xm-formula">m<sub>1</sub> = 2 kg</span> 和 <span class="xm-formula">m<sub>2</sub> = 4 kg</span> 的两物块用轻绳相连，水平力 <span class="xm-formula">F = 12 N</span> 作用在 <span class="xm-formula">m<sub>1</sub></span> 上，求绳中张力。</p>
+            <div class="xm-qcard__meta">
+              <span>牛顿第二定律</span><span class="xm-dot"></span><span>正确率 41%</span><span class="xm-dot"></span><span>3 天前</span>
+            </div>
+          </article>
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">functions</span>数学</span>
+              <span class="xm-badge xm-badge--warn">复习中</span>
+            </div>
+            <p class="xm-qcard__stem">已知函数 <span class="xm-formula">f(x) = x³ − 3ax</span> 在区间 <span class="xm-formula">(1, +∞)</span> 上单调递增，求实数 <span class="xm-formula">a</span> 的取值范围。</p>
+            <div class="xm-qcard__meta">
+              <span>导数与单调性</span><span class="xm-dot"></span><span>正确率 63%</span><span class="xm-dot"></span><span>昨天</span>
+            </div>
+          </article>
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">science</span>化学</span>
+              <span class="xm-badge xm-badge--now">未掌握</span>
+            </div>
+            <p class="xm-qcard__stem">配平离子方程式：<span class="xm-formula">MnO<sub>4</sub><sup>−</sup> + Fe<sup>2+</sup> + H<sup>+</sup> → Mn<sup>2+</sup> + Fe<sup>3+</sup> + H<sub>2</sub>O</span>，并标出氧化剂与还原剂。</p>
+            <div class="xm-qcard__meta">
+              <span>氧化还原反应</span><span class="xm-dot"></span><span>正确率 38%</span><span class="xm-dot"></span><span>3 天前</span>
+            </div>
+          </article>
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">translate</span>英语</span>
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>已掌握</span>
+            </div>
+            <p class="xm-qcard__stem">The book ______ I bought yesterday is very interesting. 选择 that / which / what，并说明限制性与非限制性定语从句的区别。</p>
+            <div class="xm-qcard__meta">
+              <span>定语从句</span><span class="xm-dot"></span><span>正确率 92%</span><span class="xm-dot"></span><span>5 天前</span>
+            </div>
+          </article>
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">biotech</span>生物</span>
+              <span class="xm-badge xm-badge--warn">复习中</span>
+            </div>
+            <p class="xm-qcard__stem">有氧呼吸三个阶段分别发生在细胞的什么部位？每个阶段产生的 ATP 和还原氢数量是多少？</p>
+            <div class="xm-qcard__meta">
+              <span>细胞呼吸</span><span class="xm-dot"></span><span>正确率 71%</span><span class="xm-dot"></span><span>2 天前</span>
+            </div>
+          </article>
+          <article class="micl-card-outlined xm-qcard" tabindex="0" data-action="open-question">
+            <div class="xm-qcard__top">
+              <span class="xm-qcard__subject"><span class="material-symbols-outlined">account_balance</span>历史</span>
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>已掌握</span>
+            </div>
+            <p class="xm-qcard__stem">比较西周分封制与宗法制：两者的核心纽带分别是什么？为什么说宗法制是分封制的基础？</p>
+            <div class="xm-qcard__meta">
+              <span>西周政治制度</span><span class="xm-dot"></span><span>正确率 88%</span><span class="xm-dot"></span><span>6 天前</span>
+            </div>
+          </article>
+        </div>
+      </div>
+      <button type="button" class="xm-fab" data-action="open-capture">
+        <span class="material-symbols-outlined">photo_camera</span>拍题录入
+      </button>
+    </section>
+  </section>
+
+  <!-- ================= 资料库 ================= -->
+  <section class="micl-panes xm-screen" data-screen="library" hidden>
+    <aside class="micl-pane xm-pane xm-pane--list">
+      <header class="micl-appbar xm-appbar">
+        <div class="micl-appbar__headline"><h1>资料</h1></div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-body">
+        <div class="xm-listsearch">
+          <div class="micl-textfield-filled">
+            <span class="micl-textfield__icon-leading material-symbols-outlined" aria-hidden="true">search</span>
+            <label for="art-q">搜资料</label>
+            <input type="text" id="art-q">
+          </div>
+        </div>
+        <div class="xm-toolbar" style="padding:0 16px 8px">
+          <div class="micl-chips xm-chiprow">
+            <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox" checked><span>全部</span></label>
+            <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>讲义</span></label>
+            <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>闪卡</span></label>
+            <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>报告</span></label>
+          </div>
+        </div>
+        <div class="xm-list">
+          <button type="button" class="xm-art is-on">
+            <span class="xm-art__ico"><span class="material-symbols-outlined">description</span></span>
+            <span class="xm-art__t"><b>连接体问题 · 讲解网页</b><span>讲义 · 物理 · 11/16</span></span>
+          </button>
+          <button type="button" class="xm-art">
+            <span class="xm-art__ico"><span class="material-symbols-outlined">picture_as_pdf</span></span>
+            <span class="xm-art__t"><b>牛顿运动定律 · 错题报告</b><span>报告 · 物理 · 11/15</span></span>
+          </button>
+          <button type="button" class="xm-art">
+            <span class="xm-art__ico"><span class="material-symbols-outlined">style</span></span>
+            <span class="xm-art__t"><b>氧化还原 · 记忆闪卡</b><span>闪卡 · 化学 · 11/14</span></span>
+          </button>
+          <button type="button" class="xm-art">
+            <span class="xm-art__ico"><span class="material-symbols-outlined">description</span></span>
+            <span class="xm-art__t"><b>导数与单调性 · 讲解网页</b><span>讲义 · 数学 · 11/13</span></span>
+          </button>
+          <button type="button" class="xm-art">
+            <span class="xm-art__ico"><span class="material-symbols-outlined">picture_as_pdf</span></span>
+            <span class="xm-art__t"><b>本周学习周报</b><span>报告 · 全部 · 11/17</span></span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="micl-pane xm-pane xm-pane--main">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>连接体问题 · 讲解网页</h1>
+          <div class="xm-appbar__sub">讲义 · 11/16 · 物理</div>
+        </div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="在新窗口打开">open_in_new</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-previewbar">
+        <span class="xm-kicker">第 1 / 2 页</span>
+        <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" aria-label="缩小">zoom_out</button>
+        <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" aria-label="放大">zoom_in</button>
+      </div>
+      <div class="xm-preview">
+        <article class="xm-paper">
+          <div class="xm-paper__brand"><img src="logo.svg" alt="" style="inline-size:16px;block-size:16px">小满 · 生成讲义</div>
+          <h2>连接体问题：先整体，后隔离</h2>
+          <p class="xm-paper__meta">物理 · 必修一 · 牛顿运动定律 · 2026-11-16</p>
+
+          <p>两个或两个以上的物体通过轻绳、轻杆或接触面连接，一起运动时，它们具有相同的加速度。这类问题叫连接体问题。</p>
+
+          <h3>一、先判断能不能整体看</h3>
+          <p>只要各物体加速度相同（大小和方向都相同），就可以先把它们看成一个整体。整体法只关心外力，不关心内部相互作用。</p>
+
+          <h3>二、固定顺序</h3>
+          <ol>
+            <li>整体：列 <span class="xm-formula">F<sub>合</sub> = (m<sub>1</sub> + m<sub>2</sub>)a</span>，求加速度。</li>
+            <li>隔离：选受力较少的那个物体，求绳张力或接触力。</li>
+            <li>有摩擦时，把 <span class="xm-formula">f = μN</span> 加进整体方程，顺序不变。</li>
+          </ol>
+
+          <h3>三、例题</h3>
+          <p>光滑水平面上，<span class="xm-formula">m<sub>1</sub> = 2 kg</span>、<span class="xm-formula">m<sub>2</sub> = 4 kg</span> 用轻绳相连，<span class="xm-formula">F = 12 N</span> 水平拉 <span class="xm-formula">m<sub>1</sub></span>。</p>
+          <p>整体：<span class="xm-formula">a = F / (m<sub>1</sub>+m<sub>2</sub>) = 2 m/s²</span>。隔离 <span class="xm-formula">m<sub>2</sub></span>：<span class="xm-formula">T = m<sub>2</sub>a = 8 N</span>。</p>
+          <p>若地面有摩擦且 <span class="xm-formula">μ = 0.1</span>，整体方程变为 <span class="xm-formula">F − μ(m<sub>1</sub>+m<sub>2</sub>)g = (m<sub>1</sub>+m<sub>2</sub>)a</span>，得到 <span class="xm-formula">a = 1 m/s²</span>，此时 <span class="xm-formula">T = m<sub>2</sub>a + μm<sub>2</sub>g = 8 N</span>。</p>
+
+          <div class="xm-paper__foot"><span>小满生成 · 仅供复习</span><span>1 / 2</span></div>
+        </article>
+      </div>
+    </section>
+  </section>
+  <!-- ================= 知识地图 ================= -->
+  <section class="micl-panes xm-screen" data-screen="map" hidden>
+    <section class="micl-pane xm-pane xm-pane--main">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>知识地图</h1>
+          <div class="xm-appbar__sub">物理 · 必修一 · 8 个知识点</div>
+        </div>
+        <button type="button" class="xm-space" data-action="open-subject">
+          <span class="material-symbols-outlined">bolt</span>
+          <span class="xm-space__name">物理</span>
+          <span class="material-symbols-outlined xm-caret">expand_more</span>
+        </button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="搜索知识点">search</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-toolbar">
+        <div class="micl-chips xm-chiprow">
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox" checked><span>必修一</span></label>
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>第四章 · 牛顿运动定律</span></label>
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>章级总览</span></label>
+        </div>
+      </div>
+      <div class="xm-map">
+        <div class="xm-map__canvas">
+          <svg class="xm-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M13 24 L30 24" />
+            <path d="M13 47 L32 47" class="is-hot" />
+            <path d="M30 25 L34 45" class="is-hot" />
+            <path d="M34 47 L55 41" class="is-hot" />
+            <path d="M34 48 L55 64" />
+            <path d="M56 41 L75 31" />
+            <path d="M56 41 L56 63" />
+            <path d="M56 64 L83 46" />
+          </svg>
+          <button type="button" class="xm-node" style="left:13%;top:24%">
+            <span class="material-symbols-outlined">straighten</span>运动的描述
+          </button>
+          <button type="button" class="xm-node" style="left:30%;top:24%">
+            <span class="material-symbols-outlined">speed</span>匀变速直线运动
+          </button>
+          <button type="button" class="xm-node xm-node--ok" style="left:13%;top:47%">
+            <span class="material-symbols-outlined">compress</span>相互作用
+          </button>
+          <button type="button" class="xm-node xm-node--now xm-node--sel" style="left:34%;top:46%">
+            <span class="material-symbols-outlined">bolt</span>牛顿运动定律
+          </button>
+          <button type="button" class="xm-node" style="left:56%;top:41%">
+            <span class="material-symbols-outlined">moving</span>曲线运动
+          </button>
+          <button type="button" class="xm-node" style="left:76%;top:31%">
+            <span class="material-symbols-outlined">public</span>万有引力
+          </button>
+          <button type="button" class="xm-node xm-node--ok" style="left:56%;top:64%">
+            <span class="material-symbols-outlined">battery_charging_full</span>机械能守恒
+          </button>
+          <button type="button" class="xm-node" style="left:83%;top:46%">
+            <span class="material-symbols-outlined">shuffle</span>动量
+          </button>
+        </div>
+        <div class="xm-map__zoom">
+          <button type="button" aria-label="放大"><span class="material-symbols-outlined">add</span></button>
+          <button type="button" aria-label="缩小"><span class="material-symbols-outlined">remove</span></button>
+          <button type="button" aria-label="适应窗口"><span class="material-symbols-outlined">fit_screen</span></button>
+        </div>
+        <div class="xm-legend">
+          <span><i class="xm-dot xm-dot--ok"></i>已掌握</span>
+          <span><i class="xm-dot xm-dot--now"></i>学习中</span>
+          <span><i class="xm-dot xm-dot--todo"></i>未开始</span>
+        </div>
+        <div class="xm-mapcard">
+          <div class="xm-row">
+            <span class="xm-badge xm-badge--now">学习中</span>
+            <span class="xm-meta">掌握度 74%</span>
+          </div>
+          <h2 class="xm-h3" style="margin-block-end:6px">牛顿运动定律</h2>
+          <p>先修「相互作用」已掌握。下一层：连接体、板块模型、超重失重。链表里有 6 道题，2 道未掌握。</p>
+          <div class="xm-row">
+            <button type="button" class="micl-button-filled-s" data-action="open-question">打开知识点</button>
+            <button type="button" class="micl-button-text-s" data-action="new-chat">在对话里问</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ================= 记忆 ================= -->
+  <section class="micl-panes xm-screen" data-screen="memories" hidden>
+    <section class="micl-pane xm-pane xm-pane--main xm-pane--tint">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>记忆</h1>
+          <div class="xm-appbar__sub">12 条已确认 · 2 条待确认</div>
+        </div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="搜索记忆">search</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-toolbar">
+        <div class="micl-chips xm-chiprow">
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox" checked><span>全部</span></label>
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>偏好</span></label>
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>约定</span></label>
+          <label class="micl-chip-filter"><span class="micl-button__icon material-symbols-outlined">check</span><input type="checkbox"><span>事实</span></label>
+        </div>
+      </div>
+      <div class="xm-body">
+        <div class="xm-memgrid">
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">person</span>偏好</div>
+            <p class="xm-mem__text">讲解先给结论，再展开原因。不要一上来就写一大段推导。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">forum</span><span>来自对话</span><span class="xm-push">11/12</span></div>
+          </article>
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">schedule</span>约定</div>
+            <p class="xm-mem__text">每天 19:30 提醒复习，超过 20 分钟就不再提醒。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">settings</span><span>来自设置</span><span class="xm-push">11/10</span></div>
+          </article>
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">lightbulb</span>事实</div>
+            <p class="xm-mem__text">物理最薄弱的是连接体问题；化学最薄弱的是氧化还原配平。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">library_books</span><span>来自题库</span><span class="xm-push">11/16</span></div>
+          </article>
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">person</span>偏好</div>
+            <p class="xm-mem__text">数学公式要一步一步写，关键一步不要跳；可以用符号，但第一次出现要说明。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">forum</span><span>来自对话</span><span class="xm-push">11/09</span></div>
+          </article>
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">schedule</span>约定</div>
+            <p class="xm-mem__text">周报周日晚生成，只放在资料库，不主动推送。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">description</span><span>来自资料</span><span class="xm-push">11/03</span></div>
+          </article>
+          <article class="micl-card-outlined xm-mem">
+            <div class="xm-mem__q"><span class="material-symbols-outlined">lightbulb</span>事实</div>
+            <p class="xm-mem__text">英语定语从句已经掌握，正确率 92%，可以少安排这类复习。</p>
+            <div class="xm-mem__foot"><span class="material-symbols-outlined">library_books</span><span>来自题库</span><span class="xm-push">11/08</span></div>
+          </article>
+        </div>
+      </div>
+      <button type="button" class="xm-fab" data-action="new-memory">
+        <span class="material-symbols-outlined">add</span>新记忆
+      </button>
+    </section>
+  </section>
+
+  <!-- ================= 本周 ================= -->
+  <section class="micl-panes xm-screen" data-screen="week" hidden>
+    <section class="micl-pane xm-pane xm-pane--main">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>本周</h1>
+          <div class="xm-appbar__sub">11/11 – 11/17 · 第 12 周</div>
+        </div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="分享周报">share</button>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-body">
+        <div class="xm-dash">
+          <div class="xm-stats">
+            <div class="xm-stat">
+              <div class="xm-stat__label"><span class="material-symbols-outlined">task_alt</span>复习</div>
+              <div class="xm-stat__num">42<small>题</small></div>
+              <div class="xm-stat__foot">比上周多 8 题</div>
+            </div>
+            <div class="xm-stat">
+              <div class="xm-stat__label"><span class="material-symbols-outlined">percent</span>正确率</div>
+              <div class="xm-stat__num">78<small>%</small></div>
+              <div class="xm-stat__foot">比上周高 6 个点</div>
+            </div>
+            <div class="xm-stat">
+              <div class="xm-stat__label"><span class="material-symbols-outlined">local_fire_department</span>连续</div>
+              <div class="xm-stat__num">6<small>天</small></div>
+              <div class="xm-stat__foot">最长记录 11 天</div>
+            </div>
+            <div class="xm-stat">
+              <div class="xm-stat__label"><span class="material-symbols-outlined">schedule</span>待复习</div>
+              <div class="xm-stat__num">12<small>题</small></div>
+              <div class="xm-stat__foot">今天到期 7 题</div>
+            </div>
+          </div>
+
+          <div class="xm-dash2">
+            <div>
+              <div class="xm-panel">
+                <div class="xm-panel__head">
+                  <h2>本周节奏</h2>
+                  <span class="xm-meta">分钟</span>
+                </div>
+                <div class="xm-bars">
+                  <div class="xm-bar"><span class="xm-bar__c">18</span><div class="xm-bar__v" style="block-size:36%"></div><span class="xm-bar__n">一</span></div>
+                  <div class="xm-bar xm-bar--on"><span class="xm-bar__c">32</span><div class="xm-bar__v" style="block-size:64%"></div><span class="xm-bar__n">二</span></div>
+                  <div class="xm-bar"><span class="xm-bar__c">14</span><div class="xm-bar__v" style="block-size:28%"></div><span class="xm-bar__n">三</span></div>
+                  <div class="xm-bar xm-bar--on"><span class="xm-bar__c">41</span><div class="xm-bar__v" style="block-size:82%"></div><span class="xm-bar__n">四</span></div>
+                  <div class="xm-bar"><span class="xm-bar__c">26</span><div class="xm-bar__v" style="block-size:52%"></div><span class="xm-bar__n">五</span></div>
+                  <div class="xm-bar xm-bar--on"><span class="xm-bar__c">47</span><div class="xm-bar__v" style="block-size:94%"></div><span class="xm-bar__n">六</span></div>
+                  <div class="xm-bar"><span class="xm-bar__c">21</span><div class="xm-bar__v" style="block-size:42%"></div><span class="xm-bar__n">日</span></div>
+                </div>
+              </div>
+              <div class="xm-panel">
+                <div class="xm-panel__head">
+                  <h2>学科掌握</h2>
+                  <span class="xm-meta">按知识点计</span>
+                </div>
+                <div class="xm-subj"><span class="xm-subj__t">物理</span><span class="xm-subj__bar"><i style="inline-size:64%"></i></span><span class="xm-subj__p">64%</span></div>
+                <div class="xm-subj"><span class="xm-subj__t">数学</span><span class="xm-subj__bar"><i style="inline-size:71%"></i></span><span class="xm-subj__p">71%</span></div>
+                <div class="xm-subj"><span class="xm-subj__t">化学</span><span class="xm-subj__bar"><i style="inline-size:58%"></i></span><span class="xm-subj__p">58%</span></div>
+                <div class="xm-subj"><span class="xm-subj__t">英语</span><span class="xm-subj__bar"><i style="inline-size:86%"></i></span><span class="xm-subj__p">86%</span></div>
+                <div class="xm-subj xm-subj--ok"><span class="xm-subj__t">历史</span><span class="xm-subj__bar"><i style="inline-size:92%"></i></span><span class="xm-subj__p">92%</span></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="xm-panel">
+                <div class="xm-panel__head">
+                  <h2>今天要做</h2>
+                  <span class="xm-meta">预计 14 分钟</span>
+                </div>
+                <div class="xm-due">
+                  <span class="xm-qrow__no">8</span>
+                  <div class="xm-due__t"><b>连接体 · 整体法与隔离法</b><span>物理 · 3 道</span></div>
+                  <span class="xm-due__n">4 天</span>
+                </div>
+                <div class="xm-due">
+                  <span class="xm-qrow__no">5</span>
+                  <div class="xm-due__t"><b>氧化还原 · 配平</b><span>化学 · 2 道</span></div>
+                  <span class="xm-due__n">2 天</span>
+                </div>
+                <div class="xm-due">
+                  <span class="xm-qrow__no">3</span>
+                  <div class="xm-due__t"><b>导数与单调性</b><span>数学 · 1 道</span></div>
+                  <span class="xm-due__n">1 天</span>
+                </div>
+                <div class="xm-due">
+                  <span class="xm-qrow__no">1</span>
+                  <div class="xm-due__t"><b>细胞呼吸 · 三个阶段</b><span>生物 · 1 道</span></div>
+                  <span class="xm-due__n">今天</span>
+                </div>
+                <div style="margin-block-start:14px">
+                  <button type="button" class="micl-button-filled-m" style="inline-size:100%" data-action="open-review">开始复习 · 7 道</button>
+                </div>
+              </div>
+              <div class="xm-panel">
+                <div class="xm-panel__head"><h2>她发现的</h2><span class="xm-meta">本周</span></div>
+                <p class="xm-sub" style="margin:0 0 10px">你在“有摩擦”的追问里停了 3 次，可能只是没把 <span class="xm-formula">f = μN</span> 画进受力图。</p>
+                <p class="xm-sub" style="margin:0">英语定语从句连续 5 次正确，下周会减少这一类。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ================= 设置 ================= -->
+  <section class="micl-panes xm-screen" data-screen="settings" hidden>
+    <aside class="micl-pane xm-pane xm-pane--list">
+      <header class="micl-appbar xm-appbar">
+        <div class="micl-appbar__headline"><h1>设置</h1></div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="切换深浅色" data-action="toggle-theme">dark_mode</button>
+      </header>
+      <div class="xm-body">
+        <div class="xm-setlist">
+          <div class="xm-setlist__day">常规</div>
+          <button type="button" class="xm-setitem is-on"><span class="material-symbols-outlined">memory</span><span class="xm-setitem__t">模型</span><span class="xm-setitem__v">5 个</span></button>
+          <button type="button" class="xm-setitem"><span class="material-symbols-outlined">search</span><span class="xm-setitem__t">搜索</span><span class="xm-setitem__v">博查</span></button>
+          <button type="button" class="xm-setitem"><span class="material-symbols-outlined">photo_camera</span><span class="xm-setitem__t">拍题</span><span class="xm-setitem__v">前摄</span></button>
+          <div class="xm-setitem" style="cursor:default"><span class="material-symbols-outlined">dark_mode</span><span class="xm-setitem__t">深色模式</span><input type="checkbox" class="micl-switch" id="theme-switch" aria-label="深色模式"></div>
+          <div class="xm-setlist__day">数据</div>
+          <button type="button" class="xm-setitem"><span class="material-symbols-outlined">database</span><span class="xm-setitem__t">导出与备份</span></button>
+          <button type="button" class="xm-setitem"><span class="material-symbols-outlined">info</span><span class="xm-setitem__t">关于小满</span><span class="xm-setitem__v">0.9.2</span></button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="micl-pane xm-pane xm-pane--main">
+      <header class="micl-appbar xm-appbar xm-appbar--hairline">
+        <div class="micl-appbar__headline">
+          <h1>模型</h1>
+          <div class="xm-appbar__sub">2 个 provider 已连接</div>
+        </div>
+        <button type="button" class="micl-appbar__trailing-icon micl-iconbutton-standard-s material-symbols-outlined" aria-label="更多">more_vert</button>
+      </header>
+      <div class="xm-body">
+        <div class="xm-set">
+          <div class="xm-group">
+            <div class="xm-group__head">
+              <span class="material-symbols-outlined">cloud</span><b>千帆</b>
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>已连接</span>
+            </div>
+            <button type="button" class="xm-model is-on">
+              <span class="xm-model__radio"></span>
+              <span class="xm-model__t"><b>deepseek-v4-pro</b><span>推理 · 适合讲题</span></span>
+              <span class="xm-model__ctx">128K</span>
+            </button>
+            <button type="button" class="xm-model">
+              <span class="xm-model__radio"></span>
+              <span class="xm-model__t"><b>deepseek-v4-flash</b><span>快速 · 日常问答</span></span>
+              <span class="xm-model__ctx">64K</span>
+            </button>
+            <button type="button" class="xm-model">
+              <span class="xm-model__radio"></span>
+              <span class="xm-model__t"><b>ernie-4.5-turbo</b><span>通用</span></span>
+              <span class="xm-model__ctx">128K</span>
+            </button>
+          </div>
+
+          <div class="xm-group">
+            <div class="xm-group__head">
+              <span class="material-symbols-outlined">cloud</span><b>火山方舟</b>
+              <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>已连接</span>
+            </div>
+            <button type="button" class="xm-model">
+              <span class="xm-model__radio"></span>
+              <span class="xm-model__t"><b>doubao-seed-2.0-pro</b><span>推理 · 长上下文</span></span>
+              <span class="xm-model__ctx">256K</span>
+            </button>
+            <button type="button" class="xm-model">
+              <span class="xm-model__radio"></span>
+              <span class="xm-model__t"><b>doubao-seed-2.0-lite</b><span>轻量 · 标题/摘要</span></span>
+              <span class="xm-model__ctx">128K</span>
+            </button>
+          </div>
+
+          <div class="xm-group">
+            <div class="xm-group__head">
+              <span class="material-symbols-outlined">dns</span><b>自定义端点</b>
+              <span class="xm-meta">未连接</span>
+              <button type="button" class="micl-button-text-s" style="margin-inline-start:auto;block-size:36px">去连接</button>
+            </div>
+          </div>
+
+
+
+          <div class="xm-row" style="gap:8px;margin-block-start:4px">
+            <button type="button" class="micl-button-text-s">更新模型目录</button>
+            <span style="flex:1"></span>
+            <button type="button" class="micl-button-outlined-m" data-action="open-model">管理模型</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+  <!-- @SCREENS -->
+</div>
+
+<!-- ================= 学科空间 ================= -->
+<dialog id="dlg-subject" class="micl-dialog xm-dialog" closedby="closerequest" aria-labelledby="subj-t">
+  <div class="micl-dialog__headline">
+    <h2 id="subj-t">学科空间</h2>
+  </div>
+  <div class="micl-dialog__content">
+    <div class="xm-dialog__grid" id="subject-grid">
+      <button type="button" class="xm-opt is-on" data-subject="全部" data-icon="apps">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">apps</span></span>
+        <span class="xm-opt__t">全部</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="语文" data-icon="menu_book">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">menu_book</span></span>
+        <span class="xm-opt__t">语文</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="数学" data-icon="functions">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">functions</span></span>
+        <span class="xm-opt__t">数学</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="英语" data-icon="translate">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">translate</span></span>
+        <span class="xm-opt__t">英语</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="物理" data-icon="bolt">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">bolt</span></span>
+        <span class="xm-opt__t">物理</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="化学" data-icon="science">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">science</span></span>
+        <span class="xm-opt__t">化学</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="生物" data-icon="biotech">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">biotech</span></span>
+        <span class="xm-opt__t">生物</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="历史" data-icon="account_balance">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">account_balance</span></span>
+        <span class="xm-opt__t">历史</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="地理" data-icon="public">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">public</span></span>
+        <span class="xm-opt__t">地理</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-subject="政治" data-icon="balance">
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">balance</span></span>
+        <span class="xm-opt__t">政治</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="micl-dialog__actions">
+    <button type="button" class="micl-button-text-s" data-close>取消</button>
+    <button type="button" class="micl-button-text-s" data-close>完成</button>
+  </form>
+</dialog>
+
+<!-- ================= 模型选择（侧边） ================= -->
+<dialog id="sheet-model" class="micl-sidesheet xm-sheet" closedby="closerequest" aria-labelledby="model-t">
+  <div class="micl-sidesheet__headline">
+    <h2 id="model-t">模型</h2>
+    <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" data-close aria-label="关闭">close</button>
+  </div>
+  <div class="micl-sidesheet__content xm-sheet__body">
+    <div class="xm-sheet__group">
+      <div class="xm-sheet__ghead"><b>千帆</b><span class="xm-auth"><span class="material-symbols-outlined">check_circle</span>已连接</span></div>
+      <button type="button" class="xm-model is-on">
+        <span class="xm-model__radio"></span>
+        <span class="xm-model__t"><b>deepseek-v4-pro</b><span>推理 · 适合讲题</span></span>
+        <span class="xm-model__ctx">128K</span>
+      </button>
+      <button type="button" class="xm-model">
+        <span class="xm-model__radio"></span>
+        <span class="xm-model__t"><b>deepseek-v4-flash</b><span>快速 · 日常问答</span></span>
+        <span class="xm-model__ctx">64K</span>
+      </button>
+    </div>
+    <div class="xm-sheet__group">
+      <div class="xm-sheet__ghead"><b>火山方舟</b><span class="xm-auth"><span class="material-symbols-outlined">check_circle</span>已连接</span></div>
+      <button type="button" class="xm-model">
+        <span class="xm-model__radio"></span>
+        <span class="xm-model__t"><b>doubao-seed-2.0-pro</b><span>推理 · 长上下文</span></span>
+        <span class="xm-model__ctx">256K</span>
+      </button>
+      <button type="button" class="xm-model">
+        <span class="xm-model__radio"></span>
+        <span class="xm-model__t"><b>doubao-seed-2.0-lite</b><span>轻量 · 标题/摘要</span></span>
+        <span class="xm-model__ctx">128K</span>
+      </button>
+    </div>
+    <div class="xm-sheet__group">
+      <div class="xm-sheet__ghead"><b>自定义端点</b><span class="xm-meta" style="margin-inline-start:auto">未连接</span></div>
+    </div>
+  </div>
+  <div class="xm-sheet__foot">
+    <button type="button" class="micl-button-text-s">更新目录</button>
+    <span class="xm-push"></span>
+    <button type="button" class="micl-button-outlined-m" data-close>管理模型</button>
+  </div>
+</dialog>
+
+<!-- ================= 题目详情（侧边） ================= -->
+<dialog id="sheet-question" class="micl-sidesheet xm-sheet" closedby="closerequest" aria-labelledby="q-t">
+  <div class="micl-sidesheet__headline">
+    <div style="flex:1;min-inline-size:0">
+      <h2 id="q-t">光滑面上两物块相连</h2>
+      <div class="xm-meta">物理 · 2024 期末 · 第 18 题</div>
+    </div>
+    <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" data-close aria-label="关闭">close</button>
+  </div>
+  <div class="micl-sidesheet__content xm-sheet__body">
+    <div class="xm-row" style="margin-block:4px 14px">
+      <span class="xm-badge xm-badge--now">未掌握</span>
+      <span class="xm-badge">牛顿第二定律</span>
+    </div>
+    <p style="font-size:14px;line-height:24px;margin:0 0 14px">光滑水平面上，质量 <span class="xm-formula">m<sub>1</sub> = 2 kg</span> 和 <span class="xm-formula">m<sub>2</sub> = 4 kg</span> 的两物块用轻绳相连，水平力 <span class="xm-formula">F = 12 N</span> 作用在 <span class="xm-formula">m<sub>1</sub></span> 上，求绳中张力。</p>
+
+    <div class="xm-answerbox" style="background:var(--md-sys-color-primary-container);border:0;color:var(--md-sys-color-on-primary-container)">
+      <b>答案</b>
+      <p style="color:inherit;font-size:20px;line-height:28px;font-weight:600;margin-block-start:2px">T = 8 N</p>
+    </div>
+
+    <div class="xm-section">
+      <div class="xm-section__head"><span class="xm-kicker">解析</span></div>
+      <p class="xm-sub" style="margin-block-end:10px">整体系：<span class="xm-formula">a = F / (m<sub>1</sub>+m<sub>2</sub>) = 12 / 6 = 2 m/s²</span>。</p>
+      <p class="xm-sub" style="margin-block-end:10px">隔离 <span class="xm-formula">m<sub>2</sub></span>：水平方向只受绳的拉力，<span class="xm-formula">T = m<sub>2</sub>a = 4 × 2 = 8 N</span>。</p>
+      <p class="xm-sub">易错点：把 <span class="xm-formula">F</span> 直接当成绳张力，或隔离 <span class="xm-formula">m<sub>1</sub></span> 时漏掉绳的拉力。</p>
+    </div>
+
+    <div class="xm-section">
+      <div class="xm-section__head"><span class="xm-kicker">知识点</span></div>
+      <div class="xm-wrap">
+        <span class="xm-badge xm-badge--now">连接体</span>
+        <span class="xm-badge xm-badge--ok"><span class="xm-dot xm-dot--ok"></span>牛顿第二定律</span>
+      </div>
+    </div>
+
+    <div class="xm-section">
+      <div class="xm-section__head"><span class="xm-kicker">复习记录</span></div>
+      <div class="xm-due"><span class="xm-due__t"><b>第 3 次 · 正确</b><span>11/14 · 用时 2 分 10 秒</span></span><span class="xm-due__n">轻松</span></div>
+      <div class="xm-due"><span class="xm-due__t"><b>第 2 次 · 错误</b><span>11/11 · 把 F 当成了 T</span></span><span class="xm-due__n">忘记</span></div>
+      <div class="xm-due"><span class="xm-due__t"><b>第 1 次 · 错误</b><span>11/08 · 未写整体方程</span></span><span class="xm-due__n">困难</span></div>
+    </div>
+  </div>
+  <div class="xm-sheet__foot">
+    <button type="button" class="micl-button-filled-m" data-action="open-review" style="flex:1">开始复习</button>
+    <button type="button" class="micl-button-outlined-m" data-close>编辑</button>
+  </div>
+</dialog>
+
+<!-- ================= 复习（全屏） ================= -->
+<dialog id="dlg-review" class="micl-dialog micl-dialog--fullscreen xm-fullscreen" closedby="closerequest" aria-labelledby="rev-t">
+  <div class="micl-dialog__headline">
+    <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" data-close aria-label="关闭">close</button>
+    <h2 id="rev-t">复习</h2>
+    <span class="xm-meta">3 / 12</span>
+  </div>
+  <div class="micl-dialog__content" style="padding:0;overflow:hidden">
+    <div class="xm-flow">
+      <progress class="micl-linear-progress" value="25" max="100" aria-label="复习进度" style="flex:none;--md-comp-progress-indicator-linear-track-thickness:6px;--md-comp-progress-indicator-linear-active-indicator-thickness:6px"></progress>
+      <div class="xm-flow__bar">
+        <span class="xm-kicker">物理 · 牛顿运动定律</span>
+        <span class="xm-h3" style="text-align:center">第 3 题</span>
+        <span class="xm-meta" style="margin-inline-start:auto">预计 1 分 30 秒</span>
+      </div>
+      <div class="xm-flow__body">
+        <div class="xm-review">
+          <div class="xm-review__q">
+            <div class="xm-kicker">2024 期末 · 第 18 题</div>
+            <p class="xm-review__stem">光滑水平面上，质量 <span class="xm-formula">m<sub>1</sub> = 2 kg</span> 和 <span class="xm-formula">m<sub>2</sub> = 4 kg</span> 的两物块用轻绳相连，水平恒力 <span class="xm-formula">F = 12 N</span> 作用在 <span class="xm-formula">m<sub>1</sub></span> 上。求轻绳对 <span class="xm-formula">m<sub>2</sub></span> 的拉力大小。</p>
+
+            <svg viewBox="0 0 420 150" style="inline-size:min(100%,420px);block-size:auto;color:var(--md-sys-color-on-surface-variant)" aria-label="两物块由轻绳连接的示意图">
+              <line x1="40" y1="118" x2="380" y2="118" stroke="currentColor" stroke-width="1.5" opacity=".5"/>
+              <rect x="70" y="58" width="86" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+              <rect x="222" y="58" width="86" height="60" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
+              <line x1="156" y1="88" x2="222" y2="88" stroke="currentColor" stroke-width="2"/>
+              <text x="113" y="94" text-anchor="middle" font-size="13" fill="currentColor">m₁</text>
+              <text x="265" y="94" text-anchor="middle" font-size="13" fill="currentColor">m₂</text>
+              <line x1="24" y1="88" x2="70" y2="88" stroke="currentColor" stroke-width="2" marker-end="url(#ar)"/>
+              <text x="20" y="78" text-anchor="start" font-size="12" fill="currentColor">F</text>
+              <defs><marker id="ar" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="currentColor"/></marker></defs>
+            </svg>
+
+            <div class="xm-review__tag">
+              <span class="xm-badge xm-badge--now">连接体</span>
+              <span class="xm-badge">牛顿第二定律</span>
+              <span class="xm-badge">整体法 / 隔离法</span>
+            </div>
+
+            <div class="xm-answerbox" style="margin-block-start:24px">
+              <b>上次作答</b>
+              <p>6 N · 只算了 <span class="xm-formula">m<sub>1</sub></span> 的合力，漏了绳对它的拉力。</p>
+            </div>
+            <div class="xm-scratch">
+              <div class="xm-scratch__head"><span class="material-symbols-outlined">edit</span>草稿</div>
+              <div class="xm-scratch__area">手写或在这里打草稿</div>
+            </div>
+          </div>
+
+          <div class="xm-review__a">
+            <div class="xm-row" style="margin-block-end:14px"><span class="xm-kicker" style="flex:1">解析</span><span class="xm-badge">已显示</span></div>
+            <div class="xm-answerbox">
+              <b>第一步 · 整体</b>
+              <p><span class="xm-formula">a = F / (m<sub>1</sub>+m<sub>2</sub>) = 12 / 6 = 2 m/s²</span></p>
+            </div>
+            <div class="xm-answerbox">
+              <b>第二步 · 隔离 m₂</b>
+              <p>水平方向只受绳的拉力：<span class="xm-formula">T = m<sub>2</sub>a = 4 × 2 = 8 N</span></p>
+            </div>
+            <div class="xm-answerbox" style="background:var(--md-sys-color-primary-container);border:0;color:var(--md-sys-color-on-primary-container)">
+              <b>答案</b>
+              <p style="color:inherit;font-size:22px;line-height:30px;font-weight:600;margin-block-start:2px">8 N</p>
+            </div>
+            <p class="xm-sub" style="margin-block-start:16px">常见错因：把外力 <span class="xm-formula">F</span> 当成绳张力；隔离时漏画绳的拉力。</p>
+            <div class="xm-review__foot">
+              <div class="xm-kicker">本题</div>
+              <div class="xm-wrap" style="margin-block-start:8px">
+                <span class="xm-badge xm-badge--now">正确率 41%</span>
+                <span class="xm-badge">已复习 3 次</span>
+                <span class="xm-badge">下次 11/21</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="xm-flow__foot">
+        <span class="xm-kicker">评分</span>
+        <div class="xm-ratebar">
+          <button type="button" class="micl-button-outlined-m" data-close>忘记 · 1天</button>
+          <button type="button" class="micl-button-outlined-m" data-close>困难 · 3天</button>
+          <button type="button" class="micl-button-filled-m" data-close>良好 · 7天</button>
+          <button type="button" class="micl-button-tonal-m" data-close>简单 · 14天</button>
+        </div>
+        <span class="xm-meta">1–4 快捷键</span>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- ================= 拍题（全屏） ================= -->
+<dialog id="dlg-capture" class="micl-dialog micl-dialog--fullscreen xm-fullscreen" closedby="closerequest" aria-labelledby="cap-t">
+  <div class="micl-dialog__headline">
+    <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" data-close aria-label="关闭">close</button>
+    <h2 id="cap-t">拍题</h2>
+    <button type="button" class="micl-iconbutton-standard-s material-symbols-outlined" aria-label="闪光灯">flash_on</button>
+  </div>
+  <div class="micl-dialog__content" style="padding:0;overflow:hidden">
+    <div class="xm-flow" style="background:var(--md-sys-color-scrim)">
+      <div class="xm-cam">
+        <div class="xm-cam__top">
+          <button type="button" class="xm-cam__chip"><span class="material-symbols-outlined">photo_camera_front</span>前摄<span class="material-symbols-outlined">expand_more</span></button>
+          <div class="xm-cam__modes" role="group" aria-label="拍题模式">
+            <button type="button" data-mode="image">图片</button>
+            <button type="button" class="is-on" data-mode="question">题目</button>
+          </div>
+          <button type="button" class="xm-cam__chip"><span class="material-symbols-outlined">grid_3x3</span>自动裁切</button>
+        </div>
+
+        <div class="xm-cam__view">
+          <div class="xm-cam__paper">
+            <h4>高一物理 · 周末练习（三）</h4>
+            <p>7. 光滑水平面上，m<sub>1</sub> = 2 kg、m<sub>2</sub> = 4 kg 用轻绳相连，F = 12 N 拉 m<sub>1</sub>，求绳张力。</p>
+            <p>8. 质量为 2 kg 的物体在水平面上受 10 N 水平力，μ = 0.2，求加速度。</p>
+            <p>9. 斜面倾角 30°，物体从静止下滑，μ = 0.1，求 2 s 内的位移。</p>
+            <div class="xm-cam__rule"></div>
+            <span class="xm-cam__hand">11 月 16 日 · 周末作业</span>
+            <div class="xm-cam__detect" style="left:6%;top:13.5%;width:88%;height:7.5%"><span>1</span></div>
+            <div class="xm-cam__detect" style="left:6%;top:21.5%;width:88%;height:7.5%"><span>2</span></div>
+            <div class="xm-cam__detect" style="left:6%;top:29.5%;width:88%;height:7.5%"><span>3</span></div>
+          </div>
+          <div class="xm-cam__frame"><i></i><i></i><i></i><i></i></div>
+        </div>
+
+        <div class="xm-cam__bottom">
+          <div class="xm-cam__thumbs">
+            <div class="xm-cam__thumb">P1</div>
+            <div class="xm-cam__thumb">P2</div>
+            <div class="xm-cam__thumb">P3</div>
+          </div>
+          <button type="button" class="xm-shutter" aria-label="拍照"></button>
+          <div class="xm-cam__side xm-cam__side--end">
+            <button type="button" class="micl-button-filled-m" data-action="finish-capture">
+              <span class="micl-button__icon material-symbols-outlined">auto_awesome</span>解析 3 题
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</dialog>
+<!-- ================= 技能 ================= -->
+<dialog id="dlg-skill" class="micl-dialog xm-dialog" closedby="closerequest" aria-labelledby="skill-t">
+  <div class="micl-dialog__headline">
+    <h2 id="skill-t">技能</h2>
+  </div>
+  <div class="micl-dialog__content">
+    <div class="xm-skilllist">
+      <button type="button" class="xm-opt" data-close>
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">description</span></span>
+        <span class="xm-opt__t">讲解网页</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-close>
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">picture_as_pdf</span></span>
+        <span class="xm-opt__t">PDF 讲义</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-close>
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">report</span></span>
+        <span class="xm-opt__t">错题报告</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-close>
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">style</span></span>
+        <span class="xm-opt__t">知识卡片</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+      <button type="button" class="xm-opt" data-close>
+        <span class="xm-opt__ico"><span class="material-symbols-outlined">bolt</span></span>
+        <span class="xm-opt__t">记忆闪卡</span><span class="xm-check material-symbols-outlined">check</span>
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="micl-dialog__actions">
+    <button type="button" class="micl-button-text-s" data-close>取消</button>
+  </form>
+</dialog>
+<!-- @DIALOGS -->
+
+<script src="vendor/micl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -128,8 +128,10 @@ def _market_groups(data: dict) -> dict:
     groups: list[dict] = []
     warnings: list[str] = []
     for page in data.get("page_list") or []:
-        w = int(page.get("width") or page.get("orgWidth") or 0)
-        h = int(page.get("height") or page.get("orgHeight") or 0)
+        # 开了 image_correction 后 pos 仍是「原图坐标」（阿里云文档明确：
+        # “矫正后返回原图坐标”），所以归一化必须用 orgWidth/orgHeight。
+        w = int(page.get("orgWidth") or page.get("width") or 0)
+        h = int(page.get("orgHeight") or page.get("height") or 0)
         pno = int(page.get("page_id") or 0) + 1
         for sub in page.get("subject_list") or []:
             text = (sub.get("text") or "").strip()
@@ -279,7 +281,7 @@ async def _call_openapi(image_path: Path, subject: str) -> dict:
 
 
 # ── 云市场（APPCODE，支持 base64）────────────────────
-async def _call_appcode(image_path: Path, subject: str) -> dict:
+async def _call_appcode(image_path: Path, subject: str, correct: bool | None = None) -> dict:
     appcode = settings.papercut_appcode
     endpoint = settings.papercut_endpoint
     if not (appcode and endpoint):
@@ -289,7 +291,7 @@ async def _call_appcode(image_path: Path, subject: str) -> dict:
         "imgList": [base64.b64encode(raw).decode()],
         "paperType": "question",
         "templateType": TEMPLATE.get(subject, "default"),
-        "image_correction": bool(settings.papercut_correct),
+        "image_correction": bool(settings.papercut_correct if correct is None else correct),
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=15.0)) as client:
         resp = await client.post(
@@ -302,11 +304,11 @@ async def _call_appcode(image_path: Path, subject: str) -> dict:
         return resp.json()
 
 
-async def cut(image_path: Path, subject: str = "全部") -> dict:
+async def cut(image_path: Path, subject: str = "全部", correct: bool | None = None) -> dict:
     """返回 {groups, warnings, source}。auth 由 settings.papercut_auth 决定（appcode|aksk）。"""
     auth = (settings.papercut_auth or "").lower()
     if auth == "appcode":
-        data = await _call_appcode(image_path, subject)
+        data = await _call_appcode(image_path, subject, correct)
     elif auth == "aksk":
         data = await _call_openapi(image_path, subject)
     else:

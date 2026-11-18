@@ -30,6 +30,7 @@ from ..services import memory as memory_service
 from ..services import quiz as quiz_service
 from ..services import spaces
 from ..services import search as search_service
+from ..services.profile import get_profile
 from ..services.llm import (
     MEMORY_ADD_TOOL,
     MEMORY_DELETE_TOOL,
@@ -292,6 +293,7 @@ async def _relay_gateway(
                     "skill": user_msg.skill or "",
                     "artifact_id": user_msg.artifact_id or "",
                     "artifact_context": artifact_context,
+                    "profile": get_profile(db),
                 },
             ) as resp:
                 if resp.status_code >= 400:
