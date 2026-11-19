@@ -22,7 +22,7 @@ android {
     // 会导致新 APK 无法覆盖安装。这个 key 只用于 alpha 自用，不是发布密钥。
     signingConfigs {
         debug {
-            storeFile file("keystore/xiaoman-debug.jks")
+            storeFile file("../keystore/xiaoman-debug.jks")
             storePassword "xiaoman-debug-2026"
             keyAlias "xiaoman"
             keyPassword "xiaoman-debug-2026"
