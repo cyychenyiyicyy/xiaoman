@@ -18,7 +18,21 @@ android {
         buildConfig true
     }
 
+    // 固定 debug 签名：GitHub Actions 每次 runner 都换默认 debug key，
+    // 会导致新 APK 无法覆盖安装。这个 key 只用于 alpha 自用，不是发布密钥。
+    signingConfigs {
+        debug {
+            storeFile file("keystore/xiaoman-debug.jks")
+            storePassword "xiaoman-debug-2026"
+            keyAlias "xiaoman"
+            keyPassword "xiaoman-debug-2026"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
