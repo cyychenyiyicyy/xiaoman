@@ -60,7 +60,8 @@ import java.util.Locale;
 public class MainActivity extends Activity {
 
     private static final String TAG = "XiaomanShell";
-    private static final Uri SERVER_URI = Uri.parse(BuildConfig.SERVER_URL);
+    private String serverUrl = "";
+    private Uri serverUri;
     private static final String FILE_PROVIDER_AUTHORITY =
             BuildConfig.APPLICATION_ID + ".fileprovider";
     private static final int REQUEST_FILE_CHOOSER = 1001;
@@ -92,7 +93,18 @@ public class MainActivity extends Activity {
         Button retry = findViewById(R.id.btn_retry);
         retry.setOnClickListener(v -> reload());
         Button openBrowser = findViewById(R.id.btn_browser);
-        openBrowser.setOnClickListener(v -> openExternally(SERVER_URI));
+        openBrowser.setOnClickListener(v -> openExternally(serverUri));
+        Button changeServer = findViewById(R.id.btn_change_server);
+        changeServer.setOnClickListener(v -> changeServer());
+
+        serverUrl = getSharedPreferences(SetupActivity.PREFS, MODE_PRIVATE)
+                .getString(SetupActivity.KEY_URL, "");
+        if (serverUrl == null || serverUrl.isEmpty()) {
+            startActivity(new Intent(this, SetupActivity.class));
+            finish();
+            return;
+        }
+        serverUri = Uri.parse(serverUrl);
 
         // 首次空白/离线页长按可重新加载；页面正常后长按仍归 WebView（选词）。
         offlineView.setOnLongClickListener(v -> {
@@ -125,6 +137,8 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
         settings.setSupportMultipleWindows(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // Caddy 用这个前缀把请求分流到 xiaoman；保留完整 Chrome UA，M3 Web 不受影响。
+        settings.setUserAgentString("XiaomanAlpha/0.2 " + settings.getUserAgentString());
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.SAFE_BROWSING_ENABLE)) {
             WebSettingsCompat.setSafeBrowsingEnabled(settings, true);
@@ -156,7 +170,16 @@ public class MainActivity extends Activity {
         offlineView.setVisibility(View.GONE);
         progressBar.setProgress(0);
         progressBar.setVisibility(View.VISIBLE);
-        webView.loadUrl(BuildConfig.SERVER_URL);
+        webView.loadUrl(serverUrl);
+    }
+
+    private void changeServer() {
+        getSharedPreferences(SetupActivity.PREFS, MODE_PRIVATE)
+                .edit().remove(SetupActivity.KEY_URL).apply();
+        Intent intent = new Intent(this, SetupActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+        finish();
     }
 
     private void reload() {
@@ -170,7 +193,7 @@ public class MainActivity extends Activity {
 
         String current = webView.getUrl();
         if (current == null || current.isEmpty() || "about:blank".equals(current)) {
-            webView.loadUrl(BuildConfig.SERVER_URL);
+            webView.loadUrl(serverUrl);
         } else {
             webView.reload();
         }
@@ -180,7 +203,7 @@ public class MainActivity extends Activity {
         Log.w(TAG, "Main frame failed: " + reason);
         mainFrameError = true;
         progressBar.setVisibility(View.GONE);
-        offlineHost.setText(BuildConfig.SERVER_URL);
+        offlineHost.setText(serverUrl);
         offlineView.setVisibility(View.VISIBLE);
         offlineView.bringToFront();
     }
@@ -213,14 +236,14 @@ public class MainActivity extends Activity {
 
     private boolean isInternal(Uri uri) {
         String host = uri.getHost();
-        String serverHost = SERVER_URI.getHost();
+        String serverHost = serverUri == null ? null : serverUri.getHost();
         if (host == null || serverHost == null) {
             return false;
         }
         if (!host.equalsIgnoreCase(serverHost)) {
             return false;
         }
-        return effectivePort(uri) == effectivePort(SERVER_URI);
+        return effectivePort(uri) == effectivePort(serverUri);
     }
 
     private static int effectivePort(Uri uri) {

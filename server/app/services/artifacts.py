@@ -305,7 +305,7 @@ def save_artifact(
     skill: str = "",
     parent_id: str | None = None,
 ) -> Artifact:
-    kind = kind if kind in ("html", "pdf", "png", "flashcards") else "html"
+    kind = kind if kind in ("html", "pdf", "png", "flashcards", "paper") else "html"
     title = (title or "知识点讲解").strip()[:120]
     aid = uuid.uuid4().hex
     folder = _art_dir()
@@ -319,7 +319,7 @@ def save_artifact(
     else:
         doc = document
 
-    if kind in ("html", "flashcards"):
+    if kind in ("html", "flashcards", "paper"):
         path = folder / f"{aid}.html"
         path.write_text(doc, encoding="utf-8")
         mime = "text/html; charset=utf-8"
@@ -414,7 +414,7 @@ def publish_workspace(
     doc = target.read_text(encoding="utf-8")
     if not doc.strip():
         raise ValueError("文件是空的")
-    real_kind = "pdf" if kind == "pdf" else "html"
+    real_kind = "pdf" if kind == "pdf" else ("paper" if kind == "paper" else "html")
     return save_artifact(
         db,
         conversation_id=conversation_id,

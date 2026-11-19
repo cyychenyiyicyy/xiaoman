@@ -122,7 +122,7 @@ def list_artifacts(
 ):
     """资料库：所有生成过的网页 / PDF / 卡片；q 搜标题、正文与知识点。"""
     where = []
-    if kind in ("html", "pdf", "png", "flashcards"):
+    if kind in ("html", "pdf", "png", "flashcards", "paper"):
         where.append(Artifact.kind == kind)
     if subject:
         where.append(Artifact.subject == subject)

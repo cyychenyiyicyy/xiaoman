@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">小满</string>
     <string name="offline_title">连不上小满</string>
-    <string name="offline_detail">检查服务器是否在运行，或稍后再试。</string>
+    <string name="offline_detail">检查服务器是否在运行，或换一个地址。</string>
     <string name="retry">重试</string>
     <string name="open_in_browser">在浏览器打开</string>
     <string name="file_chooser_title">选择照片</string>
@@ -10,4 +10,15 @@
     <string name="no_app_for_link">没有可打开这个链接的应用</string>
     <string name="download_started">已开始下载</string>
     <string name="download_failed">无法下载这个文件</string>
+
+    <string name="setup_kicker">XIAOMAN · ALPHA</string>
+    <string name="setup_title">连接小满</string>
+    <string name="setup_sub">填写你服务器的地址。\n连接一次，之后自动连接。</string>
+    <string name="setup_hint">192.168.1.10 或 http://your-server:8787</string>
+    <string name="setup_connect">连接</string>
+    <string name="setup_connecting">连接中…</string>
+    <string name="setup_foot">地址只保存在这台设备上。\n服务器是你自己的，数据不经过第三方。</string>
+    <string name="change_server">更换服务器</string>
+    <string name="setup_error_format">输入一个 IP 或地址，比如 192.168.1.10</string>
+    <string name="setup_error_connect">连不上这个地址，检查服务器是否在运行</string>
 </resources>

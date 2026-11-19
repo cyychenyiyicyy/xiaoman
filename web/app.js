@@ -2699,7 +2699,8 @@
     html: ['讲解网页', 'globe'],
     pdf: ['PDF', 'book-open-text'],
     png: ['知识卡片', 'image'],
-    flashcards: ['记忆闪卡', 'book']
+    flashcards: ['记忆闪卡', 'book'],
+    paper: ['试卷', 'description']
   };
   function artKindMeta(k) { return ART_KINDS[k] || ['资料', 'book']; }
 
@@ -2894,6 +2895,21 @@
     loadLibrary();
   }
 
+  function addPaper() {
+    state.editArtifact = null;
+    state.skill = 'exam-analysis';
+    openConversations();
+    render();
+    var ta = q('#ta');
+    if (ta) {
+      ta.value = '分析这套试卷：先看结构、分值和知识点分布，再给失分点与复习建议。';
+      autosize();
+    }
+    toast('选择试卷照片，可以多张');
+    var f = q('#file-attach');
+    if (f) f.click();
+  }
+
   function libCardHtml(a) {
     var k = artKindMeta(a.kind);
     var meta = [k[0]];
@@ -2920,7 +2936,7 @@
       return nav + '<div class="settings">' +
         pageErrorState('加载失败', b.error, 'library-reload', 'rail-chat', '返回对话') + '</div>';
     }
-    var kinds = [['', '全部'], ['html', '网页'], ['pdf', 'PDF'], ['png', '卡片'], ['flashcards', '闪卡']];
+    var kinds = [['', '全部'], ['html', '网页'], ['pdf', 'PDF'], ['png', '卡片'], ['flashcards', '闪卡'], ['paper', '试卷']];
     var chips = kinds.map(function (x) {
       var on = (b.kind || '') === x[0];
       return '<span class="fchip' + (on ? ' on' : '') + '" role="button" tabindex="0" data-act="library-kind" data-kind="' + esc(x[0]) + '">' +
@@ -2941,13 +2957,14 @@
     }).join('');
     if (!list) {
       list = '<div class="empty"><div class="t">' + (b.q ? '没有匹配的资料' : '还没有资料') + '</div>' +
-        '<div class="d">' + (b.q ? '换个关键词，或者换个类型' : '在对话里选一个技能，让她做一份网页、PDF 或卡片') + '</div>' +
+        '<div class="d">' + (b.q ? '换个关键词，或者换个类型' : '在对话里选技能做网页 / PDF / 卡片，或点「＋ 试卷」做整套试卷分析') + '</div>' +
         '<div class="btnbar"><button type="button" class="btn p" data-act="rail-chat">去对话</button></div></div>';
     }
     return nav +
       '<div class="libsearch">' +
         '<input id="lib-q" class="fi" type="search" placeholder="搜标题、正文、知识点" value="' + esc(b.q || '') + '">' +
         '<button type="button" class="btn" data-act="lib-search">搜索</button>' +
+        '<button type="button" class="btn p" data-act="add-paper">＋ 试卷</button>' +
       '</div>' +
       '<div class="bankchips libchips">' + chips + '</div>' +
       '<div class="settings bankwrap">' + list + '</div>';
@@ -3084,6 +3101,7 @@
     else if (a.kind === 'png') state.skill = 'card';
     else if (a.kind === 'flashcards') state.skill = 'flashcards';
     else if (a.kind === 'pdf') state.skill = 'pdf';
+    else if (a.kind === 'paper') state.skill = 'exam-analysis';
     else state.skill = 'webpage';
     closeOverlay();
     closePreview();
@@ -6104,6 +6122,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-library': function () { openLibrary(); },
     'library-reload': function () { loadLibrary(); },
     'library-kind': function (el) { libKind(el.getAttribute('data-kind') || ''); },
+    'add-paper': function () { addPaper(); },
     'lib-search': function () { libSearch(); },
     'artifact-menu': function (el) { openArtifactMenu(el.getAttribute('data-id') || ''); },
     'artifact-continue': function (el) { continueArtifact(el.getAttribute('data-id') || ''); },

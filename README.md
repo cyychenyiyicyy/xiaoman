@@ -12,7 +12,7 @@
 
 小满是一个**单用户、自托管**的学习 agent：对话是入口，题库、知识点地图、FSRS 复习、资料与周报是它自己长出来的结构。数据只在自己的服务器上，没有账号、没有多租户、没有订阅。
 
-当前版本：**alpha 0.1**（Android WebView 壳 + 平板优先的 Web 界面）。
+当前版本：**alpha 0.2**（Android WebView 壳 + 平板优先的 Web 界面；APK 不内置服务器地址）。
 
 ![小满界面总览](docs/screenshots/overview.png)
 
@@ -43,6 +43,9 @@
 | **记忆** | 她记住的偏好 / 约定 / 事实，可查看、可修改、可删除 |
 | **本周** | 消息、活跃天、连续天数、学科分布 |
 | **首次引导** | 第一次打开先给她起名字，再填你的名字 / 性别 / 年级，然后开始对话 |
+| **首次连接** | APK 不写死服务器；第一次填 IP / 地址，连接成功后自动记住 |
+| **试卷分析** | 上传整套试卷照片，生成结构 / 分值 / 知识点分布 / 失分点的分析页，存进资料库 |
+| **资料库** | 网页、PDF、卡片、闪卡，以及「试卷」类型；可从资料库直接添加试卷 |
 | **深色模式** | 只换 token，布局不变 |
 
 ### 截图
@@ -71,7 +74,9 @@
 
 ```mermaid
 flowchart LR
-  A["Android WebView<br/>平板 / 手机"] -->|HTTP + SSE| B["FastAPI<br/>web + API"]
+  A["Android WebView<br/>平板 / 手机"] -->|UA: XiaomanAlpha<br/>HTTP + SSE| H["Caddy<br/>80 / 443"]
+  H --> B["FastAPI<br/>web + API"]
+  H -. 其他 UA .-> I["同一 IP 的原有站点"]
   B --> C["PostgreSQL<br/>对话 / 题库 / 记忆 / 知识点"]
   B -->|/agent/chat| D["Pi Gateway<br/>对话循环 + 工具"]
   D --> E["模型 provider<br/>DeepSeek / 千帆 / 火山 …"]
@@ -83,6 +88,7 @@ flowchart LR
 - **API**：FastAPI + SQLAlchemy 2 + PostgreSQL；确定性业务（复习调度、图谱、检索）在服务端，不交给模型猜。
 - **Agent**：Pi 负责对话循环、模型、工具调用；小满只加领域工具和 prompt。
 - **Android**：系统 WebView 的轻量壳，只做外壳、返回、文件选择、前摄拍题和状态栏，不重复实现 UI。
+- **连接**：APK 首次启动填服务器地址；WebView 的 UA 带 `XiaomanAlpha/0.2` 前缀，Caddy 按 UA 分流到小满，不占路径、不开新端口。裸 IP 根路径仍归原有站点。
 - **OCR / 切题**：云 API；默认开启 `image_correction`，坐标仍按原图返回，复核框不会偏。
 
 ### 仓库结构
@@ -140,11 +146,11 @@ Pi 的模型目录 / 认证在 `agent/.pi-home`，同样不入库。模型可以
 
 ```bash
 cd android
-gradle assembleDebug -PserverUrl=http://your-server:8787
+gradle assembleDebug
 # 产物：android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-APK 通过 `BuildConfig.SERVER_URL` 加载你的服务器；GitHub Actions 从 repository variable `XIAOMAN_SERVER_URL` 注入，不把地址写进仓库。本地构建用 `-PserverUrl=...`。支持平板与手机、横竖屏、前摄拍题、文件选择与系统返回。
+APK **不内置任何服务器地址**。第一次打开会显示「连接小满」：填 IP / 地址，点连接；验证 `/health` 通过后保存到本地，以后自动连接。服务器不可达时会显示离线页，里面可以「更换服务器」。支持平板与手机、横竖屏、前摄拍题、文件选择与系统返回。
 
 ### 5. 部署到自己的服务器
 
@@ -164,15 +170,17 @@ server/.venv/bin/alembic upgrade head     # 没有新迁移时是空操作
 
 ---
 
-## 当前状态（alpha 0.1）
+## 当前状态（alpha 0.2）
 
 | 已可用 | 说明 |
 |---|---|
 | 首次引导 | agent 名字 + 用户名字 / 性别 / 年级；存服务器 `app_setting`，本地也缓存一份 |
+| 首次连接 | APK 不内置服务器；填 IP / 地址，验证后保存，之后自动连接 |
 | MD3 正式版界面 | 对话 / 题库 / 资料 / 地图 / 记忆 / 本周 / 设置 / 复习 / 拍题，平板双栏、手机单栏 |
 | 拍题 | 前摄取景，默认自动矫正；复核框按原图坐标 |
 | 题库 / 知识点 / 复习 | 解析、知识点、每日到期、FSRS 评分 |
-| 技能 | 讲解网页 / PDF / 错题报告 / 知识卡片 / 记忆闪卡 |
+| 试卷分析 | 整套试卷照片 → 结构 / 分值 / 知识点分布 / 失分点报告，存为「试卷」资料 |
+| 技能 | 讲解网页 / PDF / 错题报告 / 知识卡片 / 记忆闪卡 / 试卷分析 |
 | Android APK | GitHub Actions 构建 debug APK，tag `v*` 自动发 prerelease |
 
 **已知限制**

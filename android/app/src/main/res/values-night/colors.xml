@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="surface">#1A110F</color>
-    <color name="on_surface">#EDEAE3</color>
-    <color name="on_surface_secondary">#B8AFA6</color>
+    <color name="on_surface">#F1DFDA</color>
+    <color name="on_surface_secondary">#D8C2BC</color>
+    <color name="on_surface_tertiary">#A08C87</color>
+    <color name="line">#53433F</color>
+    <color name="clay">#FFB59F</color>
     <color name="clay_bar">#1A110F</color>
+    <color name="clay_icon">#D86535</color>
+    <color name="on_clay">#561F0E</color>
+    <color name="clay_ripple">#33FFFFFF</color>
+    <color name="setup_input">#322825</color>
+    <color name="error">#FFB4AB</color>
     <color name="progress_track">#3B251E</color>
+    <color name="icon_background">#723522</color>
 </resources>

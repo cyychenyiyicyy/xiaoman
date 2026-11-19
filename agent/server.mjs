@@ -402,11 +402,11 @@ function fileTools() {
     defineTool({
       name: "publish",
       label: "发布文件",
-      description: "把工作区里的 HTML 发布成资料（kind=html），或打印成 PDF（kind=pdf）。发布后对话里会出现产物卡。",
+      description: "把工作区里的 HTML 发布成资料（kind=html / paper），或打印成 PDF（kind=pdf）。发布后对话里会出现产物卡。",
       parameters: Type.Object({
         path: Type.String({ description: "相对路径，如 index.html" }),
         title: Type.String({ description: "标题，不超过 20 字" }),
-        kind: Type.Optional(Type.Union([Type.Literal("html"), Type.Literal("pdf")], { description: "html 或 pdf" })),
+        kind: Type.Optional(Type.Union([Type.Literal("html"), Type.Literal("pdf"), Type.Literal("paper")], { description: "html / pdf / paper" })),
       }),
       async execute(_id, params) {
         const result = await callTool("/internal/tools/publish", {
