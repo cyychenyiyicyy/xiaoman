@@ -41,6 +41,7 @@ npm ci --omit=dev
 # Gateway 需要 model key；可放 /srv/xiaoman/agent/.env（chmod 600）
 # DEEPSEEK_API_KEY=...
 # PI_INTERNAL_TOKEN=...  # 与 server/.env 的 INTERNAL_TOKEN 一致
+# PI_FASTAPI=http://127.0.0.1:8790/api/v1
 node server.mjs
 ```
 
