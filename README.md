@@ -226,6 +226,7 @@ server/.venv/bin/alembic upgrade head     # 没有新迁移时是空操作
 | 视觉系统 | [`docs/12`](docs/12-视觉系统v3.md) |
 | MD3 平板重设计 | [`docs/40`](docs/40-MD3平板界面重设计.md) |
 | 路线图与多端计划 | [`docs/41`](docs/41-路线图与多端计划.md) |
+| 部署（systemd / PostgreSQL / Caddy UA 分流） | [`deploy/README.md`](deploy/README.md) |
 
 ---
 

@@ -2910,6 +2910,18 @@
     if (f) f.click();
   }
 
+  function makeMistakeReport() {
+    state.editArtifact = null;
+    state.skill = 'mistake-report';
+    openConversations();
+    render();
+    var ta = q('#ta');
+    if (ta) {
+      ta.value = '把这周待解决的错题整理成一份复盘报告。';
+      autosize();
+    }
+  }
+
   function libCardHtml(a) {
     var k = artKindMeta(a.kind);
     var meta = [k[0]];
@@ -2964,6 +2976,7 @@
       '<div class="libsearch">' +
         '<input id="lib-q" class="fi" type="search" placeholder="搜标题、正文、知识点" value="' + esc(b.q || '') + '">' +
         '<button type="button" class="btn" data-act="lib-search">搜索</button>' +
+        '<button type="button" class="btn" data-act="make-mistake-report">错题</button>' +
         '<button type="button" class="btn p" data-act="add-paper">＋ 试卷</button>' +
       '</div>' +
       '<div class="bankchips libchips">' + chips + '</div>' +
@@ -6123,6 +6136,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'library-reload': function () { loadLibrary(); },
     'library-kind': function (el) { libKind(el.getAttribute('data-kind') || ''); },
     'add-paper': function () { addPaper(); },
+    'make-mistake-report': function () { makeMistakeReport(); },
     'lib-search': function () { libSearch(); },
     'artifact-menu': function (el) { openArtifactMenu(el.getAttribute('data-id') || ''); },
     'artifact-continue': function (el) { continueArtifact(el.getAttribute('data-id') || ''); },
