@@ -27,6 +27,8 @@
     profileLoaded: false,
     sideCollapsed: false,    // 对话列表是否收起（本地偏好）
     uiScale: 0.9,            // 界面缩放（0.8–1.15，本地偏好）
+    authEnabled: false,      // 服务器是否开启访问密码
+    authBound: false,
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
     preview: null,           // 右侧预览的产物
@@ -297,7 +299,10 @@
       // 纯静态服务下的 404 会回一整页 HTML：只留状态码，不把 HTML 塞进错误态
       if (detail.charAt(0) === '<') detail = '';
       if (detail.length > 160) detail = detail.slice(0, 160) + '…';
-      throw new Error((detail ? detail + ' · ' : '') + 'HTTP ' + res.status);
+      if (res.status === 401 && String(path).indexOf('/auth/') !== 0) showAuth();
+      var err = new Error((detail ? detail + ' · ' : '') + 'HTTP ' + res.status);
+      err.status = res.status;
+      throw err;
     }
     if (!raw) return null;
     try { return JSON.parse(raw); } catch (e3) { return raw; }
@@ -4476,7 +4481,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         '<span class="lead">' + ic('person') + '</span>' +
         '<span class="md"><span class="n1">' + esc(agentName()) + '</span>' +
         '<span class="n2">' + esc(p.user_name ? ('你 · ' + p.user_name) : '还没填你的名字') + '</span></span>' +
-        '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>');
+        '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>' +
+      (state.authEnabled ? '<button type="button" class="srow" data-act="logout">' +
+        '<span class="lead">' + ic('logout') + '</span>' +
+        '<span class="md"><span class="n1">退出登录</span></span>' +
+        '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>' : ''));
 
     if (state.searchState === 'loading' && !state.search) {
       return nav + '<div class="det">' + profileGroup + themeGroup +
@@ -6241,6 +6250,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'scale-pick': function (el) { pickUiScale(el.getAttribute('data-v') || '1'); },
     'toggle-convside': function () { toggleConvSide(); },
     'open-profile': function () { showOnboarding(true); },
+    'logout': function () { doLogout(); },
     'open-skill-sheet': function () { openSkillSheet(); },
     'open-hero-subjects': function () { openHeroSubjects(); },
     'hero-subject': function (el) { pickHeroSubject(el.getAttribute('data-subject') || '全部'); },
@@ -6579,6 +6589,81 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     });
   }
 
+  /* ── 访问密码（服务器单用户登录）──────────────────── */
+  function showAuth() {
+    var box = q('#auth');
+    if (!box) return;
+    box.hidden = false;
+    var err = q('#auth-error');
+    if (err) { err.hidden = true; err.textContent = ''; }
+    bindAuth();
+    setTimeout(function () { var p = q('#auth-pass'); if (p) p.focus(); }, 40);
+  }
+  function hideAuth() {
+    var box = q('#auth');
+    if (box) box.hidden = true;
+  }
+  function bindAuth() {
+    if (state.authBound) return;
+    state.authBound = true;
+    var go = q('#auth-go');
+    var input = q('#auth-pass');
+    if (go) go.addEventListener('click', doLogin);
+    if (input) input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doLogin(); }
+    });
+  }
+  async function checkAuth() {
+    try {
+      var r = await fetch(API + '/auth/me', { credentials: 'same-origin' });
+      if (r.status === 401) {
+        state.authEnabled = true;
+        showAuth();
+        return false;
+      }
+      if (r.ok) {
+        try {
+          var d = await r.json();
+          state.authEnabled = !!d.auth_enabled;
+        } catch (e) { state.authEnabled = false; }
+      }
+      return true;
+    } catch (e) {
+      // 连不上服务器时不要弹登录框；让主页的离线/错误态处理。
+      return true;
+    }
+  }
+  async function doLogin() {
+    var input = q('#auth-pass');
+    var go = q('#auth-go');
+    var err = q('#auth-error');
+    var pass = (input && input.value) || '';
+    if (!pass) {
+      if (err) { err.textContent = '请输入访问密码'; err.hidden = false; }
+      return;
+    }
+    if (go) { go.disabled = true; go.textContent = '验证中…'; }
+    if (err) { err.hidden = true; err.textContent = ''; }
+    try {
+      await api('/auth/login', { method: 'POST', json: { password: pass } });
+      state.authEnabled = true;
+      if (input) input.value = '';
+      // 重新加载，避免已初始化页面重复绑定事件 / 保留半截旧数据
+      location.reload();
+    } catch (e) {
+      if (err) {
+        err.textContent = (e.message && e.message.indexOf('401') >= 0) ? '密码不对' : '登录失败，请重试';
+        err.hidden = false;
+      }
+    } finally {
+      if (go) { go.disabled = false; go.textContent = '进入'; }
+    }
+  }
+  async function doLogout() {
+    try { await api('/auth/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+    location.reload();
+  }
+
   /* ── 启动 ─────────────────────────────────────────── */
   async function forceToday() {
     try { await api('/subject', { method: 'PATCH', json: { subject: '全部' } }); } catch (e) { /* 忽略 */ }
@@ -6594,6 +6679,8 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     } catch (e) { state.uiScale = defaultUiScale(); }
     applyUiScale(uiScaleValue(), false);
     applySideCollapsed();
+    var authed = await checkAuth();
+    if (!authed) return;
     await loadSprite();
     upgradeIcons();
     hydrateIcons();

@@ -31,7 +31,7 @@
 </script>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="theme-md3.css?v=md3m">
+<link rel="stylesheet" href="theme-md3.css?v=md3n">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -187,10 +187,26 @@
   </div>
 </section>
 
+<section class="ob auth" id="auth" hidden aria-labelledby="auth-title">
+  <div class="ob-card">
+    <div class="ob-brand"><img src="logo.svg" alt=""><span>小满 · 私人空间</span></div>
+    <div class="ob-kicker">需要访问密码</div>
+    <h1 class="ob-title" id="auth-title">进入小满</h1>
+    <p class="ob-sub">这个密码在服务器上设置，只保存在你的设备里。</p>
+    <label class="ob-field">
+      <span>访问密码</span>
+      <input id="auth-pass" type="password" maxlength="128" placeholder="输入访问密码" autocomplete="current-password">
+    </label>
+    <p class="auth-error" id="auth-error" hidden></p>
+    <button type="button" class="ob-go" id="auth-go">进入</button>
+    <p class="ob-fine">密码只发送到你的服务器；登录后 30 天内不用再输。</p>
+  </div>
+</section>
+
 <noscript>小满需要 JavaScript。</noscript>
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor/katex/auto-render.min.js"></script>
 <script src="vendor/cytoscape/cytoscape.min.js"></script>
-<script src="app.js?v=md3m"></script>
+<script src="app.js?v=md3n"></script>
 </body>
 </html>

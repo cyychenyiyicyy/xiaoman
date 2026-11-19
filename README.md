@@ -44,6 +44,7 @@
 | **本周** | 消息、活跃天、连续天数、学科分布 |
 | **首次引导** | 第一次打开先给她起名字，再填你的名字 / 性别 / 年级，然后开始对话 |
 | **首次连接** | APK 不写死服务器；第一次填 IP / 地址，连接成功后自动记住 |
+| **访问密码** | 单用户 scrypt 密码 + HttpOnly 会话；首次连接后输入，30 天内免登录 |
 | **平板阅读** | 聊天流内部滚动；对话侧栏可收起；界面大小 85% / 90% / 100% / 110% 可调 |
 | **即时刷新** | 新建或发送后对话列表立刻出现，不用切筛选 |
 | **试卷分析** | 上传整套试卷照片，生成结构 / 分值 / 知识点分布 / 失分点的分析页，存进资料库 |
@@ -120,7 +121,7 @@ python -m venv .venv
 # macOS / Linux
 # .venv/bin/pip install -r requirements.txt
 
-cp .env.example .env      # 填 DATABASE_URL、PAPERCUT_* 等
+cp .env.example .env      # 填 DATABASE_URL、PAPERCUT_*；公网部署还要设 APP_PASSWORD_HASH
 .venv\Scripts\alembic upgrade head
 .venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8787
 ```

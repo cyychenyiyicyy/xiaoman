@@ -18,6 +18,11 @@ python3 -m venv .venv
 - `DATABASE_URL`（PostgreSQL）
 - `PI_GATEWAY=http://127.0.0.1:8791`
 - `INTERNAL_TOKEN` / `PAPERCUT_*` 等
+- `APP_PASSWORD_HASH`：公网部署必填。生成：
+  ```bash
+  cd server && .venv/bin/python -c "from app.api.auth import make_password_hash; print(make_password_hash('你的密码'))"
+  ```
+  只把输出的 `scrypt$...` 写进 `.env`；密码本身不要入库。
 
 ## 2. PostgreSQL（Docker）
 

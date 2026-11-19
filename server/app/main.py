@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
 from .api import (
+    auth as auth_api,
     capture,
     catalog_api,
     chat,
@@ -66,6 +67,31 @@ async def shell_no_cache(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def auth_guard(request: Request, call_next):
+    """单用户访问密码：只保护 API，静态壳公开（登录页需要加载）。"""
+    if not auth_api.auth_enabled():
+        return await call_next(request)
+    path = request.url.path
+    if not path.startswith("/api"):
+        return await call_next(request)
+    public = {
+        "/api/v1/auth/me",
+        "/api/v1/auth/login",
+        "/api/v1/auth/logout",
+    }
+    if path in public:
+        return await call_next(request)
+    if path.startswith("/api/v1/internal/"):
+        if request.headers.get("x-internal-token") == settings.internal_token:
+            return await call_next(request)
+        return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    if not auth_api.session_valid(request.cookies.get(auth_api.COOKIE)):
+        return JSONResponse({"detail": "未登录"}, status_code=401)
+    return await call_next(request)
+
+
+app.include_router(auth_api.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(catalog_api.router, prefix="/api/v1")

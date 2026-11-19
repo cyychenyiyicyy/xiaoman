@@ -726,3 +726,10 @@ html.md3.ui-scaled .shell{
   block-size:calc(100% / var(--ui-scale,0.9));
   transform:scale(var(--ui-scale,0.9));transform-origin:0 0;
 }
+
+/* 登录：复用 onboarding 卡片，仅补错误行 */
+html.md3 .auth-error{
+  margin:-6px 0 14px;font-size:13px;line-height:20px;color:#ba1a1a;
+}
+html.md3 .auth-error[hidden]{display:none}
+html.md3[data-theme="dark"] .auth-error{color:#ffb4ab}
