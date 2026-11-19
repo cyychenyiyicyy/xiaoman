@@ -755,7 +755,7 @@ html.md3 .sheet--bottom .grab{
   background:var(--line2);margin:10px auto 2px;flex:none;
 }
 html.md3 .sheet--bottom .shd{border-block-end:0;padding:10px 12px 6px 24px;min-block-size:52px}
-html.md3 .sheet--bottom .sheet-body{padding:6px 24px 24px;overflow-y:auto;min-block-size:0}
+html.md3 .sheet--bottom .sheet-body{padding:6px 24px 30px;overflow-y:auto;min-block-size:0}
 html.md3 .sheet--bottom .sheet-foot{border-block-start:0;padding:4px 24px calc(20px + env(safe-area-inset-bottom))}
 
 /* 大内容：side sheet */
