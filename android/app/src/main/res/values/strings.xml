@@ -21,4 +21,28 @@
     <string name="change_server">更换服务器</string>
     <string name="setup_error_format">输入一个 IP 或地址，比如 192.168.1.10</string>
     <string name="setup_error_connect">连不上这个地址，检查服务器是否在运行</string>
+
+    <!-- 拍题相机 -->
+    <string name="camera_title">拍题</string>
+    <string name="camera_close">关闭</string>
+    <string name="camera_flash_on">打开闪光灯</string>
+    <string name="camera_flash_off">关闭闪光灯</string>
+    <string name="camera_switch_camera">切换摄像头</string>
+    <string name="camera_gallery">从相册选择</string>
+    <string name="camera_lens_front">前摄</string>
+    <string name="camera_lens_back">后摄</string>
+    <string name="camera_retake">重拍</string>
+    <string name="camera_use">使用</string>
+    <string name="camera_shutter">拍照</string>
+    <string name="camera_captured">已拍下的照片</string>
+    <string name="camera_permission_title">没有相机权限</string>
+    <string name="camera_permission_body">允许使用相机，才能直接拍题。</string>
+    <string name="camera_permission_settings">去系统设置</string>
+    <string name="camera_error_title">相机打不开</string>
+    <string name="camera_error_body">可以先从相册选一张。</string>
+    <string name="camera_none_title">没有可用的相机</string>
+    <string name="camera_none_body">先从相册选一张。</string>
+    <string name="camera_capture_failed">没有拍下来，再试一次</string>
+    <string name="camera_save_failed">这张照片没能保存，再试一次</string>
+    <string name="camera_unavailable">相机打不开</string>
 </resources>

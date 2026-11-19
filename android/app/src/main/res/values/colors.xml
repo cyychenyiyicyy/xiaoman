@@ -15,4 +15,26 @@
     <color name="error">#BA1A1A</color>
     <color name="progress_track">#EAD5CB</color>
     <color name="icon_background">#FFDBD0</color>
+
+    <!-- 拍题相机：固定深色，不随日/夜切换，所以只在这里定义，values-night 不覆盖。 -->
+    <color name="camera_bg">#120C0A</color>
+    <color name="camera_bg_elevated">#1A110F</color>
+    <color name="camera_clay">#8F4C37</color>
+    <color name="camera_clay_pressed">#A45741</color>
+    <color name="camera_clay_ripple">#33FFFFFF</color>
+    <color name="camera_on_clay">#FFFFFF</color>
+    <color name="camera_text_primary">#F7EFEC</color>
+    <color name="camera_text_secondary">#C9B9B4</color>
+    <color name="camera_button_bg">#33120C0A</color>
+    <color name="camera_line">#33FFFFFF</color>
+    <color name="camera_ring">#E6FFFFFF</color>
+    <color name="camera_ring_active">#FFFFFFFF</color>
+    <color name="camera_frame_line">#B3FFFFFF</color>
+    <color name="camera_ripple">#33FFFFFF</color>
+    <color name="camera_chip_bg">#73120C0A</color>
+    <color name="camera_panel_bg">#1A110F</color>
+    <color name="camera_panel_stroke">#33FFFFFF</color>
+    <color name="camera_scrim_top">#99000000</color>
+    <color name="camera_scrim_bottom">#B3000000</color>
+    <color name="camera_busy_scrim">#66120C0A</color>
 </resources>

@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  拍题相机。层叠顺序（后写的在上）：预览 → 取景框 → 明暗遮罩 → 底部条 →
+  确认页 → 权限/错误面板 → 顶栏 → 忙碌遮罩。
+  顶栏放在后面压住确认页和面板，是为了「关闭」在每一态都能点到。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/camera_bg">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/camera_preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:implementationMode="compatible"
+        app:scaleType="fillCenter" />
+
+    <site.e1e.xiaoman.CaptureFrameView
+        android:id="@+id/camera_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingStart="16dp"
+        android:paddingTop="76dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="120dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="104dp"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_camera_scrim_top" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="176dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_camera_scrim_bottom" />
+
+    <LinearLayout
+        android:id="@+id/camera_bottom"
+        android:layout_width="match_parent"
+        android:layout_height="132dp"
+        android:layout_gravity="bottom"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/camera_gallery"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_camera_icon_button"
+                android:contentDescription="@string/camera_gallery"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_camera_gallery" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/camera_shutter"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_shutter_ring"
+            android:clickable="true"
+            android:contentDescription="@string/camera_shutter"
+            android:focusable="true">
+
+            <View
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_shutter_core"
+                android:duplicateParentState="true" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/camera_lens"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_camera_chip"
+                android:letterSpacing="0.04"
+                android:paddingStart="12dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="5dp"
+                android:text="@string/camera_lens_front"
+                android:textColor="@color/camera_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/camera_confirm"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/camera_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/camera_confirm_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/camera_captured"
+            android:paddingStart="20dp"
+            android:paddingTop="76dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="112dp"
+            android:scaleType="fitCenter" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingStart="20dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="28dp">
+
+            <Button
+                android:id="@+id/camera_retake"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_camera_action_secondary"
+                android:drawableStart="@drawable/ic_camera_retake"
+                android:drawablePadding="8dp"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
+                android:text="@string/camera_retake"
+                android:textAllCaps="false"
+                android:textColor="@color/camera_text_primary"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/camera_use"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_camera_action_primary"
+                android:drawableStart="@drawable/ic_camera_check"
+                android:drawablePadding="8dp"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:minWidth="0dp"
+                android:stateListAnimator="@null"
+                android:text="@string/camera_use"
+                android:textAllCaps="false"
+                android:textColor="@color/camera_on_clay"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/camera_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/camera_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
+        android:paddingTop="76dp"
+        android:paddingBottom="48dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_camera_panel"
+            android:orientation="vertical"
+            android:paddingStart="24dp"
+            android:paddingTop="28dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:id="@+id/camera_panel_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/camera_permission_title"
+                android:textColor="@color/camera_text_primary"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/camera_panel_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="3dp"
+                android:text="@string/camera_permission_body"
+                android:textColor="@color/camera_text_secondary"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/camera_panel_settings"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_camera_action_primary"
+                android:minHeight="48dp"
+                android:stateListAnimator="@null"
+                android:text="@string/camera_permission_settings"
+                android:textAllCaps="false"
+                android:textColor="@color/camera_on_clay"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/camera_panel_gallery"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_camera_action_secondary"
+                android:drawableStart="@drawable/ic_camera_gallery"
+                android:drawablePadding="8dp"
+                android:gravity="center"
+                android:minHeight="48dp"
+                android:stateListAnimator="@null"
+                android:text="@string/camera_gallery"
+                android:textAllCaps="false"
+                android:textColor="@color/camera_text_primary"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/camera_top"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="top">
+
+        <ImageButton
+            android:id="@+id/camera_close"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_camera_icon_button"
+            android:contentDescription="@string/camera_close"
+            android:padding="12dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_camera_close" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:letterSpacing="0.04"
+            android:text="@string/camera_title"
+            android:textColor="@color/camera_text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/camera_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="8dp"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/camera_flash"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_camera_icon_button"
+                android:contentDescription="@string/camera_flash_on"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_camera_flash" />
+
+            <ImageButton
+                android:id="@+id/camera_switch"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_camera_icon_button"
+                android:contentDescription="@string/camera_switch_camera"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_camera_switch" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/camera_busy"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/camera_busy_scrim"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/camera_text_primary" />
+    </FrameLayout>
+
+</FrameLayout>

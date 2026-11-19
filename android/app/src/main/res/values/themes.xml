@@ -10,4 +10,20 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
+
+    <!--
+      拍题相机：固定深色，父主题就是 Material 深色 NoActionBar。
+      只定义在 values/ 下（不带 values-night 变体），日/夜都用这一份，
+      颜色引用 camera_* token，不随主题切换。
+    -->
+    <style name="Theme.Xiaoman.Camera" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/camera_bg</item>
+        <item name="android:colorBackground">@color/camera_bg</item>
+        <item name="android:colorForeground">@color/camera_text_primary</item>
+        <item name="android:colorAccent">@color/camera_clay</item>
+        <item name="android:statusBarColor">@color/camera_bg</item>
+        <item name="android:navigationBarColor">@color/camera_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>

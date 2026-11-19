@@ -15,7 +15,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -40,12 +39,9 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.core.content.FileProvider;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -62,10 +58,9 @@ public class MainActivity extends Activity {
     private static final String TAG = "XiaomanShell";
     private String serverUrl = "";
     private Uri serverUri;
-    private static final String FILE_PROVIDER_AUTHORITY =
-            BuildConfig.APPLICATION_ID + ".fileprovider";
     private static final int REQUEST_FILE_CHOOSER = 1001;
     private static final int REQUEST_WEB_PERMISSIONS = 1002;
+    private static final int REQUEST_CAPTURE = 1003;
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -76,8 +71,6 @@ public class MainActivity extends Activity {
     private boolean hasLoadedOnce;
 
     private ValueCallback<Uri[]> filePathCallback;
-    private Uri cameraOutputUri;
-    private File cameraOutputFile;
     private PermissionRequest pendingPermissionRequest;
 
     @Override
@@ -389,42 +382,41 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CAPTURE) {
+            // 自建相机页：成功就回一张 content://，取消就回 null（让 input 复位）。
+            Uri captured = null;
+            if (resultCode == RESULT_OK && data != null) {
+                captured = data.getData();
+            }
+            ValueCallback<Uri[]> captureCallback = filePathCallback;
+            filePathCallback = null;
+            if (captureCallback != null) {
+                captureCallback.onReceiveValue(captured == null ? null : new Uri[]{captured});
+            }
+            return;
+        }
+
         if (requestCode != REQUEST_FILE_CHOOSER) {
             super.onActivityResult(requestCode, resultCode, data);
             return;
         }
 
         Uri[] results = null;
-        if (resultCode == RESULT_OK) {
-            if (data != null) {
-                ClipData clipData = data.getClipData();
-                if (clipData != null && clipData.getItemCount() > 0) {
-                    List<Uri> uris = new ArrayList<>();
-                    for (int i = 0; i < clipData.getItemCount(); i++) {
-                        Uri uri = clipData.getItemAt(i).getUri();
-                        if (uri != null) {
-                            uris.add(uri);
-                        }
+        if (resultCode == RESULT_OK && data != null) {
+            ClipData clipData = data.getClipData();
+            if (clipData != null && clipData.getItemCount() > 0) {
+                List<Uri> uris = new ArrayList<>();
+                for (int i = 0; i < clipData.getItemCount(); i++) {
+                    Uri uri = clipData.getItemAt(i).getUri();
+                    if (uri != null) {
+                        uris.add(uri);
                     }
-                    if (!uris.isEmpty()) {
-                        results = uris.toArray(new Uri[0]);
-                    }
-                } else if (data.getData() != null) {
-                    results = new Uri[]{data.getData()};
                 }
-            }
-            if (results == null && cameraOutputUri != null) {
-                results = new Uri[]{cameraOutputUri};
-            }
-        }
-
-        boolean usedCamera = false;
-        if (results != null && cameraOutputUri != null) {
-            for (Uri uri : results) {
-                if (cameraOutputUri.equals(uri)) {
-                    usedCamera = true;
-                    break;
+                if (!uris.isEmpty()) {
+                    results = uris.toArray(new Uri[0]);
                 }
+            } else if (data.getData() != null) {
+                results = new Uri[]{data.getData()};
             }
         }
 
@@ -432,13 +424,6 @@ public class MainActivity extends Activity {
         filePathCallback = null;
         if (callback != null) {
             callback.onReceiveValue(results);
-        }
-
-        if (usedCamera) {
-            cameraOutputUri = null;
-            cameraOutputFile = null;
-        } else {
-            cleanupCameraFile();
         }
     }
 
@@ -480,7 +465,6 @@ public class MainActivity extends Activity {
             denyPermission(pendingPermissionRequest);
             pendingPermissionRequest = null;
         }
-        cleanupCameraFile();
 
         if (webView != null) {
             if (webView.getParent() instanceof ViewGroup) {
@@ -496,68 +480,6 @@ public class MainActivity extends Activity {
             webView = null;
         }
         super.onDestroy();
-    }
-
-    private Intent createCameraIntent() {
-        PackageManager packageManager = getPackageManager();
-        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
-            return null;
-        }
-        Uri output = createCameraOutputUri();
-        if (output == null) {
-            return null;
-        }
-
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, output);
-        // 学习机前摄是俯拍机位；这是 OEM 相机常见的非官方前摄提示。
-        intent.putExtra("android.intent.extras.CAMERA_FACING", 1);
-        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-        if (intent.resolveActivity(packageManager) == null) {
-            cleanupCameraFile();
-            return null;
-        }
-        cameraOutputUri = output;
-        return intent;
-    }
-
-    private Uri createCameraOutputUri() {
-        File base = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        if (base == null) {
-            base = getCacheDir();
-        }
-        File directory = new File(base, "captures");
-        if (!directory.exists() && !directory.mkdirs()) {
-            Log.w(TAG, "Cannot create camera output directory");
-            return null;
-        }
-
-        File file = new File(directory, "xiaoman_" + System.currentTimeMillis() + ".jpg");
-        try {
-            if (!file.createNewFile()) {
-                Log.w(TAG, "Cannot create camera output file");
-                return null;
-            }
-            Uri uri = FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, file);
-            cameraOutputFile = file;
-            return uri;
-        } catch (IOException | IllegalArgumentException e) {
-            Log.w(TAG, "Cannot prepare camera output", e);
-            //noinspection ResultOfMethodCallIgnored
-            file.delete();
-            return null;
-        }
-    }
-
-    private void cleanupCameraFile() {
-        if (cameraOutputFile != null) {
-            //noinspection ResultOfMethodCallIgnored
-            cameraOutputFile.delete();
-        }
-        cameraOutputFile = null;
-        cameraOutputUri = null;
     }
 
     private boolean acceptsImages(WebChromeClient.FileChooserParams params) {
@@ -650,13 +572,28 @@ public class MainActivity extends Activity {
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(null);
             }
-            cleanupCameraFile();
             filePathCallback = callback;
 
             if (params == null) {
                 filePathCallback = null;
                 callback.onReceiveValue(null);
                 return true;
+            }
+
+            // <input capture>：拍题走自建相机页（默认前摄，拍完进确认页），不再调系统相机。
+            if (params.isCaptureEnabled() && acceptsImages(params)) {
+                Intent camera = new Intent(MainActivity.this, CameraActivity.class);
+                try {
+                    startActivityForResult(camera, REQUEST_CAPTURE);
+                    return true;
+                } catch (ActivityNotFoundException | SecurityException e) {
+                    Log.w(TAG, "Cannot open the in-app camera", e);
+                    filePathCallback = null;
+                    callback.onReceiveValue(null);
+                    Toast.makeText(MainActivity.this, R.string.camera_unavailable,
+                            Toast.LENGTH_SHORT).show();
+                    return false;
+                }
             }
 
             Intent contentIntent = params.createIntent();
@@ -668,20 +605,12 @@ public class MainActivity extends Activity {
 
             Intent chooser = Intent.createChooser(contentIntent,
                     getString(R.string.file_chooser_title));
-            if (acceptsImages(params)) {
-                Intent captureIntent = createCameraIntent();
-                if (captureIntent != null) {
-                    chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS,
-                            new Intent[]{captureIntent});
-                }
-            }
 
             try {
                 startActivityForResult(chooser, REQUEST_FILE_CHOOSER);
                 return true;
             } catch (ActivityNotFoundException e) {
                 filePathCallback = null;
-                cleanupCameraFile();
                 callback.onReceiveValue(null);
                 Toast.makeText(MainActivity.this, R.string.no_file_picker,
                         Toast.LENGTH_SHORT).show();
