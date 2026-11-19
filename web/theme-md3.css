@@ -428,7 +428,7 @@ html.md3 .previewpane{
 html.md3 .overlay .scrim{background:color-mix(in srgb,var(--ink) 40%,transparent)}
 html.md3 .overlay .sheet{
   position:absolute;inset-block:0;inset-inline-end:0;inset-inline-start:auto;
-  inline-size:min(420px,92vw);max-inline-size:420px;margin:0;border-radius:24px 0 0 24px;
+  inline-size:min(360px,92vw);max-inline-size:360px;margin:0;border-radius:24px 0 0 24px;
   background:var(--card);box-shadow:var(--md-shadow-2);z-index:5;
   display:flex;flex-direction:column;
 }
@@ -761,7 +761,7 @@ html.md3 .sheet--bottom .sheet-foot{border-block-start:0;padding:4px 24px calc(2
 /* 大内容：side sheet */
 html.md3 .sheet--side{
   inset-block:0;inset-inline-end:0;inset-inline-start:auto;margin:0;
-  inline-size:min(420px,92vw);max-inline-size:420px;
+  inline-size:min(360px,92vw);max-inline-size:360px;
   block-size:100%;max-block-size:none;border-radius:24px 0 0 24px;
   animation:md-side-in .22s cubic-bezier(.2,0,0,1) both;
 }
@@ -814,7 +814,7 @@ html.md3 .sheet .caprow .ic{color:var(--ink2)}
 /* 提高优先级，覆盖基础 .overlay .sheet 的底部定位 */
 html.md3 .overlay .sheet.sheet--side{
   inset-block:0;inset-inline-end:0;inset-inline-start:auto;margin:0;
-  inline-size:min(420px,92vw);max-inline-size:420px;
+  inline-size:min(360px,92vw);max-inline-size:360px;
   block-size:100%;max-block-size:none;border-radius:24px 0 0 24px;
   animation:md-side-in .22s cubic-bezier(.2,0,0,1) both;
 }
