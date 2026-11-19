@@ -249,6 +249,7 @@ async def _relay_gateway(
     image_paths: list[str] | None = None,
     question_sources: list[dict] | None = None,
     artifact_context: str = "",
+    history_payload: list[dict] | None = None,
 ) -> AsyncIterator[str]:
     """PI_GATEWAY 开着时：流由 Pi 产出，消息仍落我们的库。"""
     gateway = settings.pi_gateway.rstrip("/")
@@ -294,6 +295,7 @@ async def _relay_gateway(
                     "artifact_id": user_msg.artifact_id or "",
                     "artifact_context": artifact_context,
                     "profile": get_profile(db),
+                    "history": history_payload or [],
                 },
             ) as resp:
                 if resp.status_code >= 400:
@@ -590,6 +592,11 @@ async def chat(payload: ChatIn, db: Session = Depends(get_db)):
                 for qr in question_refs
             ],
             artifact_context=artifact_context,
+            history_payload=[
+                {"role": m.role, "text": (m.content_md or "")[:2000]}
+                for m in history[-20:]
+                if (m.content_md or "").strip()
+            ],
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

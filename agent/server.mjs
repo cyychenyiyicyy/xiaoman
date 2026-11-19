@@ -118,11 +118,11 @@ function readIndex() {
     return {};
   }
 }
-function saveSessionFile(subject, sm) {
+function saveSessionFile(key, sm) {
   const file = sm.getSessionFile();
   if (!file) return;
   const idx = readIndex();
-  idx[subject] = file;
+  idx[key] = file;
   writeFileSync(INDEX, JSON.stringify(idx, null, 2));
 }
 
@@ -575,7 +575,27 @@ async function handleChat(res, body) {
   const convKey = body.conversation_id ? `conv:${body.conversation_id}` : `subj:${subject}`;
   const idx = readIndex();
   const saved = idx[convKey];
-  const sm = saved && existsSync(saved) ? SessionManager.open(saved, SESS_DIR, CWD) : SessionManager.create(CWD, SESS_DIR);
+  const savedExists = saved && existsSync(saved);
+  const sm = savedExists ? SessionManager.open(saved, SESS_DIR, CWD) : SessionManager.create(CWD, SESS_DIR);
+
+  // 首次接手一个旧对话时，用数据库里的历史补一轮上下文。
+  // 修复前 session 索引用 subject 写、用 conversation_id 读，永远读不到；
+  // 这里对老会话做一次自愈，避免「刚才的新闻是什么」被回答成不知道。
+  if (!savedExists && Array.isArray(body.history) && body.history.length) {
+    const lines = [];
+    for (const h of body.history.slice(-20)) {
+      const role = h.role === "assistant" ? "你" : "她";
+      const text = String(h.text || "").replace(/\s+/g, " ").trim().slice(0, 1800);
+      if (text) lines.push(`${role}：${text}`);
+    }
+    if (lines.length) {
+      sm.appendCustomMessageEntry(
+        "history_bootstrap",
+        "【这是本对话之前已经发生的交流，供你接续。不要说你不知道，也不要整段复述。】\n\n" + lines.join("\n\n"),
+        false
+      );
+    }
+  }
 
   res.writeHead(200, {
     "content-type": "text/event-stream; charset=utf-8",
@@ -618,7 +638,7 @@ async function handleChat(res, body) {
   const finish = () => {
     if (finished) return;
     finished = true;
-    saveSessionFile(subject, sm);
+    saveSessionFile(convKey, sm);
     // usage / 成本（Pi 的 message.usage：input/output/cacheRead/cacheWrite/cost）
     let usage = { prompt_tokens: 0, completion_tokens: 0, cache_hit: 0, cache_miss: 0, cost: 0 };
     try {
