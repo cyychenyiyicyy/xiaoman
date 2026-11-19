@@ -4070,8 +4070,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     }
     host.hidden = false;
     var kind = state.overlay.kind;
-    host.innerHTML = kind === 'confirm' ? confirmSheetHtml(state.overlay)
-      : kind === 'model' ? modelDetailSheetHtml(state.overlay)
+    host.innerHTML = kind === 'confirm' ? confirmSheetHtml(state.overlay)      : kind === 'model' ? modelDetailSheetHtml(state.overlay)
         : kind === 'sources' ? sourcesSheetHtml(state.overlay)
       : kind === 'memory' ? memoryEditSheetHtml(state.overlay)
       : kind === 'subjects' ? subjectsSheetHtml(state.overlay)
@@ -4091,6 +4090,14 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
           : kind === 'provider-pick' ? providerPickSheetHtml()
             : kind === 'search-key' ? searchKeySheetHtml()
               : modelSheetHtml();
+    var variant = (kind === 'models' || kind === 'model' || kind === 'qpicker' ||
+      kind === 'qrefs' || kind === 'sources') ? 'side'
+      : kind === 'confirm' ? 'dialog' : 'bottom';
+    var sheet = q('.sheet', host);
+    if (sheet) {
+      sheet.classList.add('sheet--' + variant);
+      sheet.setAttribute('data-variant', variant);
+    }
     typesetMath(host);
   }
 

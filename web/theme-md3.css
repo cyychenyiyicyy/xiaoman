@@ -733,3 +733,106 @@ html.md3 .auth-error{
 }
 html.md3 .auth-error[hidden]{display:none}
 html.md3[data-theme="dark"] .auth-error{color:#ffb4ab}
+
+/* ══════════════════════════════════════════════════════════════════
+   M3 浮层规范（2026-11-19 用户反馈）
+   - 选择/操作类 → Modal bottom sheet（平板居中 640，手机贴底全宽）
+   - 模型/题库/来源等大内容 → side sheet
+   - 确认类 → dialog
+   ══════════════════════════════════════════════════════════════════ */
+html.md3 .overlay .scrim{background:color-mix(in srgb,var(--ink) 32%,transparent)}
+
+html.md3 .overlay .sheet{
+  position:absolute;inset-inline:0;inset-block:auto 0;margin-inline:auto;
+  inline-size:min(640px,calc(100% - 32px));max-inline-size:640px;
+  block-size:auto;max-block-size:min(86vh,760px);
+  border-radius:28px;background:var(--card);box-shadow:var(--md-shadow-2);
+  z-index:5;display:flex;flex-direction:column;overflow:hidden;
+  animation:md-sheet-up .22s cubic-bezier(.2,0,0,1) both;
+}
+html.md3 .sheet--bottom .grab{
+  display:block;inline-size:32px;block-size:4px;border-radius:999px;
+  background:var(--line2);margin:10px auto 2px;flex:none;
+}
+html.md3 .sheet--bottom .shd{border-block-end:0;padding:10px 12px 6px 24px;min-block-size:52px}
+html.md3 .sheet--bottom .sheet-body{padding:6px 24px 24px;overflow-y:auto;min-block-size:0}
+html.md3 .sheet--bottom .sheet-foot{border-block-start:0;padding:4px 24px calc(20px + env(safe-area-inset-bottom))}
+
+/* 大内容：side sheet */
+html.md3 .sheet--side{
+  inset-block:0;inset-inline-end:0;inset-inline-start:auto;margin:0;
+  inline-size:min(420px,92vw);max-inline-size:420px;
+  block-size:100%;max-block-size:none;border-radius:24px 0 0 24px;
+  animation:md-side-in .22s cubic-bezier(.2,0,0,1) both;
+}
+html.md3 .sheet--side .grab{display:none}
+html.md3 .sheet--side .shd{border-block-end:1px solid var(--line);padding:8px 12px 8px 24px}
+
+/* 确认：M3 dialog */
+html.md3 .sheet--dialog{
+  inset:50% auto auto 50%;transform:translate(-50%,-50%);
+  inline-size:min(360px,calc(100% - 32px));max-inline-size:360px;
+  max-block-size:80vh;border-radius:28px;
+  animation:md-dialog-in .18s cubic-bezier(.2,0,0,1) both;
+}
+html.md3 .sheet--dialog .grab{display:none}
+html.md3 .sheet--dialog .shd{border:0;padding:24px 24px 4px;min-block-size:0}
+html.md3 .sheet--dialog .shd .hit{display:none}
+html.md3 .sheet--dialog .shd .ttl{font-size:24px;line-height:32px}
+html.md3 .sheet--dialog .sheet-body{padding:4px 24px 20px;overflow-y:auto}
+html.md3 .sheet--dialog .sheet-foot{border:0;padding:0 16px 10px}
+html.md3 .sheet--dialog .sheet-foot .btnbar.full{justify-content:flex-end;gap:8px}
+html.md3 .sheet--dialog .sheet-foot .btn{inline-size:auto;min-inline-size:88px;padding:0 16px}
+
+/* M3 list rows in sheets：去掉“卡片套卡片”的边框 */
+html.md3 .sheet .caprow{
+  border:0;border-radius:14px;background:transparent;min-block-size:56px;padding:8px 14px;
+}
+html.md3 .sheet .caprow:hover{background:var(--fill)}
+html.md3 .sheet .caprow.on{background:var(--claybg)}
+html.md3 .sheet .caprow .ic{color:var(--ink2)}
+
+@keyframes md-sheet-up{from{transform:translateY(28px);opacity:.5}to{transform:none;opacity:1}}
+@keyframes md-side-in{from{transform:translateX(28px);opacity:.5}to{transform:none;opacity:1}}
+@keyframes md-dialog-in{from{transform:translate(-50%,calc(-50% + 10px)) scale(.98);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+@media (min-width:900px){
+  html.md3 .overlay .sheet.sheet--bottom{inset-block-end:24px;border-radius:28px}
+  html.md3 .sheet--bottom .sheet-foot{padding-block-end:20px}
+}
+@media (max-width:899px){
+  html.md3 .overlay .sheet.sheet--bottom{
+    inset-block-end:0;inline-size:100%;max-inline-size:100%;
+    border-radius:28px 28px 0 0;max-block-size:88vh;
+  }
+  html.md3 .overlay .sheet.sheet--side{
+    inset:0;inline-size:100%;max-inline-size:100%;block-size:100%;
+    border-radius:0;
+  }
+}
+
+/* 提高优先级，覆盖基础 .overlay .sheet 的底部定位 */
+html.md3 .overlay .sheet.sheet--side{
+  inset-block:0;inset-inline-end:0;inset-inline-start:auto;margin:0;
+  inline-size:min(420px,92vw);max-inline-size:420px;
+  block-size:100%;max-block-size:none;border-radius:24px 0 0 24px;
+  animation:md-side-in .22s cubic-bezier(.2,0,0,1) both;
+}
+html.md3 .overlay .sheet.sheet--dialog{
+  inset:50% auto auto 50%;transform:translate(-50%,-50%);
+  inline-size:min(360px,calc(100% - 32px));max-inline-size:360px;
+  max-block-size:80vh;border-radius:28px;
+  animation:md-dialog-in .18s cubic-bezier(.2,0,0,1) both;
+}
+html.md3 .overlay .sheet.sheet--bottom{
+  inset-block:auto 0;inset-inline:0;margin-inline:auto;
+  inline-size:min(640px,calc(100% - 32px));max-inline-size:640px;
+  block-size:auto;max-block-size:min(86vh,760px);border-radius:28px;
+}
+@media (max-width:899px){
+  html.md3 .overlay .sheet.sheet--side{inset:0;inline-size:100%;max-inline-size:100%;block-size:100%;border-radius:0}
+  html.md3 .overlay .sheet.sheet--bottom{inset-block-end:0;inline-size:100%;max-inline-size:100%;border-radius:28px 28px 0 0;max-block-size:88vh}
+}
+@media (min-width:900px){
+  html.md3 .overlay .sheet.sheet--bottom{inset-block-end:24px}
+}
