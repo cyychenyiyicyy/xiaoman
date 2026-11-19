@@ -25,6 +25,8 @@
     theme: 'system',         // system | light | dark（本地偏好，index.html 已先应用）
     profile: null,           // {agent_name,user_name,gender,grade,completed}
     profileLoaded: false,
+    sideCollapsed: false,    // 对话列表是否收起（本地偏好）
+    uiScale: 0.9,            // 界面缩放（0.8–1.15，本地偏好）
     skills: null,            // 技能注册表（GET /skills）
     skill: '',               // 当前选中的技能 id（跟着输入框走）
     preview: null,           // 右侧预览的产物
@@ -972,6 +974,7 @@
       state.messages = [];
       state.overlay = null;
       openPage(null);
+      await loadConversations();
       await loadMessages();
       render();
     } catch (e) {
@@ -2252,6 +2255,9 @@
         if (tuse) tuse.setAttribute('href', '#i-' + iconName);
       }
     }
+    var side = q('#top-side');
+    if (side) side.hidden = state.view !== 'chat';
+    applySideCollapsed();
   }
 
   // rail 只有「对话 / 设置」两格可点（其余仍是占位），按所在空间换 on
@@ -4071,6 +4077,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       : kind === 'qedit' ? qeditSheetHtml()
       : kind === 'bankfilter' ? bankFilterSheetHtml()
       : kind === 'theme' ? themeSheetHtml()
+      : kind === 'scale' ? scaleSheetHtml()
       : kind === 'skills' ? skillSheetHtml()
       : kind === 'herosub' ? heroSubjectsSheetHtml()
       : kind === 'artmenu' ? artMenuSheetHtml()
@@ -4368,6 +4375,79 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       '</div>';
   }
 
+  /* ── 界面缩放（本地偏好）──────────────────────────── */
+  function defaultUiScale() { return window.innerWidth >= 900 ? 0.9 : 1; }
+  function uiScaleValue() {
+    var z = parseFloat(state.uiScale);
+    if (!(z >= 0.8 && z <= 1.15)) z = defaultUiScale();
+    return Math.round(z * 100) / 100;
+  }
+  function uiScaleLabel(z) {
+    z = Math.round((parseFloat(z) || 1) * 100) / 100;
+    if (Math.abs(z - 0.85) < 0.001) return '紧凑 85%';
+    if (Math.abs(z - 0.9) < 0.001) return '推荐 90%';
+    if (Math.abs(z - 1) < 0.001) return '标准 100%';
+    if (Math.abs(z - 1.1) < 0.001) return '宽松 110%';
+    return Math.round(z * 100) + '%';
+  }
+  function applyUiScale(z, persist) {
+    z = Math.round((parseFloat(z) || 1) * 100) / 100;
+    if (!(z >= 0.8 && z <= 1.15)) z = defaultUiScale();
+    var root = document.documentElement;
+    if (Math.abs(z - 1) > 0.001) {
+      root.style.setProperty('--ui-scale', String(z));
+      root.classList.add('ui-scaled');
+    } else {
+      root.classList.remove('ui-scaled');
+      root.style.removeProperty('--ui-scale');
+    }
+    state.uiScale = z;
+    if (persist) {
+      try { localStorage.setItem('xm_ui_scale', String(z)); } catch (e) { /* noop */ }
+    }
+  }
+  function scaleSheetHtml() {
+    var cur = uiScaleValue();
+    var opts = [[0.85, '紧凑 85%'], [0.9, '推荐 90%'], [1, '标准 100%'], [1.1, '宽松 110%']];
+    var rows = opts.map(function (o) {
+      var on = Math.abs(cur - o[0]) < 0.001;
+      return '<button type="button" class="caprow' + (on ? ' on' : '') + '" data-act="scale-pick" data-v="' + o[0] + '">' +
+        '<span>' + o[1] + '</span><span class="sp"></span>' +
+        (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
+    }).join('');
+    return '<div class="scrim" data-act="close-sheet"></div>' +
+      '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sc-ttl" tabindex="-1">' +
+      '<div class="grab"></div>' +
+      '<div class="shd"><div class="ttl" id="sc-ttl">界面大小</div>' +
+      '<button type="button" class="hit" data-act="close-sheet" aria-label="关闭">' + ic('x') + '</button></div>' +
+      '<div class="sheet-body"><div class="capmenu">' + rows + '</div></div>' +
+      '</div>';
+  }
+  function pickUiScale(v) {
+    applyUiScale(parseFloat(v), true);
+    closeOverlay();
+    render();
+  }
+
+  /* ── 对话列表收起 ─────────────────────────────────── */
+  function applySideCollapsed() {
+    document.body.classList.toggle('side-collapsed', !!state.sideCollapsed);
+    var b = q('#top-side');
+    if (!b) return;
+    var collapsed = !!state.sideCollapsed;
+    b.innerHTML = '<span class="ic msym" aria-hidden="true">' + (collapsed ? 'left_panel_open' : 'left_panel_close') + '</span>';
+    b.setAttribute('aria-label', collapsed ? '展开对话列表' : '收起对话列表');
+  }
+  function toggleConvSide() {
+    if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
+      document.body.classList.toggle('side-open');
+      return;
+    }
+    state.sideCollapsed = !state.sideCollapsed;
+    try { localStorage.setItem('xm_side_collapsed', state.sideCollapsed ? '1' : '0'); } catch (e) { /* noop */ }
+    applySideCollapsed();
+  }
+
   function pickTheme(mode) {
     applyTheme(mode, true);
     closeOverlay();
@@ -4383,6 +4463,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         '<span class="lead">' + ic('sun') + '</span>' +
         '<span class="md"><span class="n1">主题</span></span>' +
         '<span class="trail"><span class="val">' + esc(themeLabel(themeMode())) + '</span>' +
+        ic('chevron-right', 'sm chev') + '</span></button>' +
+      '<button type="button" class="srow" data-act="open-scale">' +
+        '<span class="lead">' + ic('format_size') + '</span>' +
+        '<span class="md"><span class="n1">界面大小</span></span>' +
+        '<span class="trail"><span class="val">' + esc(uiScaleLabel(uiScaleValue())) + '</span>' +
         ic('chevron-right', 'sm chev') + '</span></button>');
 
     var p = state.profile || {};
@@ -5681,6 +5766,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         state.convId = nrc.id;
         state.convTitle = (text || '新对话').slice(0, 30);
         state.messages = [];
+        await loadConversations();
       } catch (e) {
         toast('新建对话失败：' + e.message);
         return;
@@ -5696,6 +5782,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     await doSend(text, imgs.map(function (x) { return x.id; }), imgs, qs, qids);
     setTimeout(function () { typesetMath(q('#stream')); }, 60);
     setTimeout(maybeAutoTitle, 400);
+    loadConversations();
   }
 
   async function doSend(text, imageIds, imgs, questions, questionIds) {
@@ -6150,6 +6237,9 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     'rail-week': function () { openWeek(); },
     'week-reload': function () { openWeek(); },
     'open-theme': function () { setOverlay({ kind: 'theme' }); },
+    'open-scale': function () { setOverlay({ kind: 'scale' }); },
+    'scale-pick': function (el) { pickUiScale(el.getAttribute('data-v') || '1'); },
+    'toggle-convside': function () { toggleConvSide(); },
     'open-profile': function () { showOnboarding(true); },
     'open-skill-sheet': function () { openSkillSheet(); },
     'open-hero-subjects': function () { openHeroSubjects(); },
@@ -6496,6 +6586,14 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
   async function boot() {
     applyTheme(themeMode(), false);
+    try {
+      state.sideCollapsed = localStorage.getItem('xm_side_collapsed') === '1';
+      var savedScale = parseFloat(localStorage.getItem('xm_ui_scale'));
+      if (savedScale >= 0.8 && savedScale <= 1.15) state.uiScale = savedScale;
+      else state.uiScale = defaultUiScale();
+    } catch (e) { state.uiScale = defaultUiScale(); }
+    applyUiScale(uiScaleValue(), false);
+    applySideCollapsed();
     await loadSprite();
     upgradeIcons();
     hydrateIcons();

@@ -17,10 +17,21 @@
       r.style.colorScheme = dark ? 'dark' : 'light';
     } catch (e) { /* 无痕模式里 localStorage 会抛，忽略 */ }
   })();
+  /* 界面缩放尽早生效：平板默认 90%，手机默认 100%；用户可在设置里改。 */
+  (function () {
+    try {
+      var z = parseFloat(localStorage.getItem('xm_ui_scale'));
+      if (!(z >= 0.8 && z <= 1.15)) z = window.innerWidth >= 900 ? 0.9 : 1;
+      if (Math.abs(z - 1) > 0.001) {
+        document.documentElement.style.setProperty('--ui-scale', z);
+        document.documentElement.classList.add('ui-scaled');
+      }
+    } catch (e) { /* ignore */ }
+  })();
 </script>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="theme-md3.css?v=md3k">
+<link rel="stylesheet" href="theme-md3.css?v=md3m">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -63,6 +74,7 @@
     <section class="view" id="view-chat">
       <header class="top">
         <button type="button" class="hit back topback" id="top-back" hidden data-act="toggle-side" aria-label="对话列表"><svg class="ic" aria-hidden="true"><use data-i="chevron-left"/></svg></button>
+        <button type="button" class="hit side-toggle" id="top-side" hidden data-act="toggle-convside" aria-label="收起对话列表"><span class="ic msym" aria-hidden="true">left_panel_close</span></button>
         <div class="l1" id="top-brand">小满</div>
         <div class="l2">
           <button type="button" class="subj" id="top-subj" data-act="open-subjects" aria-haspopup="dialog">
@@ -179,6 +191,6 @@
 <script src="vendor/katex/katex.min.js"></script>
 <script src="vendor/katex/auto-render.min.js"></script>
 <script src="vendor/cytoscape/cytoscape.min.js"></script>
-<script src="app.js?v=md3k"></script>
+<script src="app.js?v=md3m"></script>
 </body>
 </html>

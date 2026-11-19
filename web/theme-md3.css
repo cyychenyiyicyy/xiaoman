@@ -681,3 +681,48 @@ html.md3 .ob-fine{margin:14px 0 0;font-size:11px;line-height:16px;color:var(--in
   html.md3 .ob-card{padding:24px;border-radius:24px}
   html.md3 .ob-title{font-size:26px;line-height:34px}
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   2026-11-19 平板反馈：滚动 / 会话行溢出 / 侧栏收起 / 界面缩放
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 1) 聊天页固定视口：body 不随内容变长，滚动只发生在 .stream */
+html.md3,html.md3 body{height:100%;min-height:0}
+html.md3 body{position:fixed;inset:0;overflow:hidden;overscroll-behavior:none}
+html.md3 .shell{
+  height:100%;min-height:0;overflow:hidden;
+}
+html.md3 .pane,html.md3 .view{min-height:0;overflow:hidden}
+html.md3 .stream{
+  min-height:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+}
+
+/* 2) 会话行：flex 子项必须能收缩，标题/预览统一省略号 */
+html.md3 .convrow{min-inline-size:0;overflow:hidden}
+html.md3 .convttl,html.md3 .convprev{
+  display:block;inline-size:100%;max-inline-size:100%;min-inline-size:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+html.md3 .convmeta{min-inline-size:0;overflow:hidden}
+html.md3 .convmeta .convprev{flex:1 1 auto;min-inline-size:0}
+
+/* 3) 对话列表收起（平板/桌面）；手机上仍走抽屉 */
+html.md3 .top .side-toggle{
+  display:grid;place-items:center;inline-size:44px;block-size:44px;flex:none;
+  border:0;border-radius:999px;background:transparent;color:var(--ink2);
+  cursor:pointer;padding:0;
+}
+html.md3 .top .side-toggle .ic{font-size:22px;inline-size:22px;block-size:22px}
+html.md3 .top .side-toggle[hidden]{display:none}
+@media (min-width:901px){
+  html.md3 body.side-collapsed .convside{display:none}
+}
+
+/* 4) 用户界面缩放：缩放 shell 但用反向尺寸填满视口 */
+html.md3.ui-scaled .shell{
+  position:absolute;inset:0;
+  inline-size:calc(100% / var(--ui-scale,0.9));
+  block-size:calc(100% / var(--ui-scale,0.9));
+  transform:scale(var(--ui-scale,0.9));transform-origin:0 0;
+}

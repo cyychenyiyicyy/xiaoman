@@ -55,6 +55,17 @@ async def token_guard(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def shell_no_cache(request: Request, call_next):
+    """壳 HTML 不强缓存：WebView 关闭重开才能拿到新的 version 参数。"""
+    response = await call_next(request)
+    if request.url.path in ("/", "/index.html") and response.headers.get(
+        "content-type", ""
+    ).startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(catalog_api.router, prefix="/api/v1")
