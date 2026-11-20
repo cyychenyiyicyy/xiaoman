@@ -836,3 +836,165 @@ html.md3 .overlay .sheet.sheet--bottom{
 @media (min-width:900px){
   html.md3 .overlay .sheet.sheet--bottom{inset-block-end:24px}
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   2026-11-20 拍题复核 / scrim / 动画
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 旧 WebView 不支持 color-mix：所有关键层给 rgba 兜底 */
+html.md3 .overlay .scrim{background:rgba(16,10,8,.42)}
+html.md3 .qpanel-scrim{background:rgba(16,10,8,.32)}
+html.md3 .scanmask{background:rgba(10,8,7,.26)}
+html.md3 .scanbeam{
+  background:linear-gradient(180deg,transparent,rgba(176,86,58,.45) 45%,rgba(176,86,58,.95) 52%,transparent);
+}
+html.md3 .scanhud{background:rgba(10,8,7,.72);color:#fff}
+
+/* 框选：清晰的圆角框 + 左上角编号，不再依赖 color-mix 才能看见 */
+html.md3 .capbox{
+  border:2px solid rgba(176,86,58,.62);
+  background:rgba(176,86,58,.10);
+  border-radius:12px;padding:0;cursor:pointer;
+  transition:background .14s ease,border-color .14s ease,box-shadow .14s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+html.md3 .capbox:active{background:rgba(176,86,58,.2)}
+html.md3 .capbox.on{
+  border-color:#8f4c37;background:rgba(176,86,58,.24);
+  box-shadow:0 0 0 1px rgba(143,76,55,.35);
+}
+html.md3 .capbox .capn{
+  position:absolute;inset-block-start:-10px;inset-inline-start:-10px;
+  min-inline-size:22px;block-size:22px;padding:0 5px;border-radius:999px;
+  display:grid;place-items:center;background:#8f4c37;color:#fff;
+  font-size:11px;line-height:1;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+html.md3[data-theme="dark"] .capbox{border-color:rgba(255,181,159,.55);background:rgba(255,181,159,.08)}
+html.md3[data-theme="dark"] .capbox.on{border-color:#ffb59f;background:rgba(255,181,159,.18)}
+html.md3[data-theme="dark"] .capbox .capn{background:#ffb59f;color:#561f0e}
+
+html.md3 .capselectbar{display:flex;align-items:center;gap:8px;min-block-size:44px;padding:0 2px 4px}
+html.md3 .capcount{font-size:13px;color:var(--ink2);font-weight:500}
+html.md3 .capsp{flex:1}
+html.md3 .capall{border:0;border-radius:999px;background:transparent;color:var(--clay);font-family:inherit;font-size:13px;font-weight:500;padding:8px 12px;cursor:pointer}
+html.md3 .capall:hover{background:var(--fill)}
+html.md3 .cap-subject{margin-block-start:12px}
+html.md3 .capauto{font-size:11px;color:var(--clay);font-weight:400;margin-inline-start:4px}
+html.md3 .cap-subject .slabel{margin:0 0 6px}
+html.md3 .cap-subject .capsub{padding:0;gap:8px}
+
+/* 复核整页：同样把框画清楚 */
+html.md3 .revimg .rbox{
+  border:2px solid rgba(176,86,58,.62);background:rgba(176,86,58,.08);
+  border-radius:8px;
+}
+html.md3 .revimg .rbox::before{
+  content:attr(data-n);position:absolute;top:-10px;left:-10px;
+  min-inline-size:20px;height:20px;padding:0 4px;border-radius:999px;
+  display:grid;place-items:center;background:#8f4c37;color:#fff;
+  font:600 11px/1 var(--sans);box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+
+/* 侧栏收起：宽度/透明度过渡，不再 display:none 硬切 */
+html.md3 .convside{
+  transition:flex-basis .24s cubic-bezier(.2,0,0,1),inline-size .24s cubic-bezier(.2,0,0,1),
+    opacity .18s ease,transform .24s cubic-bezier(.2,0,0,1),margin-inline-end .24s cubic-bezier(.2,0,0,1);
+}
+@media (min-width:901px){
+  html.md3 body.side-collapsed .convside{
+    display:flex;flex-basis:0;inline-size:0;min-inline-size:0;
+    opacity:0;transform:translateX(-14px);margin-inline-end:-24px;
+    pointer-events:none;overflow:hidden;
+  }
+}
+html.md3 #view-page:not([hidden]){animation:md-view-in .18s cubic-bezier(.2,0,0,1) both}
+@keyframes md-view-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+html.md3 .rail .it.on::before{transition:background .18s ease}
+html.md3 .fchip{transition:background .16s ease,border-color .16s ease,color .16s ease}
+
+@media (prefers-reduced-motion:reduce){
+  html.md3 .overlay .sheet,
+  html.md3 #view-page:not([hidden]),
+  html.md3 .convside{animation:none !important;transition:none !important}
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   2026-11-20 平板排版：设置双列 / 工具栏等宽 / 地图紧凑
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 设置页在平板上用两列，不再一条窄卡片 + 大块空白 */
+@media (min-width:1000px){
+  html.md3 .det.settings-grid{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:24px 32px;align-content:start;align-items:start;
+    inline-size:100%;max-inline-size:1180px;margin-inline:auto;padding:24px 32px 48px;overflow-y:auto;
+  }
+  html.md3 .settings-grid .sgroup{margin-block-end:0;min-inline-size:0}
+  html.md3 .settings-grid .sgroup .slabel{padding-block-end:8px}
+  html.md3 .settings-grid .scard{min-inline-size:0}
+}
+@media (max-width:999px){
+  html.md3 .det.settings-grid{padding:16px 20px 32px}
+}
+
+/* 资料库/题库顶部工具栏：同高、同圆角、按钮等宽 */
+html.md3 .libsearch,html.md3 .bankbar{
+  gap:12px;padding:20px 24px 14px;flex-wrap:wrap;
+}
+html.md3 .libsearch .fi,html.md3 .bankbar .fi{
+  block-size:48px;border-radius:999px;padding-inline:18px;flex:1;min-inline-size:220px;
+}
+html.md3 .libsearch .btn,html.md3 .bankbar .btn{
+  block-size:48px;min-block-size:48px;min-inline-size:96px;padding-inline:20px;border-radius:999px;
+}
+html.md3 .libsearch .btn.p,html.md3 .bankbar .btn.p{min-inline-size:112px}
+html.md3 .libchips,html.md3 .bankchips{padding:0 24px 18px;gap:10px}
+html.md3 .bankwrap{padding:0 24px 32px}
+html.md3 .bankwrap .dhead{margin:10px 0 14px}
+html.md3 .bankgrid{gap:18px}
+html.md3 .qattach{padding:18px}
+
+/* 设置行/分割线再让出呼吸位 */
+html.md3 .srow{padding:12px 18px;min-block-size:62px;gap:14px}
+html.md3 .srow + .srow::before{inset-inline:18px}
+html.md3 .scard{padding-block:2px}
+html.md3 .sgroup{margin-block-end:24px}
+html.md3 .sgroup .slabel{padding:0 4px 10px}
+
+/* 地图：过滤条收紧，画布更大 */
+html.md3 .mapbars{padding:4px 24px 0;gap:8px}
+html.md3 .mapbars .mapchips{
+  flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:10px;padding:0 0 2px;
+}
+html.md3 .mapbars .mapchips::-webkit-scrollbar{display:none}
+html.md3 .maprow{padding:0 24px 10px;gap:12px}
+html.md3 .mapsearch{gap:10px}
+html.md3 .mapsearch .fi{block-size:44px;inline-size:220px;padding-inline:16px}
+html.md3 .mapsearch .btn{block-size:44px;min-block-size:44px;min-inline-size:84px}
+html.md3 .mapwrap{padding:0 24px 24px}
+html.md3 .mapstage{border-radius:20px 0 0 20px}
+html.md3 .mapside{border-radius:0 20px 20px 0}
+html.md3 .maplegend{block-size:32px;padding:0 12px}
+
+/* 空态按钮、危险按钮统一触控高度 */
+html.md3 .empty .btn{min-block-size:48px;height:48px;min-inline-size:112px;border-radius:999px}
+html.md3 .sheet--dialog .sheet-foot .btn{min-block-size:40px;height:40px}
+
+/* 手动补框 */
+html.md3 .scancanvas.drawing{cursor:crosshair}
+html.md3 .capdraw{position:absolute;inset:0;z-index:3;touch-action:none;cursor:crosshair}
+html.md3 .capdrawbox{
+  position:absolute;border:2px dashed #ffb59f;border-radius:10px;
+  background:rgba(255,181,159,.16);pointer-events:none;
+}
+html.md3 .capdrawhint{
+  position:absolute;left:50%;bottom:10px;transform:translateX(-50%);
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  background:rgba(10,8,7,.78);color:#fff;border-radius:999px;padding:6px 12px;
+  font-size:12px;line-height:16px;pointer-events:none;
+}
+html.md3 .capdrawhint .ic{font-size:16px;inline-size:16px;block-size:16px}
+
+/* 顶栏按钮统一长度，避免搜索/错题/试卷参差 */
+html.md3 .libsearch .btn,html.md3 .bankbar .btn{min-inline-size:104px}
+html.md3 .libsearch .btn.p,html.md3 .bankbar .btn.p{min-inline-size:104px}

@@ -9,15 +9,18 @@ import hashlib
 import re as _re
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from PIL import Image, ImageOps
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import get_db
 from ..models import CaptureTask, Kp, Question, QuestionKp
-from ..services import knowledge, solve
+from ..services import knowledge, papercut, solve
 
 router = APIRouter(tags=["questions"])
 
@@ -61,6 +64,7 @@ def _crop_question(page_path: str, bbox: list, out_path) -> str:
 
 class ConfirmIn(BaseModel):
     groups: list = []
+    subject: str | None = None
 
 
 def _out(q: Question, kps: list[dict] | None = None) -> dict:
@@ -117,6 +121,10 @@ def confirm(
         raise HTTPException(409, "这一页已经入库了")
 
     groups = payload.groups or (task.groups_json or {}).get("groups") or []
+    subject = ((payload.subject or task.subject or "全部").strip() or "全部")[:20]
+    if subject != task.subject:
+        task.subject = subject
+        db.commit()
     created: list[str] = []
     skipped = 0
 
@@ -128,7 +136,7 @@ def confirm(
                 continue
             if shared and not stem.startswith(shared):
                 stem = f"{shared}\n\n{stem}"
-            fp = _fp(task.subject, stem)
+            fp = _fp(subject, stem)
             if db.scalar(select(Question.id).where(Question.stem_fp == fp)):
                 skipped += 1
                 continue
@@ -136,7 +144,7 @@ def confirm(
             qid = uuid.uuid4().hex
             row = Question(
                 id=qid,
-                subject=task.subject,
+                subject=subject,
                 stem_md=stem,
                 answer_md=(q.get("answer") or "").strip(),
                 solution_md=(q.get("solution") or "").strip(),
@@ -171,6 +179,89 @@ def confirm(
     if created:
         background.add_task(solve.solve_many, created, True)
     return {"ok": True, "created": len(created), "skipped": skipped, "ids": created, "solving": len(created)}
+
+
+class BoxIn(BaseModel):
+    bbox: list[int] = []
+    subject: str | None = None
+
+
+@router.post("/capture/tasks/{task_id}/box")
+async def manual_box(task_id: str, payload: BoxIn, db: Session = Depends(get_db)):
+    """手动补框：裁出用户圈的区域，再走一次切题，把漏掉的题补进本题页。"""
+    task = db.get(CaptureTask, task_id)
+    if task is None:
+        raise HTTPException(404, "任务不存在")
+    if task.status in ("done", "failed"):
+        raise HTTPException(409, "这一页不能再补框")
+    if not task.page_path or not Path(task.page_path).is_file():
+        raise HTTPException(410, "原图已丢失")
+    bbox = [int(v) for v in (payload.bbox or [])]
+    if len(bbox) != 4:
+        raise HTTPException(400, "bbox 需要 4 个值")
+    x1, y1, x2, y2 = bbox
+    if not (0 <= x1 < x2 <= 1000 and 0 <= y1 < y2 <= 1000):
+        raise HTTPException(400, "bbox 超出页面")
+    if (x2 - x1) < 30 or (y2 - y1) < 20:
+        raise HTTPException(400, "框太小了")
+
+    crop_dir = settings.data_path.parent / "captures"
+    crop_dir.mkdir(parents=True, exist_ok=True)
+    tmp = crop_dir / f"manual_{uuid.uuid4().hex}.jpg"
+    try:
+        with Image.open(task.page_path) as im:
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            w, h = im.size
+            px = (
+                max(0, min(w - 1, round(x1 * w / 1000))),
+                max(0, min(h - 1, round(y1 * h / 1000))),
+                max(1, min(w, round(x2 * w / 1000))),
+                max(1, min(h, round(y2 * h / 1000))),
+            )
+            im.crop(px).save(tmp, "JPEG", quality=92)
+        subject = ((payload.subject or task.subject or "全部").strip() or "全部")[:20]
+        cut = await papercut.cut(tmp, subject, True)
+        questions: list[dict] = []
+        for g in cut.get("groups") or []:
+            for q in g.get("questions") or []:
+                if (q.get("stem") or "").strip():
+                    questions.append(q)
+        if not questions:
+            raise HTTPException(422, "这块没识别出题目，换大一点的框再试")
+        groups = (task.groups_json or {}).get("groups") or []
+        next_no = len(groups) + 1
+        items = []
+        for i, q in enumerate(questions):
+            items.append({
+                **q,
+                "number": str(next_no + i),
+                "bbox": bbox,
+                "source_page": task.page_no,
+            })
+        groups.append({
+            "group_id": f"manual-{uuid.uuid4().hex[:8]}",
+            "section": "手动补框",
+            "shared_stem": "",
+            "shared_pages": [],
+            "questions": items,
+        })
+        warnings = list((task.groups_json or {}).get("warnings") or [])
+        warnings.append("手动补框 1 题")
+        task.groups_json = {"groups": groups, "warnings": warnings, "source": "manual"}
+        task.subject = subject
+        task.question_count = sum(len(g.get("questions") or []) for g in groups)
+        db.commit()
+        return {"ok": True, "groups": groups, "subject": subject, "added": len(items)}
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        raise HTTPException(422, f"补框失败：{str(exc)[:160]}")
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 @router.get("/questions")

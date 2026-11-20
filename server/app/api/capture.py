@@ -14,6 +14,7 @@ from sqlalchemy import select
 from ..models import CaptureTask, LLMProvider
 from ..seed import get_current
 from ..services import ocr, papercut
+from ..services.subject_guess import guess_subject
 
 router = APIRouter(tags=["capture"])
 
@@ -43,10 +44,27 @@ async def run_task(task_id: str, correct: bool = True) -> None:
             # ① 配了阿里云切题就用它：题组是算法切的，比「OCR+模型猜」稳
             if (settings.papercut_auth or "").lower() in ("appcode", "aksk"):
                 cut = await papercut.cut(Path(task.page_path), task.subject, correct)
-                task.blocks_json = {"provider": "papercut", "groups": cut.get("groups")}
+                groups = cut.get("groups") or []
+                guessed = guess_subject(groups, task.subject)
+                # 学科模板会直接影响切题：数学模板切英语听力通常只出几题。
+                # 先按用户当前学科跑，若文字明显是另一科，再用正确模板重跑一次。
+                if guessed and guessed != task.subject:
+                    try:
+                        cut2 = await papercut.cut(Path(task.page_path), guessed, correct)
+                        groups2 = cut2.get("groups") or []
+                        if len(groups2) >= max(1, len(groups)):
+                            cut = cut2
+                            groups = groups2
+                        cut.setdefault("warnings", [])
+                        cut["warnings"].append(f"学科自动识别为{guessed}")
+                    except Exception:  # noqa: BLE001
+                        cut.setdefault("warnings", [])
+                        cut["warnings"].append(f"可能是{guessed}，但自动重切失败")
+                    task.subject = guessed
+                task.blocks_json = {"provider": "papercut", "groups": groups}
                 task.groups_json = cut
-                task.confidence = 0.92 if cut.get("groups") else 0.2
-                task.question_count = sum(len(g.get("questions") or []) for g in cut.get("groups") or [])
+                task.confidence = 0.92 if groups else 0.2
+                task.question_count = sum(len(g.get("questions") or []) for g in groups)
                 task.status = "review"
                 db.commit()
                 return
@@ -63,6 +81,10 @@ async def run_task(task_id: str, correct: bool = True) -> None:
 
             provider, model, _ = get_current(db)
             groups = await ocr.extract_groups(blocks, provider, model)
+            guessed = guess_subject(groups.get("groups") or [], task.subject)
+            if guessed:
+                task.subject = guessed
+                groups.setdefault("warnings", []).append(f"学科自动识别为{guessed}")
             task.groups_json = groups
             task.confidence = ocr.confidence_of(groups)
             task.status = "review"

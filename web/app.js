@@ -530,6 +530,85 @@
     }
   }
 
+  function bindCaptureDraw(host) {
+    var layer = q('.capdraw', host);
+    var canvas = q('.scancanvas', host);
+    var boxEl = q('.capdrawbox', host);
+    if (!layer || !canvas || !boxEl) return;
+    var drawing = false, sx = 0, sy = 0, cur = null;
+
+    function pct(e) {
+      var r = canvas.getBoundingClientRect();
+      return {
+        x: Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width))),
+        y: Math.min(1, Math.max(0, (e.clientY - r.top) / Math.max(1, r.height))),
+        w: r.width, h: r.height
+      };
+    }
+    function paint(a, b) {
+      boxEl.hidden = false;
+      boxEl.style.left = (Math.min(a.x, b.x) * 100) + '%';
+      boxEl.style.top = (Math.min(a.y, b.y) * 100) + '%';
+      boxEl.style.width = (Math.abs(a.x - b.x) * 100) + '%';
+      boxEl.style.height = (Math.abs(a.y - b.y) * 100) + '%';
+    }
+    layer.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      drawing = true;
+      sx = pct(e);
+      cur = sx;
+      try { layer.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      boxEl.hidden = true;
+    });
+    layer.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      e.preventDefault();
+      cur = pct(e);
+      paint(sx, cur);
+    });
+    layer.addEventListener('pointerup', async function (e) {
+      if (!drawing) return;
+      drawing = false;
+      e.preventDefault();
+      var end = pct(e);
+      var bbox = [
+        Math.round(Math.min(sx.x, end.x) * 1000),
+        Math.round(Math.min(sx.y, end.y) * 1000),
+        Math.round(Math.max(sx.x, end.x) * 1000),
+        Math.round(Math.max(sx.y, end.y) * 1000)
+      ];
+      var o = state.overlay;
+      if (!o || o.kind !== 'capture') return;
+      if ((bbox[2] - bbox[0]) < 30 || (bbox[3] - bbox[1]) < 20) {
+        boxEl.hidden = true;
+        toast('框太小了，再圈大一点');
+        return;
+      }
+      boxEl.hidden = true;
+      toast('补框识别中…');
+      try {
+        var res = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '/box', {
+          method: 'POST', json: { bbox: bbox, subject: o.subject || '' }
+        });
+        var full = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '?full=true');
+        o.task = full;
+        o.groups = (full.groups && full.groups.groups) || [];
+        o.subject = full.subject || o.subject;
+        o.selected = {};
+        flatQuestions(o.groups).forEach(function (f, i) { o.selected[i] = true; });
+        o.drawMode = false;
+        renderOverlay();
+        toast('补上了 ' + (res.added || 1) + ' 题');
+      } catch (err) {
+        toast('补框失败：' + err.message);
+      }
+    });
+    layer.addEventListener('pointercancel', function () {
+      drawing = false;
+      boxEl.hidden = true;
+    });
+  }
+
   async function capturePoll(taskId) {
     var o = state.overlay;
     var deadline = Date.now() + 180000;
@@ -547,6 +626,7 @@
       if (t.status === 'review') {
         var full = await api('/capture/tasks/' + encodeURIComponent(taskId) + '?full=true');
         o.task = full;
+        o.subject = full.subject || o.subject;
         o.groups = (full.groups && full.groups.groups) || [];
         o.selected = {};
         flatQuestions(o.groups).forEach(function (f, i) { o.selected[i] = true; });
@@ -594,7 +674,7 @@
       };
     });
     try {
-      var res = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '/confirm', { method: 'POST', json: { groups: groups } });
+      var res = await api('/capture/tasks/' + encodeURIComponent(o.taskId) + '/confirm', { method: 'POST', json: { groups: groups, subject: o.subject || '' } });
       if (o.intent === 'bank') {
         state.overlay = null;
         var made = (res.ids || []).length;
@@ -672,14 +752,30 @@
         if (b.length < 4) return '';
         var on = !!o.selected[i];
         return '<button type="button" class="capbox' + (on ? ' on' : '') + '" data-act="cap-toggle" data-i="' + i + '"' +
+          ' aria-label="第 ' + (i + 1) + ' 题" aria-pressed="' + (on ? 'true' : 'false') + '"' +
           ' style="left:' + (b[0] / 10) + '%;top:' + (b[1] / 10) + '%;width:' + ((b[2] - b[0]) / 10) + '%;height:' + ((b[3] - b[1]) / 10) + '%">' +
-          (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') + '</button>';
+          '<span class="capn">' + (i + 1) + '</span>' +
+          (on ? '<span class="capchk">' + ic('check', 'sm') + '</span>' : '') +
+          '</button>';
       }).join('');
-      body = '<div class="scanwrap"><div class="scancanvas">' +
+      var picked = Object.keys(o.selected).filter(function (k) { return o.selected[k]; }).length;
+      var subjChips = ['全部'].concat(SUBJECTS).map(function (s) {
+        var onS = (o.subject || '全部') === s;
+        return '<span class="fchip' + (onS ? ' on' : '') + '" role="button" tabindex="0" data-act="cap-subject" data-subject="' + esc(s) + '">' + s + '</span>';
+      }).join('');
+      body = '<div class="capselectbar"><span class="capcount">识别到 ' + flat.length + ' 题</span>' +
+        '<span class="capsp"></span>' +
+        '<button type="button" class="capall" data-act="cap-all">' + (picked === flat.length ? '取消全选' : '全选') + '</button>' +
+        '<button type="button" class="capall" data-act="cap-draw">' + (o.drawMode ? '退出补框' : '补框') + '</button></div>' +
+        '<div class="scanwrap"><div class="scancanvas' + (o.drawMode ? ' drawing' : '') + '">' +
         '<img src="' + esc(o.preview || ('/api/v1/capture/page/' + o.taskId)) + '" alt="">' +
         boxes +
+        (o.drawMode ? '<div class="capdraw"><div class="capdrawbox" hidden></div><div class="capdrawhint">' +
+          ic('crop') + '拖动框住漏掉的题</div></div>' : '') +
         '</div></div>' +
-        (flat.length ? '<div class="revhint">点框选题目，再点取消</div>'
+        '<div class="cap-subject"><div class="slabel">学科 <span class="capauto">自动识别</span></div>' +
+        '<div class="bankchips capsub">' + subjChips + '</div></div>' +
+        (flat.length ? '<div class="revhint">点框选择/取消；漏题点「补框」，框不全建议重拍</div>'
                      : '<div class="revhint">没切出题目，换一张试试</div>');
     } else {
       body = '<div class="revhint">解析失败：' + esc(o.error || '不知道原因') + '</div>' +
@@ -4099,6 +4195,10 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       sheet.setAttribute('data-variant', variant);
     }
     typesetMath(host);
+    if (state.overlay && state.overlay.kind === 'capture' &&
+        state.overlay.step === 'select' && state.overlay.drawMode) {
+      bindCaptureDraw(host);
+    }
   }
 
   /* ── 渲染：模型管理 / provider 详情 / 表单 ─────────── */
@@ -4495,11 +4595,11 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         '<span class="trail">' + ic('chevron-right', 'sm chev') + '</span></button>' : ''));
 
     if (state.searchState === 'loading' && !state.search) {
-      return nav + '<div class="det">' + profileGroup + themeGroup +
+      return nav + '<div class="det settings-grid">' + profileGroup + themeGroup +
         '<div class="skel">' + skelRows(4) + '</div></div>';
     }
     if (state.searchState === 'error') {
-      return nav + '<div class="det">' + profileGroup + themeGroup +
+      return nav + '<div class="det settings-grid">' + profileGroup + themeGroup +
         pageErrorState('加载失败', state.searchError, 'reload-settings', 'goto-chat', '返回对话') + '</div>';
     }
 
@@ -4531,7 +4631,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       '<span class="trail"><span class="val mono">' + esc(testVal) + '</span></span></button>';
 
 
-    return nav + '<div class="det">' +
+    return nav + '<div class="det settings-grid">' +
       profileGroup + themeGroup +
       groupHtml('模型', '<button type="button" class="srow" data-act="open-models">' +
         '<span class="lead">' + ic('cpu') + '</span>' +
@@ -4962,18 +5062,18 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     var clay = v('--clay'), claybg = v('--claybg'), clayline = v('--clayline');
     return [
       { selector: 'node[kind="chapter"]', style: {
-        shape: 'round-rectangle', width: 196, height: 38, 'background-color': card,
+        shape: 'round-rectangle', width: 196, height: 40, 'background-color': card,
         'border-width': 1.5, 'border-color': clayline, label: 'data(label)',
         'font-size': 13, 'font-family': v('--sans'), color: clay,
         'text-valign': 'center', 'text-halign': 'center',
         'text-wrap': 'ellipsis', 'text-max-width': '180px', 'min-zoomed-font-size': 0
       } },
       { selector: 'node[kind="point"]', style: {
-        shape: 'ellipse', width: 24, height: 24, 'background-color': v('--fill2'),
+        shape: 'ellipse', width: 28, height: 28, 'background-color': v('--fill2'),
         'border-width': 1.5, 'border-color': v('--outline'), label: 'data(label)',
-        'font-size': 12, 'font-family': v('--sans'), color: ink2,
-        'text-valign': 'bottom', 'text-margin-y': 3,
-        'text-wrap': 'ellipsis', 'text-max-width': '120px', 'min-zoomed-font-size': 7,
+        'font-size': 13, 'font-family': v('--sans'), color: ink2,
+        'text-valign': 'bottom', 'text-margin-y': 4,
+        'text-wrap': 'ellipsis', 'text-max-width': '140px', 'min-zoomed-font-size': 10,
         'text-outline-color': paper, 'text-outline-width': 2
       } },
       { selector: 'node[kind="point"].hasq', style: { 'background-color': claybg, 'border-color': clay } },
@@ -5001,6 +5101,22 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         width: 1, 'line-color': v('--line2'), 'curve-style': 'bezier', 'line-style': 'dotted'
       } }
     ];
+  }
+
+  function mapFit(cy, pad) {
+    if (!cy) return;
+    cy.resize();
+    cy.fit(undefined, pad || 44);
+    var n = cy.nodes().length;
+    var z = cy.zoom();
+    // 小图（一章 20–50 个点）fit 后往往缩得太小；给一个可读下限，用户仍可拖动。
+    if (n > 0 && n <= 60 && isFinite(z) && z < 0.9) {
+      cy.zoom({
+        level: Math.min(1.5, Math.max(0.9, z * 1.8)),
+        renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+      });
+      cy.center();
+    }
   }
 
   function mapRelax(minDist) {
@@ -5070,8 +5186,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
         var a = -Math.PI / 2 + i * 2 * Math.PI / n;
         nd.position({ x: W / 2 + Math.cos(a) * Rx, y: H / 2 + Math.sin(a) * Ry });
       });
-      cy.fit(undefined, 48);
-      cy.resize();
+      mapFit(cy, 48);
     } else {
       layout = cy.layout({
         name: 'cose', animate: false, randomize: true, numIter: 700,
@@ -5080,8 +5195,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
       });
       layout.one('layoutstop', function () {
         mapRelax(112);
-        cy.fit(undefined, 40);
-        cy.resize();
+        mapFit(cy, 40);
         if (m.focus) {
           var want = m.focus;
           m.focus = '';
@@ -5233,7 +5347,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
 
   function mapZoomFit() {
     var cy = state.mapCy;
-    if (cy) cy.fit(undefined, 40);
+    if (cy) mapFit(cy, 40);
   }
 
   async function openMapPoint(id) {
@@ -6335,6 +6449,20 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     },
     'open-picker': function () { state.overlay = null; openQuestionPicker(); },
     'cap-toggle': function (el) { captureToggle(el.getAttribute('data-i')); },
+    'cap-all': function () {
+      var o = state.overlay;
+      if (!o || o.kind !== 'capture') return;
+      var flat = flatQuestions(o.groups);
+      var all = flat.length > 0 && flat.every(function (f, i) { return !!o.selected[i]; });
+      flat.forEach(function (f, i) { o.selected[i] = !all; });
+      renderOverlay();
+    },
+    'cap-draw': function () {
+      var o = state.overlay;
+      if (!o || o.kind !== 'capture') return;
+      o.drawMode = !o.drawMode;
+      renderOverlay();
+    },
     'cap-subject': function (el) {
       var o = state.overlay;
       if (!o || o.kind !== 'capture') return;
@@ -6465,7 +6593,7 @@ var CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '�
     window.addEventListener('resize', function () {
       clearTimeout(mapResizeTimer);
       mapResizeTimer = setTimeout(function () {
-        if (state.mapCy) { state.mapCy.resize(); state.mapCy.fit(undefined, 40); }
+        if (state.mapCy) { mapFit(state.mapCy, 40); }
       }, 180);
     });
 

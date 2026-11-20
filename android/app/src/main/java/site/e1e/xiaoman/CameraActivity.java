@@ -98,7 +98,7 @@ public class CameraActivity extends Activity implements LifecycleOwner {
     private Preview preview;
     private ImageCapture imageCapture;
 
-    private boolean lensFront = true;
+    private boolean lensFront = false;
     private boolean flashOn;
     private boolean hasFront;
     private boolean hasBack;
@@ -131,7 +131,7 @@ public class CameraActivity extends Activity implements LifecycleOwner {
         wireListeners();
 
         if (savedInstanceState != null) {
-            lensFront = savedInstanceState.getBoolean(STATE_LENS_FRONT, true);
+            lensFront = savedInstanceState.getBoolean(STATE_LENS_FRONT, false);
             flashOn = savedInstanceState.getBoolean(STATE_FLASH_ON, false);
         }
         refreshControls();

@@ -47,13 +47,13 @@ jobs:
         run: gradle assembleDebug --no-daemon
 
       - name: Name alpha APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xiaoman-alpha-0.3
-          path: android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.apk
+          name: xiaoman-alpha-0.3.1
+          path: android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -61,15 +61,15 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: 小满 alpha 0.3
+          name: 小满 alpha 0.3.1
           tag_name: ${{ github.ref_name }}
           prerelease: true
-          files: android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.apk
+          files: android/app/build/outputs/apk/debug/xiaoman-alpha-0.3.1.apk
           fail_on_unmatched_files: true
           body: |
-            WebView 壳 + 自建 CameraX 拍题页（前摄默认、拍完确认）。首次打开填写服务器 IP / 地址，登录访问密码；不是离线应用。
+            WebView 壳 + 自建 CameraX 拍题页（后摄默认、可切换前摄、拍完确认）。首次打开填写服务器 IP / 地址，登录访问密码；不是离线应用。
 
             - 包名 site.e1e.xiaoman
             - 平板 / 手机自适应，横竖屏与分屏
-            - 拍题调用前摄，也可从相册选择
+            - 拍题默认后摄，也可切换前摄 / 从相册选择
             - debug 签名，自用测试
