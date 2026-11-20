@@ -12,7 +12,7 @@
 
 小满是一个**单用户、自托管**的学习 agent：对话是入口，题库、知识点地图、FSRS 复习、资料与周报是它自己长出来的结构。数据只在自己的服务器上，没有账号、没有多租户、没有订阅。
 
-当前版本：**alpha 0.3**（Android WebView 壳 + 自建 CameraX 拍题页；APK 不内置服务器地址）。
+当前版本：**alpha 0.3.1**（Android WebView 壳 + 自建 CameraX 拍题页；APK 不内置服务器地址）。
 
 ![小满界面总览](docs/screenshots/overview.png)
 
