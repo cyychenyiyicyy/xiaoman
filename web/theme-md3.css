@@ -923,7 +923,7 @@ html.md3 .fchip{transition:background .16s ease,border-color .16s ease,color .16
    ══════════════════════════════════════════════════════════════════ */
 
 /* 设置页在平板上用两列，不再一条窄卡片 + 大块空白 */
-@media (min-width:1000px){
+@media (min-width:900px){
   html.md3 .det.settings-grid{
     display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
     gap:24px 32px;align-content:start;align-items:start;
@@ -933,7 +933,7 @@ html.md3 .fchip{transition:background .16s ease,border-color .16s ease,color .16
   html.md3 .settings-grid .sgroup .slabel{padding-block-end:8px}
   html.md3 .settings-grid .scard{min-inline-size:0}
 }
-@media (max-width:999px){
+@media (max-width:899px){
   html.md3 .det.settings-grid{padding:16px 20px 32px}
 }
 
